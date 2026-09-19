@@ -316,6 +316,8 @@ export interface EntityConfig {
   taxRatePercent: number;
   transferProfitTo: 'reserves' | 'partners_capital' | 'proprietor_capital';
   yearEndAdjustments?: YearEndAdjustments;
+  partnerCapitalSchedule?: PartnerCapitalRecord[];
+  pyPartnerCapitalSchedule?: PartnerCapitalRecord[];
   partners?: Array<{
     name: string;
     profitSharePercent?: number;
@@ -324,6 +326,15 @@ export interface EntityConfig {
     remuneration?: number;
     interestOnCapital?: number;
     withdrawals?: number;
+    shareOfProfit?: number;
+    closingBalance?: number;
+    pyOpeningBalance?: number;
+    pyCapitalIntroduced?: number;
+    pyRemuneration?: number;
+    pyInterestOnCapital?: number;
+    pyWithdrawals?: number;
+    pyShareOfProfit?: number;
+    pyClosingBalance?: number;
   }>;
 }
 

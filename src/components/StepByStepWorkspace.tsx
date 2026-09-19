@@ -327,6 +327,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           computedFinancials={computedFinancials}
           onProceedToStep2={() => setCurrentStep(2)}
           onSelectNote={handleSelectNote}
+          onUpdateConfig={onUpdateConfig}
         />
       )}
 
@@ -351,6 +352,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onBackToStep1={() => setCurrentStep(1)}
           onProceedToStep3={() => setCurrentStep(3)}
           onSelectNote={handleSelectNote}
+          onUpdateConfig={onUpdateConfig}
         />
       )}
 

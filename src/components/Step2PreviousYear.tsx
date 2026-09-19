@@ -55,10 +55,12 @@ interface Step2PreviousYearProps {
   onBackToStep1: () => void;
   onProceedToStep3: () => void;
   onSelectNote?: (noteNumber: number) => void;
+  onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
 }
 
 export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
   config,
+  onUpdateConfig,
   pyMappedLedgers,
   pyTotalDebit,
   pyTotalCredit,
@@ -486,6 +488,8 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
                 financialYear: pyYearLabel,
                 reportingPeriod: config.previousReportingPeriod || 'March 31, 2024',
               }}
+              onUpdateConfig={onUpdateConfig}
+              profitAndLoss={pyComputedFinancials.profitAndLoss}
             />
           )}
         </div>

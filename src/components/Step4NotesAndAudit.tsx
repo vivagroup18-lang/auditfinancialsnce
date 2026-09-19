@@ -157,6 +157,8 @@ export const Step4NotesAndAudit: React.FC<Step4NotesAndAuditProps> = ({
           config={config}
           selectedNoteNumber={selectedNoteNumber}
           onOpenYearEndAdjustments={onOpenYearEndAdjustments}
+          onUpdateConfig={onUpdateConfig}
+          profitAndLoss={profitAndLoss}
         />
       )}
 

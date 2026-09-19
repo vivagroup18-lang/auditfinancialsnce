@@ -55,10 +55,12 @@ interface Step1CurrentYearProps {
   } | null;
   onProceedToStep2: () => void;
   onSelectNote?: (noteNumber: number) => void;
+  onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
 }
 
 export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
   config,
+  onUpdateConfig,
   mappedLedgers,
   totalDebit,
   totalCredit,
@@ -473,6 +475,8 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
               noteSchedules={computedFinancials.noteSchedules}
               config={config}
               onOpenYearEndAdjustments={onOpenYearEndAdjustments}
+              onUpdateConfig={onUpdateConfig}
+              profitAndLoss={computedFinancials?.profitAndLoss}
             />
           )}
         </div>

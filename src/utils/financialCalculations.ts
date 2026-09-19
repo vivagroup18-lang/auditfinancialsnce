@@ -11,6 +11,17 @@ interface SinglePeriodResult {
 }
 
 /**
+ * Formats a number into Indian Rupee currency format (e.g. 1,23,456.78)
+ */
+export function formatINR(val?: number): string {
+  if (val === undefined || val === null || isNaN(val)) return '0.00';
+  return val.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
  * Helper to identify whether a ledger account is Partners' Remuneration / Salary
  */
 export function isPartnersRemunerationItem(item: { accountName?: string; subCategory?: string }): boolean {
@@ -60,6 +71,22 @@ export function computeOwnersCapitalTable(
   profitAndLoss: Omit<ProfitAndLossData, 'previousYear'>,
   isPY: boolean = false
 ): PartnerCapitalRecord[] {
+  // 1. Priority 1: User explicitly uploaded or configured statutory schedule
+  if (!isPY && config.partnerCapitalSchedule && config.partnerCapitalSchedule.length > 0) {
+    return config.partnerCapitalSchedule.map((r, idx) => ({
+      ...r,
+      srNo: idx + 1,
+      profitShareRatio: r.profitShareRatio || `${r.profitSharePercent}%`,
+    }));
+  }
+  if (isPY && config.pyPartnerCapitalSchedule && config.pyPartnerCapitalSchedule.length > 0) {
+    return config.pyPartnerCapitalSchedule.map((r, idx) => ({
+      ...r,
+      srNo: idx + 1,
+      profitShareRatio: r.profitShareRatio || `${r.profitSharePercent}%`,
+    }));
+  }
+
   const isProprietorship = config.entityType === 'Sole Proprietorship';
   const totalClosing = schedule.totalAmount || 0;
   const pat = profitAndLoss.profitAfterTax || 0;
@@ -77,108 +104,206 @@ export function computeOwnersCapitalTable(
   // Check if configured partners exist
   let partnerConfigs = config.partners && config.partners.length > 0 ? [...config.partners] : [];
 
-  if (partnerConfigs.length === 0) {
-    // Attempt to discover partner names from mapped items in Note 3
-    const partnerNames = new Set<string>();
-    schedule.items.forEach((it) => {
-      const name = it.accountName;
-      if (
-        it.accountCode?.startsWith('VIRT-') ||
-        name.toLowerCase().includes('statutory') ||
-        name.toLowerCase().includes('net profit') ||
-        name.toLowerCase().includes('net loss')
-      ) {
-        return;
-      }
-      const cleaned = name
-        .replace(/(capital\s*a\/c|capital\s*account|current\s*a\/c|current\s*account|drawings\s*a\/c|drawings|partner)/gi, '')
-        .replace(/[-–:_]/g, '')
-        .trim();
-      if (cleaned.length >= 2 && !cleaned.toLowerCase().includes('total') && !cleaned.toLowerCase().includes('surplus')) {
-        partnerNames.add(cleaned);
-      }
+  // 2. Priority 2: Configured partners with individual balances
+  if (partnerConfigs.length > 0) {
+    const records: PartnerCapitalRecord[] = partnerConfigs.map((p, idx) => {
+      const ratio = (p.profitSharePercent || (100 / partnerConfigs.length)) / 100;
+      const pOpening = isPY ? (p.pyOpeningBalance ?? p.openingBalance) : p.openingBalance;
+      const pIntroduced = isPY ? (p.pyCapitalIntroduced ?? p.capitalIntroduced) : p.capitalIntroduced;
+      const pRemun = isPY ? (p.pyRemuneration ?? p.remuneration) : p.remuneration;
+      const pInterest = isPY ? (p.pyInterestOnCapital ?? p.interestOnCapital) : p.interestOnCapital;
+      const pDrawings = isPY ? (p.pyWithdrawals ?? p.withdrawals) : p.withdrawals;
+      const pProfitShare = isPY ? (p.pyShareOfProfit ?? p.shareOfProfit) : p.shareOfProfit;
+      const pExplicitClosing = isPY ? (p.pyClosingBalance ?? p.closingBalance) : p.closingBalance;
+
+      const effectiveOpening = pOpening !== undefined ? pOpening : 0;
+      const effectiveIntroduced = pIntroduced !== undefined ? pIntroduced : 0;
+      const effectiveRemun = pRemun !== undefined ? pRemun : Math.round(remuneration * ratio * 100) / 100;
+      const effectiveInterest = pInterest !== undefined ? pInterest : Math.round(interestOnCapital * ratio * 100) / 100;
+      const effectiveDrawings = pDrawings !== undefined ? pDrawings : 0;
+      const effectiveProfitShare = pProfitShare !== undefined ? pProfitShare : Math.round(pat * ratio * 100) / 100;
+
+      const computedClosing = Math.round(
+        (effectiveOpening + effectiveIntroduced + effectiveRemun + effectiveInterest - effectiveDrawings + effectiveProfitShare) * 100
+      ) / 100;
+
+      const finalClosing = pExplicitClosing !== undefined ? pExplicitClosing : computedClosing;
+
+      return {
+        srNo: idx + 1,
+        partnerName: p.name,
+        profitSharePercent: p.profitSharePercent || Math.round(100 / partnerConfigs.length),
+        profitShareRatio: `${p.profitSharePercent || Math.round(100 / partnerConfigs.length)}%`,
+        openingBalance: effectiveOpening,
+        capitalIntroduced: effectiveIntroduced,
+        remuneration: effectiveRemun,
+        interestOnCapital: effectiveInterest,
+        withdrawals: effectiveDrawings,
+        shareOfProfit: effectiveProfitShare,
+        closingBalance: finalClosing,
+      };
     });
 
-    if (partnerNames.size >= 1 && !isProprietorship) {
-      const arr = Array.from(partnerNames);
-      const equalShare = Math.round((100 / arr.length) * 100) / 100;
-      partnerConfigs = arr.map((name, idx) => ({
-        name: name,
-        profitSharePercent: idx === arr.length - 1 ? Math.round((100 - equalShare * (arr.length - 1)) * 100) / 100 : equalShare,
-      }));
-    } else if (isProprietorship) {
-      partnerConfigs = [
-        {
-          name: config.entityName ? `${config.entityName} (Proprietor)` : 'Proprietor',
-          profitSharePercent: 100,
-        },
-      ];
-    } else {
-      // Default to 2 partners with 50-50 share for Partnership Firm / LLP
-      partnerConfigs = [
-        { name: 'Partner 1', profitSharePercent: 50 },
-        { name: 'Partner 2', profitSharePercent: 50 },
-      ];
-    }
+    return records;
   }
 
-  // Sum up withdrawals from debit items in Note 3
-  let totalDrawings = 0;
-  let totalIntroduced = 0;
+  // 3. Priority 3: Intelligent discovery directly from Note 3 Trial Balance Ledgers
+  // Map individual partner ledger accounts and their actual balances
+  interface DiscoveredPartner {
+    name: string;
+    capitalBal: number;
+    drawingsBal: number;
+    introducedBal: number;
+    hasExplicitLedger: boolean;
+  }
+  const discoveredMap = new Map<string, DiscoveredPartner>();
+
   schedule.items.forEach((it) => {
-    if (it.accountCode?.startsWith('VIRT-')) return;
+    const name = it.accountName;
+    if (
+      it.accountCode?.startsWith('VIRT-') ||
+      name.toLowerCase().includes('statutory') ||
+      name.toLowerCase().includes('net profit') ||
+      name.toLowerCase().includes('net loss') ||
+      name.toLowerCase().includes('total') ||
+      name.toLowerCase().includes('surplus')
+    ) {
+      return;
+    }
+
+    const cleaned = name
+      .replace(/(capital\s*a\/c|capital\s*account|current\s*a\/c|current\s*account|drawings\s*a\/c|drawings|partner)/gi, '')
+      .replace(/[-–:_]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (cleaned.length < 2) return;
+
+    if (!discoveredMap.has(cleaned)) {
+      discoveredMap.set(cleaned, {
+        name: cleaned,
+        capitalBal: 0,
+        drawingsBal: 0,
+        introducedBal: 0,
+        hasExplicitLedger: true,
+      });
+    }
+
+    const partner = discoveredMap.get(cleaned)!;
     const isDebit = ((it.originalDebit || 0) > (it.originalCredit || 0)) || it.accountName.toLowerCase().includes('drawing');
     const bal = Math.abs(it.displayBalance !== undefined ? it.displayBalance : it.netBalance);
+
     if (isDebit) {
-      totalDrawings += bal;
+      partner.drawingsBal += bal;
+    } else if (it.subCategory?.toLowerCase().includes('introduced') || it.accountName.toLowerCase().includes('introduced')) {
+      partner.introducedBal += bal;
     } else {
-      if (it.subCategory?.toLowerCase().includes('introduced') || it.accountName.toLowerCase().includes('introduced')) {
-        totalIntroduced += bal;
-      }
+      partner.capitalBal += bal;
     }
   });
 
-  // Calculate opening balance so the equation holds:
-  // Closing = Opening + Introduced + Remuneration + Interest - Drawings + ProfitShare
-  // => Opening = Closing - Introduced - Remuneration - Interest + Drawings - ProfitShare
-  const totalOpening = totalClosing - totalIntroduced - remuneration - interestOnCapital + totalDrawings - pat;
+  const discoveredPartners = Array.from(discoveredMap.values());
 
-  const records: PartnerCapitalRecord[] = partnerConfigs.map((p, idx) => {
-    const ratio = (p.profitSharePercent || (100 / partnerConfigs.length)) / 100;
+  if (discoveredPartners.length >= 1 && !isProprietorship) {
+    const count = discoveredPartners.length;
+    const equalShare = Math.round((100 / count) * 100) / 100;
 
-    const pRemun = p.remuneration !== undefined ? p.remuneration : Math.round(remuneration * ratio);
-    const pInterest = p.interestOnCapital !== undefined ? p.interestOnCapital : Math.round(interestOnCapital * ratio);
-    const pDrawings = p.withdrawals !== undefined ? p.withdrawals : Math.round(totalDrawings * ratio);
-    const pIntroduced = p.capitalIntroduced !== undefined ? p.capitalIntroduced : Math.round(totalIntroduced * ratio);
-    const pProfitShare = Math.round(pat * ratio * 100) / 100;
-    const pOpening = p.openingBalance !== undefined ? p.openingBalance : Math.round(totalOpening * ratio * 100) / 100;
+    const records: PartnerCapitalRecord[] = discoveredPartners.map((dp, idx) => {
+      const psr = idx === count - 1 ? Math.round((100 - equalShare * (count - 1)) * 100) / 100 : equalShare;
+      const ratio = psr / 100;
+      const pRemun = Math.round(remuneration * ratio * 100) / 100;
+      const pInterest = Math.round(interestOnCapital * ratio * 100) / 100;
+      const pProfit = Math.round(pat * ratio * 100) / 100;
+      const pClosing = Math.round(dp.capitalBal * 100) / 100;
 
-    const pClosing = Math.round((pOpening + pIntroduced + pRemun + pInterest - pDrawings + pProfitShare) * 100) / 100;
+      // Deduce opening balance based on the ledger balance
+      const pOpening = Math.round((pClosing - dp.introducedBal - pRemun - pInterest + dp.drawingsBal - pProfit) * 100) / 100;
 
-    return {
-      srNo: idx + 1,
-      partnerName: p.name,
-      profitSharePercent: p.profitSharePercent || Math.round(100 / partnerConfigs.length),
-      openingBalance: pOpening,
-      capitalIntroduced: pIntroduced,
-      remuneration: pRemun,
-      interestOnCapital: pInterest,
-      withdrawals: pDrawings,
-      shareOfProfit: pProfitShare,
-      closingBalance: pClosing,
-    };
-  });
+      return {
+        srNo: idx + 1,
+        partnerName: dp.name,
+        profitSharePercent: psr,
+        profitShareRatio: `${psr}%`,
+        openingBalance: pOpening >= 0 ? pOpening : pClosing,
+        capitalIntroduced: dp.introducedBal,
+        remuneration: pRemun,
+        interestOnCapital: pInterest,
+        withdrawals: dp.drawingsBal,
+        shareOfProfit: pProfit,
+        closingBalance: pClosing,
+      };
+    });
 
-  // Reconcile rounding discrepancy with totalClosing on the last partner
-  const computedTotalClosing = records.reduce((sum, r) => sum + r.closingBalance, 0);
-  const diff = Math.round((totalClosing - computedTotalClosing) * 100) / 100;
-  if (Math.abs(diff) > 0 && records.length > 0) {
-    const lastRec = records[records.length - 1];
-    lastRec.closingBalance = Math.round((lastRec.closingBalance + diff) * 100) / 100;
-    lastRec.openingBalance = Math.round((lastRec.openingBalance + diff) * 100) / 100;
+    // Verify if sum of closing balances matches totalClosing
+    const sumClose = records.reduce((s, r) => s + r.closingBalance, 0);
+    const variance = Math.round((totalClosing - sumClose) * 100) / 100;
+    if (Math.abs(variance) > 0 && records.length > 0) {
+      const last = records[records.length - 1];
+      last.closingBalance = Math.round((last.closingBalance + variance) * 100) / 100;
+      last.openingBalance = Math.round((last.openingBalance + variance) * 100) / 100;
+    }
+
+    return records;
   }
 
-  return records;
+  // Sole Proprietorship fallback
+  if (isProprietorship) {
+    const propName = config.entityName ? `${config.entityName} (Proprietor)` : 'Proprietor';
+    const pOpening = Math.round((totalClosing - remuneration - interestOnCapital - pat) * 100) / 100;
+    return [
+      {
+        srNo: 1,
+        partnerName: propName,
+        profitSharePercent: 100,
+        profitShareRatio: '100%',
+        openingBalance: pOpening,
+        capitalIntroduced: 0,
+        remuneration: remuneration,
+        interestOnCapital: interestOnCapital,
+        withdrawals: 0,
+        shareOfProfit: pat,
+        closingBalance: totalClosing,
+      },
+    ];
+  }
+
+  // Default fallback for 2 partners
+  const halfShare = 50;
+  const halfRatio = 0.5;
+  const halfClosing = Math.round((totalClosing / 2) * 100) / 100;
+  const halfProfit = Math.round((pat / 2) * 100) / 100;
+  const halfRemun = Math.round((remuneration / 2) * 100) / 100;
+  const halfInterest = Math.round((interestOnCapital / 2) * 100) / 100;
+  const halfOpening = Math.round((halfClosing - halfRemun - halfInterest - halfProfit) * 100) / 100;
+
+  return [
+    {
+      srNo: 1,
+      partnerName: 'Partner 1',
+      profitSharePercent: halfShare,
+      profitShareRatio: '50%',
+      openingBalance: halfOpening,
+      capitalIntroduced: 0,
+      remuneration: halfRemun,
+      interestOnCapital: halfInterest,
+      withdrawals: 0,
+      shareOfProfit: halfProfit,
+      closingBalance: halfClosing,
+    },
+    {
+      srNo: 2,
+      partnerName: 'Partner 2',
+      profitSharePercent: halfShare,
+      profitShareRatio: '50%',
+      openingBalance: totalClosing - halfClosing - halfRemun - halfInterest - (pat - halfProfit),
+      capitalIntroduced: 0,
+      remuneration: remuneration - halfRemun,
+      interestOnCapital: interestOnCapital - halfInterest,
+      withdrawals: 0,
+      shareOfProfit: pat - halfProfit,
+      closingBalance: totalClosing - halfClosing,
+    },
+  ];
 }
 
 /**

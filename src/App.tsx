@@ -589,6 +589,27 @@ export default function App() {
     [activeCompanyId]
   );
 
+  const handleUpdateConfig = useCallback(
+    (up: Partial<EntityConfig>) => {
+      setConfig((prev) => {
+        const next = { ...prev, ...up };
+        if (activeCompanyId) {
+          setCompanies((all) => {
+            const updated = all.map((c) =>
+              c.id === activeCompanyId
+                ? { ...c, config: next, updatedAt: new Date().toISOString() }
+                : c
+            );
+            saveCompaniesToStorage(updated);
+            return updated;
+          });
+        }
+        return next;
+      });
+    },
+    [activeCompanyId]
+  );
+
   // Handler: Delete Company
   const handleDeleteCompany = useCallback(
     (companyId: string) => {
@@ -1708,7 +1729,7 @@ export default function App() {
             allExceptions={allExceptions}
             onExportExcel={handleExportExcel}
             onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
-            onUpdateConfig={(up) => setConfig((prev) => ({ ...prev, ...up }))}
+            onUpdateConfig={handleUpdateConfig}
             onSwitchCompany={() => setDashboardView('companies')}
             initialStep={workspaceStep}
             currentUser={currentUser}

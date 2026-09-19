@@ -1,14 +1,34 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, ChevronDown, ChevronRight, FileText, CheckCircle2, Building, ShieldCheck, DollarSign, Box, Calculator } from 'lucide-react';
-import { NoteScheduleData, EntityConfig } from '../types';
+import {
+  Search,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  CheckCircle2,
+  Building,
+  ShieldCheck,
+  DollarSign,
+  Box,
+  Calculator,
+  Upload,
+  Download,
+  Sliders,
+  AlertTriangle,
+  Users,
+} from 'lucide-react';
+import { NoteScheduleData, EntityConfig, ProfitAndLossData } from '../types';
 import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
-import { isPartnersRemunerationItem } from '../utils/financialCalculations';
+import { isPartnersRemunerationItem, formatINR } from '../utils/financialCalculations';
+import { PartnerCapitalModal } from './PartnerCapitalModal';
+import { downloadPartnerCapitalTemplate } from '../utils/fileParsers';
 
 interface NotesViewProps {
   noteSchedules: Record<number, NoteScheduleData>;
   config: EntityConfig;
   selectedNoteNumber?: number;
   onOpenYearEndAdjustments?: () => void;
+  onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
+  profitAndLoss?: Omit<ProfitAndLossData, 'previousYear'>;
 }
 
 export const NotesView: React.FC<NotesViewProps> = ({
@@ -16,8 +36,11 @@ export const NotesView: React.FC<NotesViewProps> = ({
   config,
   selectedNoteNumber,
   onOpenYearEndAdjustments,
+  onUpdateConfig,
+  profitAndLoss,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'WITH_BALANCE' | 'BALANCE_SHEET' | 'PROFIT_LOSS' | 'POLICIES'>('ALL');
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
 
@@ -323,14 +346,80 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
                       {/* Note 3: Official ICAI 10-Column Partner / Owner Capital Account Table */}
                       {def.noteNumber === 3 && (
-                        <div className="mb-5 space-y-2">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1 border-b border-emerald-100">
-                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                              <span>Note 3 Statutory Schedule: Owners' / Partners' Capital Account Reconciliation (Page 6)</span>
-                            </h4>
-                            <span className="text-[10px] text-slate-500 font-mono">(Amount in Rs.)</span>
+                        <div className="mb-5 space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-emerald-100">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                                Note 3 Statutory Schedule: Owners' / Partners' Capital Account Reconciliation (Page 6)
+                              </h4>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setIsPartnerModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-2xs transition"
+                              >
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>Upload Partner Ledgers / Statement</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIsPartnerModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 font-semibold text-xs rounded-lg shadow-2xs transition"
+                              >
+                                <Sliders className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>Edit Schedule & PSR</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  downloadPartnerCapitalTemplate(
+                                    config.entityName,
+                                    config.partners ||
+                                      (schedule.partnerCapitalTable || []).map((r) => ({
+                                        name: r.partnerName,
+                                        profitSharePercent: r.profitSharePercent,
+                                      }))
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-xs rounded-lg transition"
+                                title="Download pre-formatted Excel template"
+                              >
+                                <Download className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Template</span>
+                              </button>
+                            </div>
                           </div>
+
+                          {/* Variance Alert Banner if schedule closing total != Note 3 total */}
+                          {(() => {
+                            const schedTotal = (schedule.partnerCapitalTable || []).reduce(
+                              (s, r) => s + r.closingBalance,
+                              0
+                            );
+                            const diff = Math.round((totalAmt - schedTotal) * 100) / 100;
+                            if (Math.abs(diff) >= 0.05 && (schedule.partnerCapitalTable || []).length > 0) {
+                              return (
+                                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between text-xs text-amber-900 shadow-2xs">
+                                  <div className="flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <span>
+                                      Partner Schedule Total (₹{formatINR(schedTotal)}) differs from Balance Sheet Note 3 Total (₹{formatINR(totalAmt)}) by ₹{formatINR(Math.abs(diff))}.
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsPartnerModalOpen(true)}
+                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[11px] rounded-md transition shadow-2xs"
+                                  >
+                                    Reconcile Schedule
+                                  </button>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           <div className="overflow-x-auto border border-emerald-300/80 rounded-xl shadow-xs">
                             <table className="w-full text-left text-[11px] border-collapse min-w-[880px]">
                               <thead>
@@ -566,6 +655,16 @@ export const NotesView: React.FC<NotesViewProps> = ({
           );
         })}
       </div>
+
+      {/* Note 3 Statutory Partner Capital Manager Modal */}
+      <PartnerCapitalModal
+        isOpen={isPartnerModalOpen}
+        onClose={() => setIsPartnerModalOpen(false)}
+        config={config}
+        onUpdateConfig={onUpdateConfig || (() => {})}
+        noteSchedule={noteSchedules[3]}
+        profitAndLoss={profitAndLoss}
+      />
     </div>
   );
 };

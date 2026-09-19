@@ -1,5 +1,12 @@
 import * as XLSX from 'xlsx';
-import { TrialBalanceRow, UploadedFinancialLineItem, UploadedStatementDoc, BalanceSheetData, ProfitAndLossData } from '../types';
+import {
+  TrialBalanceRow,
+  UploadedFinancialLineItem,
+  UploadedStatementDoc,
+  BalanceSheetData,
+  ProfitAndLossData,
+  PartnerCapitalRecord,
+} from '../types';
 import { generateAttractiveExcelReport } from './excelExporter';
 
 export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBalanceRow[] {
@@ -894,4 +901,374 @@ export function exportFinancialStatementsToExcel(
     noteSchedules,
     exceptions,
   });
+}
+
+/**
+ * Result of parsing partner ledgers or capital schedule
+ */
+export interface PartnerParseResult {
+  partners: PartnerCapitalRecord[];
+  format: 'schedule' | 'ledger' | 'unknown';
+  detectedSheetCount: number;
+  warnings: string[];
+}
+
+/**
+ * Parses partner capital statements or detailed Tally/Busy ledger account exports
+ * Supports both multi-partner summary schedules and individual partner ledger statements.
+ */
+export function parsePartnerLedgerOrScheduleFile(
+  data: ArrayBuffer | string,
+  fileName: string = ''
+): PartnerParseResult {
+  const workbook = XLSX.read(data, { type: typeof data === 'string' ? 'string' : 'array' });
+  const warnings: string[] = [];
+  const partnersMap = new Map<string, PartnerCapitalRecord>();
+
+  let detectedFormat: 'schedule' | 'ledger' | 'unknown' = 'unknown';
+
+  // Helper to parse numeric cell safely
+  const parseNum = (val: any): number => {
+    if (val === undefined || val === null || val === '') return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    const str = String(val).replace(/[, ₹]/g, '').trim();
+    const isNegative = str.startsWith('(') && str.endsWith(')');
+    const cleaned = str.replace(/[()]/g, '');
+    const num = parseFloat(cleaned);
+    if (isNaN(num)) return 0;
+    return isNegative ? -num : num;
+  };
+
+  // Process all sheets in the uploaded workbook
+  for (const sheetName of workbook.SheetNames) {
+    const worksheet = workbook.Sheets[sheetName];
+    const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    if (!rawRows || rawRows.length === 0) continue;
+
+    // Check if this sheet is a Summary Schedule format
+    let scheduleHeaderIdx = -1;
+    let colName = -1;
+    let colPsr = -1;
+    let colOpening = -1;
+    let colIntroduced = -1;
+    let colRemun = -1;
+    let colInterest = -1;
+    let colDrawings = -1;
+    let colProfit = -1;
+    let colClosing = -1;
+
+    for (let r = 0; r < Math.min(rawRows.length, 25); r++) {
+      const row = rawRows[r].map((cell: any) => String(cell || '').toLowerCase().trim());
+      const hasName = row.some((c) => c.includes('partner') || c.includes('proprietor') || c === 'name' || c.includes('partner name'));
+      const hasOpeningOrClosing = row.some((c) => c.includes('opening') || c.includes('closing') || c.includes('01.04') || c.includes('31.03') || c.includes('capital'));
+
+      if (hasName && hasOpeningOrClosing) {
+        scheduleHeaderIdx = r;
+        row.forEach((cell, cIdx) => {
+          if ((cell.includes('partner') || cell.includes('proprietor') || cell === 'name') && !cell.includes('share') && !cell.includes('remun') && !cell.includes('interest')) {
+            if (colName === -1) colName = cIdx;
+          }
+          if (cell.includes('share') || cell.includes('psr') || cell.includes('ratio') || cell.includes('%') || cell.includes('percent')) {
+            if (colPsr === -1) colPsr = cIdx;
+          }
+          if (cell.includes('opening') || cell.includes('01.04') || cell.includes('1st april') || cell.includes('op bal') || cell.includes('b/f') || cell.includes('op.')) {
+            if (colOpening === -1) colOpening = cIdx;
+          }
+          if (cell.includes('introduced') || cell.includes('addition') || cell.includes('fresh') || cell.includes('contributed') || cell.includes('intro')) {
+            if (colIntroduced === -1) colIntroduced = cIdx;
+          }
+          if (cell.includes('remuneration') || cell.includes('salary') || cell.includes('remun')) {
+            if (colRemun === -1) colRemun = cIdx;
+          }
+          if (cell.includes('interest') || cell.includes('ioc')) {
+            if (colInterest === -1) colInterest = cIdx;
+          }
+          if (cell.includes('drawing') || cell.includes('withdrawal') || cell.includes('drawings')) {
+            if (colDrawings === -1) colDrawings = cIdx;
+          }
+          if (cell.includes('profit') || cell.includes('loss') || cell.includes('share of profit') || cell.includes('pat')) {
+            if (colProfit === -1 && !cell.includes('share (%)') && !cell.includes('ratio')) colProfit = cIdx;
+          }
+          if (cell.includes('closing') || cell.includes('31.03') || cell.includes('31st march') || cell.includes('cl bal') || cell.includes('c/f') || cell.includes('cl.')) {
+            if (colClosing === -1) colClosing = cIdx;
+          }
+        });
+        break;
+      }
+    }
+
+    if (scheduleHeaderIdx !== -1 && colName !== -1) {
+      detectedFormat = 'schedule';
+      for (let r = scheduleHeaderIdx + 1; r < rawRows.length; r++) {
+        const row = rawRows[r];
+        const rawName = String(row[colName] || '').trim();
+        if (!rawName) continue;
+        const lowerName = rawName.toLowerCase();
+        if (
+          lowerName.includes('total') ||
+          lowerName.includes('sub-total') ||
+          lowerName.includes('previous year') ||
+          lowerName.startsWith('note') ||
+          lowerName.startsWith('sr.')
+        ) {
+          continue;
+        }
+
+        const psrVal = colPsr !== -1 ? parseNum(row[colPsr]) : 0;
+        const openingVal = colOpening !== -1 ? parseNum(row[colOpening]) : 0;
+        const introVal = colIntroduced !== -1 ? parseNum(row[colIntroduced]) : 0;
+        const remunVal = colRemun !== -1 ? parseNum(row[colRemun]) : 0;
+        const interestVal = colInterest !== -1 ? parseNum(row[colInterest]) : 0;
+        const drawingsVal = colDrawings !== -1 ? Math.abs(parseNum(row[colDrawings])) : 0;
+        const profitVal = colProfit !== -1 ? parseNum(row[colProfit]) : 0;
+        let closingVal = colClosing !== -1 ? parseNum(row[colClosing]) : 0;
+
+        if (closingVal === 0 && (openingVal !== 0 || profitVal !== 0 || introVal !== 0)) {
+          closingVal = Math.round((openingVal + introVal + remunVal + interestVal - drawingsVal + profitVal) * 100) / 100;
+        }
+
+        const cleanedName = rawName.replace(/^(\d+[\.\s\-]+)/, '').trim();
+
+        partnersMap.set(cleanedName, {
+          srNo: partnersMap.size + 1,
+          partnerName: cleanedName,
+          profitSharePercent: psrVal || (100 / Math.max(1, partnersMap.size + 1)),
+          profitShareRatio: `${psrVal || 0}%`,
+          openingBalance: openingVal,
+          capitalIntroduced: introVal,
+          remuneration: remunVal,
+          interestOnCapital: interestVal,
+          withdrawals: drawingsVal,
+          shareOfProfit: profitVal,
+          closingBalance: closingVal,
+        });
+      }
+      continue;
+    }
+
+    // Check if this sheet is a Ledger Account Statement format (Tally / Busy)
+    let ledgerHeaderIdx = -1;
+    let colParticulars = -1;
+    let colDebit = -1;
+    let colCredit = -1;
+
+    for (let r = 0; r < Math.min(rawRows.length, 25); r++) {
+      const row = rawRows[r].map((cell: any) => String(cell || '').toLowerCase().trim());
+      const partIdx = row.findIndex((c) => c.includes('particular') || c.includes('narration') || c.includes('description') || c === 'account');
+      const drIdx = row.findIndex((c) => c.includes('debit') || c.includes('dr.') || c === 'dr');
+      const crIdx = row.findIndex((c) => c.includes('credit') || c.includes('cr.') || c === 'cr');
+
+      if (partIdx !== -1 && (drIdx !== -1 || crIdx !== -1)) {
+        ledgerHeaderIdx = r;
+        colParticulars = partIdx;
+        colDebit = drIdx;
+        colCredit = crIdx;
+        break;
+      }
+    }
+
+    if (ledgerHeaderIdx !== -1 && colParticulars !== -1) {
+      detectedFormat = 'ledger';
+      // Identify Partner Name from sheet name, file name, or top header lines
+      let partnerName = sheetName;
+      if (partnerName.toLowerCase().startsWith('sheet') || partnerName.toLowerCase().includes('ledger')) {
+        for (let r = 0; r < ledgerHeaderIdx; r++) {
+          const rowText = rawRows[r].map((c) => String(c || '').trim()).join(' ');
+          if (rowText.toLowerCase().includes('ledger:') || rowText.toLowerCase().includes('account:')) {
+            partnerName = rowText.replace(/ledger:|account:/gi, '').trim();
+            break;
+          }
+        }
+      }
+      if (!partnerName || partnerName.toLowerCase().startsWith('sheet')) {
+        partnerName = fileName.replace(/\.(xlsx?|csv)$/i, '').replace(/[-_]/g, ' ').trim();
+      }
+
+      partnerName = partnerName
+        .replace(/(capital\s*a\/c|capital\s*account|current\s*a\/c|current\s*account|drawings\s*a\/c|partner)/gi, '')
+        .replace(/[-–:_]/g, ' ')
+        .trim();
+
+      if (!partnerName) partnerName = `Partner ${partnersMap.size + 1}`;
+
+      let opBal = 0;
+      let intro = 0;
+      let remun = 0;
+      let interest = 0;
+      let draw = 0;
+      let profit = 0;
+      let closeBal = 0;
+
+      for (let r = ledgerHeaderIdx + 1; r < rawRows.length; r++) {
+        const row = rawRows[r];
+        const particulars = String(row[colParticulars] || '').trim().toLowerCase();
+        if (!particulars) continue;
+
+        const dr = colDebit !== -1 ? parseNum(row[colDebit]) : 0;
+        const cr = colCredit !== -1 ? parseNum(row[colCredit]) : 0;
+
+        if (particulars.includes('opening balance') || particulars.includes('op. bal') || particulars.includes('balance b/f') || particulars.includes('b/d')) {
+          opBal = cr > 0 ? cr : -dr;
+        } else if (particulars.includes('salary') || particulars.includes('remuneration')) {
+          remun += cr > 0 ? cr : 0;
+        } else if (particulars.includes('interest on capital') || particulars.includes('interest')) {
+          interest += cr > 0 ? cr : 0;
+        } else if (particulars.includes('cash') || particulars.includes('bank') || particulars.includes('capital introduced') || particulars.includes('addition')) {
+          if (cr > 0) intro += cr;
+        } else if (particulars.includes('drawing') || particulars.includes('withdrawal') || particulars.includes('income tax') || particulars.includes('lic') || particulars.includes('self')) {
+          draw += dr > 0 ? dr : 0;
+        } else if (particulars.includes('profit') || particulars.includes('p&l') || particulars.includes('share of')) {
+          profit += cr > 0 ? cr : -dr;
+        } else if (particulars.includes('closing balance') || particulars.includes('bal c/f') || particulars.includes('c/d')) {
+          closeBal = cr > 0 ? cr : dr;
+        }
+      }
+
+      if (closeBal === 0 && (opBal !== 0 || intro !== 0 || profit !== 0)) {
+        closeBal = Math.round((opBal + intro + remun + interest - draw + profit) * 100) / 100;
+      }
+
+      partnersMap.set(partnerName, {
+        srNo: partnersMap.size + 1,
+        partnerName: partnerName,
+        profitSharePercent: 0, // will recompute equally if 0
+        profitShareRatio: '0%',
+        openingBalance: opBal,
+        capitalIntroduced: intro,
+        remuneration: remun,
+        interestOnCapital: interest,
+        withdrawals: draw,
+        shareOfProfit: profit,
+        closingBalance: closeBal,
+      });
+    }
+  }
+
+  const partners = Array.from(partnersMap.values());
+
+  // If PSR percentages sum to 0 or are empty, distribute equally
+  const totalPsr = partners.reduce((s, p) => s + (p.profitSharePercent || 0), 0);
+  if (totalPsr <= 0 && partners.length > 0) {
+    const eq = Math.round((100 / partners.length) * 100) / 100;
+    partners.forEach((p, idx) => {
+      const psr = idx === partners.length - 1 ? Math.round((100 - eq * (partners.length - 1)) * 100) / 100 : eq;
+      p.profitSharePercent = psr;
+      p.profitShareRatio = `${psr}%`;
+    });
+  }
+
+  if (partners.length === 0) {
+    warnings.push('Could not detect any partner records. Please ensure your file contains partner names, opening balance, and capital movements.');
+  }
+
+  return {
+    partners,
+    format: detectedFormat,
+    detectedSheetCount: workbook.SheetNames.length,
+    warnings,
+  };
+}
+
+/**
+ * Generates and downloads a clean, statutory Excel (.xlsx) template for Note 3 Partner Capital Schedule
+ */
+export function downloadPartnerCapitalTemplate(
+  entityName: string = 'Entity',
+  existingPartners?: Array<{ name: string; profitSharePercent?: number; openingBalance?: number }>
+): void {
+  const wb = XLSX.utils.book_new();
+
+  const headers = [
+    'Sr. No.',
+    'Name of Partner/ Proprietor/ Owner',
+    'Share of Profit (%)',
+    'As at 1st April (Opening Balance)',
+    'Capital Introduced / Contributed',
+    'Remuneration for the year',
+    'Interest for the year',
+    'Withdrawals / Drawings during the year',
+    'Share of Profit / Loss for the year',
+    'As at 31st March (Closing Balance)',
+  ];
+
+  const rows: any[][] = [headers];
+
+  if (existingPartners && existingPartners.length > 0) {
+    existingPartners.forEach((p, idx) => {
+      rows.push([
+        idx + 1,
+        p.name,
+        p.profitSharePercent || Math.round(100 / existingPartners.length),
+        p.openingBalance || 0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        p.openingBalance || 0,
+      ]);
+    });
+  } else {
+    rows.push(
+      [1, 'Partner A', 50, 500000, 0, 120000, 30000, 60000, 150000, 740000],
+      [2, 'Partner B', 50, 500000, 0, 120000, 30000, 60000, 150000, 740000]
+    );
+  }
+
+  // Add Total Row
+  rows.push([
+    '',
+    'TOTAL',
+    100,
+    '=SUM(D2:D' + (rows.length) + ')',
+    '=SUM(E2:E' + (rows.length) + ')',
+    '=SUM(F2:F' + (rows.length) + ')',
+    '=SUM(G2:G' + (rows.length) + ')',
+    '=SUM(H2:H' + (rows.length) + ')',
+    '=SUM(I2:I' + (rows.length) + ')',
+    '=SUM(J2:J' + (rows.length) + ')',
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 8 },  // Sr
+    { wch: 32 }, // Name
+    { wch: 18 }, // Share %
+    { wch: 24 }, // Opening
+    { wch: 24 }, // Introduced
+    { wch: 22 }, // Remun
+    { wch: 20 }, // Interest
+    { wch: 26 }, // Withdrawals
+    { wch: 24 }, // Share of Profit
+    { wch: 24 }, // Closing
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Partner_Capital_Schedule');
+
+  // Instructions Sheet
+  const instructions = [
+    ['ICAI GUIDANCE NOTE ON FINANCIAL STATEMENTS OF NON-CORPORATE ENTITIES'],
+    ['STATUTORY SCHEDULE: OWNERS\' / PARTNERS\' CAPITAL ACCOUNT RECONCILIATION (PAGE 6)'],
+    [''],
+    ['HOW TO USE THIS TEMPLATE:'],
+    ['1. Enter the full legal name of each partner or proprietor in Column B.'],
+    ['2. Enter the agreed Profit Sharing Ratio (PSR %) in Column C (total must equal 100%).'],
+    ['3. Fill in Opening Capital Balance as on 1st April in Column D.'],
+    ['4. Record fresh capital introduced in Column E, partners\' remuneration in Column F, and interest in Column G.'],
+    ['5. Record partner withdrawals or personal drawings in Column H.'],
+    ['6. Enter share of Net Profit or Loss allocated to each partner in Column I.'],
+    ['7. Closing Balance in Column J should satisfy: Opening + Introduced + Remuneration + Interest - Withdrawals + Share of Profit.'],
+    ['8. Save the file and upload it directly in the CA Financial Statement application under Note 3.'],
+    [''],
+    ['NOTE: You can also upload exported ledger statements directly from Tally, Busy, or Excel.'],
+  ];
+
+  const wsInst = XLSX.utils.aoa_to_sheet(instructions);
+  wsInst['!cols'] = [{ wch: 80 }];
+  XLSX.utils.book_append_sheet(wb, wsInst, 'Instructions');
+
+  const cleanName = entityName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  XLSX.writeFile(wb, `${cleanName}_Partner_Capital_Schedule_Template.xlsx`);
 }
