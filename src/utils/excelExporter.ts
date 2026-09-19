@@ -1764,6 +1764,50 @@ export function buildAttractiveExcelWorkbook({
       numCell(profitAndLoss.previousYear?.partnersRemuneration || 0, { isGrandTotal: true }),
     ], 24);
 
+    // Statutory Working Paper: Section 40(b) Maximum Allowable Ceiling (Budget 2024 Revised Limits)
+    if (profitAndLoss.profitBeforePartnersRemunerationAndTax !== undefined) {
+      const bp = profitAndLoss.profitBeforePartnersRemunerationAndTax;
+      const isLoss = bp <= 0;
+      const bpPos = Math.max(0, bp);
+      const firstSlabAllowable = isLoss ? 300000 : Math.max(300000, Math.min(bpPos, 600000) * 0.9);
+      const balanceBP = Math.max(0, bpPos - 600000);
+      const balanceAllowable = balanceBP * 0.6;
+      const maxCap = Math.round((firstSlabAllowable + balanceAllowable) * 100) / 100;
+      const isWithinLimit = profitAndLoss.partnersRemuneration <= maxCap;
+
+      addNotesRow([
+        textCell('', { bg: 'F0FDF4' }),
+        textCell('', { bg: 'F0FDF4' }),
+        textCell("Book Profit before Partners' Remuneration (Line IX)", { bold: true, sz: 9.5, bg: 'F0FDF4', color: '14532D' }),
+        textCell("Book Profit Base", { sz: 9, bg: 'F0FDF4', color: '166534' }),
+        numCell(bp, { bg: 'F0FDF4' }),
+        textCell('-', { align: 'right', bg: 'F0FDF4' }),
+      ], 20);
+
+      addNotesRow([
+        textCell('', { bg: 'F0FDF4' }),
+        textCell('', { bg: 'F0FDF4' }),
+        textCell("Max Permissible Remuneration u/s 40(b) (Budget 2024: First ₹6L @ 90% [min ₹3L] + Bal @ 60%)", { bold: true, sz: 9.5, bg: 'F0FDF4', color: '14532D' }),
+        textCell("Statutory Ceiling", { sz: 9, bg: 'F0FDF4', color: '166534' }),
+        numCell(maxCap, { bg: 'F0FDF4' }),
+        textCell('-', { align: 'right', bg: 'F0FDF4' }),
+      ], 20);
+
+      addNotesRow([
+        textCell('', { bg: isWithinLimit ? 'ECFDF5' : 'FFF1F2' }),
+        textCell('', { bg: isWithinLimit ? 'ECFDF5' : 'FFF1F2' }),
+        textCell(
+          isWithinLimit
+            ? "Status: Fully allowable under Section 40(b) of the Income-tax Act, 1961"
+            : `Status: Remuneration exceeds Section 40(b) limit by ₹${(profitAndLoss.partnersRemuneration - maxCap).toLocaleString('en-IN')}`,
+          { bold: true, sz: 9.5, bg: isWithinLimit ? 'ECFDF5' : 'FFF1F2', color: isWithinLimit ? '065F46' : '9F1239' }
+        ),
+        textCell(isWithinLimit ? "Compliant" : "Excess Disallowed", { sz: 9, bg: isWithinLimit ? 'ECFDF5' : 'FFF1F2', color: isWithinLimit ? '047857' : 'BE123C' }),
+        numCell(profitAndLoss.partnersRemuneration, { bg: isWithinLimit ? 'ECFDF5' : 'FFF1F2' }),
+        textCell('-', { align: 'right', bg: isWithinLimit ? 'ECFDF5' : 'FFF1F2' }),
+      ], 20);
+    }
+
     addNotesRow(new Array(notesColCount).fill(textCell('', { border: {} })), 12);
   }
 

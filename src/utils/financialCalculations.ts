@@ -22,6 +22,84 @@ export function formatINR(val?: number): string {
 }
 
 /**
+ * Result of Section 40(b) allowable remuneration calculation
+ */
+export interface Section40bResult {
+  bookProfit: number;
+  isLoss: boolean;
+  firstSlabLimit: number;
+  firstSlabAllowable: number;
+  balanceBookProfit: number;
+  balanceSlabAllowable: number;
+  maxAllowableRemuneration: number;
+  actualRemuneration: number;
+  isWithinLimit: boolean;
+  excessDisallowed: number;
+  ruleDescription: string;
+}
+
+/**
+ * Computes allowable partners' remuneration under Section 40(b) of the Income-tax Act, 1961.
+ * As amended by the Finance (No. 2) Act, 2024 (Budget 2024) effective AY 2025-26 / FY 2024-25 onwards:
+ * - On the first Rs. 6,00,000 of book profit or in case of a loss: Rs. 3,00,000 or 90% of book profit, whichever is higher
+ * - On the balance of book profit: 60%
+ */
+export function computeSection40bLimit(
+  bookProfit: number,
+  actualRemuneration: number = 0,
+  useBudget2024Limit: boolean = true
+): Section40bResult {
+  const isLoss = bookProfit <= 0;
+  const bp = Math.max(0, bookProfit);
+
+  if (useBudget2024Limit) {
+    const firstSlabBP = Math.min(bp, 600000);
+    const firstSlabAllowable = isLoss ? 300000 : Math.max(300000, firstSlabBP * 0.9);
+    const balanceBP = Math.max(0, bp - 600000);
+    const balanceAllowable = balanceBP * 0.6;
+    const maxAllowable = Math.round((firstSlabAllowable + balanceAllowable) * 100) / 100;
+    const excess = Math.max(0, Math.round((actualRemuneration - maxAllowable) * 100) / 100);
+
+    return {
+      bookProfit,
+      isLoss,
+      firstSlabLimit: 600000,
+      firstSlabAllowable: Math.round(firstSlabAllowable * 100) / 100,
+      balanceBookProfit: Math.round(balanceBP * 100) / 100,
+      balanceSlabAllowable: Math.round(balanceAllowable * 100) / 100,
+      maxAllowableRemuneration: maxAllowable,
+      actualRemuneration,
+      isWithinLimit: actualRemuneration <= maxAllowable,
+      excessDisallowed: excess,
+      ruleDescription:
+        'Budget 2024 Revised Slabs: First ₹6,00,000 of Book Profit (or Loss) - ₹3,00,000 or 90% whichever is higher; Balance @ 60%',
+    };
+  } else {
+    const firstSlabBP = Math.min(bp, 300000);
+    const firstSlabAllowable = isLoss ? 150000 : Math.max(150000, firstSlabBP * 0.9);
+    const balanceBP = Math.max(0, bp - 300000);
+    const balanceAllowable = balanceBP * 0.6;
+    const maxAllowable = Math.round((firstSlabAllowable + balanceAllowable) * 100) / 100;
+    const excess = Math.max(0, Math.round((actualRemuneration - maxAllowable) * 100) / 100);
+
+    return {
+      bookProfit,
+      isLoss,
+      firstSlabLimit: 300000,
+      firstSlabAllowable: Math.round(firstSlabAllowable * 100) / 100,
+      balanceBookProfit: Math.round(balanceBP * 100) / 100,
+      balanceSlabAllowable: Math.round(balanceAllowable * 100) / 100,
+      maxAllowableRemuneration: maxAllowable,
+      actualRemuneration,
+      isWithinLimit: actualRemuneration <= maxAllowable,
+      excessDisallowed: excess,
+      ruleDescription:
+        'Pre-Budget 2024 Slabs: First ₹3,00,000 of Book Profit (or Loss) - ₹1,50,000 or 90% whichever is higher; Balance @ 60%',
+    };
+  }
+}
+
+/**
  * Helper to identify whether a ledger account is Partners' Remuneration / Salary
  */
 export function isPartnersRemunerationItem(item: { accountName?: string; subCategory?: string }): boolean {

@@ -282,7 +282,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
                 </span>
               </div>
               <p className="text-slate-600 leading-relaxed">
-                Interest to partners restricted to max 12% per annum. Partners' remuneration allowed up to ₹3,00,000 or 90% of book profit on first ₹3 lakhs of book profit, and 60% on the balance.
+                Interest to partners restricted to max 12% per annum. Partners' remuneration allowed up to ₹3,00,000 or 90% of book profit on the first ₹6,00,000 of book profit (or in case of a loss), and 60% on the balance of book profit (as enhanced by the Budget 2024 amendment to Section 40(b)).
               </p>
               <div className="mt-2 text-[11px] text-slate-700 font-medium">
                 Book profit before partners' remuneration is tracked via Note 24 and Note 3 to verify whether deed clauses and Section 40(b) thresholds are met.

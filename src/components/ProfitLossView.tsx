@@ -1,6 +1,7 @@
 import React from 'react';
 import { ExternalLink, TrendingUp, TrendingDown, Printer, ShieldCheck, Mail } from 'lucide-react';
 import { ProfitAndLossData, EntityConfig } from '../types';
+import { computeSection40bLimit } from '../utils/financialCalculations';
 
 interface ProfitLossViewProps {
   profitAndLoss: ProfitAndLossData;
@@ -603,47 +604,80 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
           </div>
         )}
 
-        {/* Section 40(b) Maximum Allowable Deduction Calculator */}
+        {/* Section 40(b) Maximum Allowable Deduction Calculator (Budget 2024 Revised Limits) */}
         {profitAndLoss.profitBeforePartnersRemunerationAndTax !== undefined && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1 text-xs">
-            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Book Profit (Line IX)</span>
-              <span className="font-mono font-bold text-slate-900 text-sm">
-                {formatINR(profitAndLoss.profitBeforePartnersRemunerationAndTax)}
-              </span>
-            </div>
+          <div className="space-y-2.5 pt-1 text-xs">
+            {(() => {
+              const sec40b = computeSection40bLimit(
+                profitAndLoss.profitBeforePartnersRemunerationAndTax || 0,
+                profitAndLoss.partnersRemuneration || 0,
+                true // Budget 2024 enhanced limits
+              );
 
-            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Sec 40(b) Allowable Cap</span>
-              {(() => {
-                const bp = Math.max(0, profitAndLoss.profitBeforePartnersRemunerationAndTax);
-                const cap = bp <= 300000 
-                  ? Math.max(150000, bp * 0.9) 
-                  : Math.max(150000, 300000 * 0.9) + (bp - 300000) * 0.6;
-                return (
-                  <span className="font-mono font-bold text-emerald-800 text-sm">
-                    {formatINR(cap)}
-                  </span>
-                );
-              })()}
-            </div>
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Book Profit (Line IX)</span>
+                      <span className="font-mono font-bold text-slate-900 text-sm">
+                        {formatINR(sec40b.bookProfit)}
+                      </span>
+                    </div>
 
-            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Compliance Status</span>
-              {(() => {
-                const bp = Math.max(0, profitAndLoss.profitBeforePartnersRemunerationAndTax);
-                const cap = bp <= 300000 
-                  ? Math.max(150000, bp * 0.9) 
-                  : Math.max(150000, 300000 * 0.9) + (bp - 300000) * 0.6;
-                const actual = profitAndLoss.partnersRemuneration;
-                const isWithinLimit = actual <= cap;
-                return (
-                  <span className={`font-bold text-xs ${isWithinLimit ? 'text-emerald-700' : 'text-rose-700'}`}>
-                    {actual === 0 ? 'No remuneration charged' : (isWithinLimit ? '✓ Fully allowable under Sec 40(b)' : '⚠ Remuneration exceeds Sec 40(b) limits')}
-                  </span>
-                );
-              })()}
-            </div>
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-slate-500 block">Sec 40(b) Allowable Cap</span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded font-mono">
+                          Budget 2024
+                        </span>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-800 text-sm">
+                        {formatINR(sec40b.maxAllowableRemuneration)}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Actual Remuneration (Line X)</span>
+                      <span className="font-mono font-bold text-slate-900 text-sm">
+                        {formatINR(sec40b.actualRemuneration)}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Compliance Status</span>
+                      <span className={`font-bold text-xs ${sec40b.actualRemuneration === 0 ? 'text-slate-600' : (sec40b.isWithinLimit ? 'text-emerald-700' : 'text-rose-700')}`}>
+                        {sec40b.actualRemuneration === 0
+                          ? 'No remuneration charged'
+                          : sec40b.isWithinLimit
+                          ? '✓ Fully allowable under Sec 40(b)'
+                          : `⚠ Exceeds limit by ${formatINR(sec40b.excessDisallowed)}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Statutory Computation Breakdown as per Budget 2024 */}
+                  <div className="p-3 bg-emerald-100/40 rounded-xl border border-emerald-200/80 text-[11px] text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>Sec 40(b) Allowable Slabs (As amended by Finance (No. 2) Act, 2024):</span>
+                      </div>
+                      <div className="text-emerald-900 font-mono text-[10px]">
+                        • First ₹6,00,000 of book profit (or in case of loss): Higher of ₹3,00,000 or 90% = {formatINR(sec40b.firstSlabAllowable)}
+                        {sec40b.balanceBookProfit > 0 && (
+                          <span> • Balance ₹{formatINR(sec40b.balanceBookProfit)} @ 60% = {formatINR(sec40b.balanceSlabAllowable)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] text-slate-600 block">Max Permissible Deduction:</span>
+                      <span className="font-mono font-black text-emerald-950 text-xs">
+                        {formatINR(sec40b.maxAllowableRemuneration)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
