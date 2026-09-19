@@ -321,6 +321,79 @@ export const NotesView: React.FC<NotesViewProps> = ({
                         </div>
                       )}
 
+                      {/* Note 3: Official ICAI 10-Column Partner / Owner Capital Account Table */}
+                      {def.noteNumber === 3 && (
+                        <div className="mb-5 space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1 border-b border-emerald-100">
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                              <span>Note 3 Statutory Schedule: Owners' / Partners' Capital Account Reconciliation (Page 6)</span>
+                            </h4>
+                            <span className="text-[10px] text-slate-500 font-mono">(Amount in Rs.)</span>
+                          </div>
+                          <div className="overflow-x-auto border border-emerald-300/80 rounded-xl shadow-xs">
+                            <table className="w-full text-left text-[11px] border-collapse min-w-[880px]">
+                              <thead>
+                                <tr className="bg-emerald-900 text-white font-semibold">
+                                  <th className="py-2.5 px-2 text-center w-12">Sr. No.</th>
+                                  <th className="py-2.5 px-3">Name of Partner/ Proprietor/ Owner</th>
+                                  <th className="py-2.5 px-2 text-center w-16">Share (%)</th>
+                                  <th className="py-2.5 px-3 text-right">As at 1st April (Opening)</th>
+                                  <th className="py-2.5 px-3 text-right">Capital Introduced</th>
+                                  <th className="py-2.5 px-3 text-right">Remuneration</th>
+                                  <th className="py-2.5 px-3 text-right">Interest</th>
+                                  <th className="py-2.5 px-3 text-right">Withdrawals</th>
+                                  <th className="py-2.5 px-3 text-right">Share of Profit/Loss</th>
+                                  <th className="py-2.5 px-3 text-right font-bold text-emerald-200 bg-emerald-950">As at 31st March (Closing)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-emerald-100 bg-emerald-50/20 text-slate-800">
+                                {(schedule.partnerCapitalTable || []).map((row) => (
+                                  <tr key={row.srNo} className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-2 text-center font-mono text-slate-500">{row.srNo}</td>
+                                    <td className="py-2 px-3 font-semibold text-slate-900">{row.partnerName}</td>
+                                    <td className="py-2 px-2 text-center font-mono">{row.profitSharePercent}%</td>
+                                    <td className="py-2 px-3 text-right font-mono">{formatINR(row.openingBalance)}</td>
+                                    <td className="py-2 px-3 text-right font-mono">{row.capitalIntroduced ? formatINR(row.capitalIntroduced) : '-'}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-emerald-900 font-semibold">{row.remuneration ? formatINR(row.remuneration) : '-'}</td>
+                                    <td className="py-2 px-3 text-right font-mono">{row.interestOnCapital ? formatINR(row.interestOnCapital) : '-'}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-rose-700">{row.withdrawals ? `(${formatINR(row.withdrawals)})` : '-'}</td>
+                                    <td className={`py-2 px-3 text-right font-mono font-semibold ${row.shareOfProfit >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
+                                      {formatINR(row.shareOfProfit)}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-950 bg-emerald-100/60">{formatINR(row.closingBalance)}</td>
+                                  </tr>
+                                ))}
+                                {/* Current Year Total Row */}
+                                <tr className="bg-emerald-100/90 font-bold text-emerald-950 border-t-2 border-emerald-300 text-xs">
+                                  <td colSpan={2} className="py-2 px-3 text-right uppercase tracking-wider">Total (CY)</td>
+                                  <td className="py-2 px-2 text-center font-mono">100%</td>
+                                  <td className="py-2 px-3 text-right font-mono">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.openingBalance, 0))}</td>
+                                  <td className="py-2 px-3 text-right font-mono">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.capitalIntroduced, 0))}</td>
+                                  <td className="py-2 px-3 text-right font-mono">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.remuneration, 0))}</td>
+                                  <td className="py-2 px-3 text-right font-mono">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.interestOnCapital, 0))}</td>
+                                  <td className="py-2 px-3 text-right font-mono text-rose-800">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.withdrawals, 0))}</td>
+                                  <td className="py-2 px-3 text-right font-mono">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.shareOfProfit, 0))}</td>
+                                  <td className="py-2 px-3 text-right font-mono font-black text-emerald-950 bg-emerald-200">{formatINR(totalAmt)}</td>
+                                </tr>
+                                {/* Previous Year (PY) Row */}
+                                <tr className="bg-slate-100 font-semibold text-slate-700 border-t border-slate-300 text-[10px]">
+                                  <td colSpan={2} className="py-1.5 px-3 uppercase text-slate-600">Previous Year (PY)</td>
+                                  <td className="py-1.5 px-2 text-center font-mono">100%</td>
+                                  <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.openingBalance, 0))}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.capitalIntroduced, 0))}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.remuneration, 0))}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.interestOnCapital, 0))}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.withdrawals, 0))}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.shareOfProfit, 0))}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 bg-slate-200">{formatINR(schedule.previousYearAmount || 0)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
                       {!hasItems ? (
                         <div className="p-4 rounded-lg bg-slate-50 text-center text-xs text-slate-500 border border-dashed border-slate-200 flex flex-col items-center justify-center gap-3">
                           <p>Nil balance / No ledger accounts mapped to Note {def.noteNumber} in the current or comparative period.</p>
@@ -410,6 +483,79 @@ export const NotesView: React.FC<NotesViewProps> = ({
                               <li key={idx}>{disc}</li>
                             ))}
                           </ul>
+                        </div>
+                      )}
+
+                      {/* Note 5: Statutory Borrowings Footnotes (Page 7) */}
+                      {def.noteNumber === 5 && (
+                        <div className="mt-3 p-3 bg-amber-50/70 border border-amber-200 rounded-lg text-xs text-amber-950 space-y-1">
+                          <span className="font-bold block">Statutory ICAI Disclosure Footnotes (Page 7):</span>
+                          <p>(i) Nature of the Security to be specified separately for each secured borrowing.</p>
+                          <p>(ii) Terms of repayment of term loans and other loans shall be stated.</p>
+                          <p>(iii) Where loans guaranteed by partners/proprietors/owners aggregate of such amount under each head shall be disclosed.</p>
+                        </div>
+                      )}
+
+                      {/* Note 9: Statutory MSMED Act Interest & Delayed Payments Disclosure (Page 9 & 10) */}
+                      {def.noteNumber === 9 && (
+                        <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                            <h4 className="font-bold text-slate-900 uppercase tracking-wide">
+                              Disclosure relating to suppliers registered under MSMED Act (Based on info available with entity)
+                            </h4>
+                            <span className="text-[10px] text-slate-500 font-mono">(Amount in Rs.)</span>
+                          </div>
+                          <table className="w-full text-left text-[11px] border-collapse">
+                            <thead>
+                              <tr className="bg-slate-200/80 text-slate-800 font-bold">
+                                <th className="py-2 px-3">Particulars</th>
+                                <th className="py-2 px-3 w-36 text-right">CY ({config.reportingPeriod || '31 March 2026'})</th>
+                                <th className="py-2 px-3 w-36 text-right">PY ({config.previousReportingPeriod || '31 March 2025'})</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 text-slate-700">
+                              <tr>
+                                <td className="py-2 px-3 font-medium">
+                                  (a) Amount remaining unpaid to any supplier at the end of each accounting year:
+                                  <div className="pl-4 text-slate-500 text-[10px] space-y-0.5 mt-0.5">
+                                    <div>- Principal amount: ₹0.00</div>
+                                    <div>- Interest due thereon: ₹0.00</div>
+                                    <div className="font-semibold text-slate-700">- Total: ₹0.00</div>
+                                  </div>
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono font-medium align-top pt-2.5">-</td>
+                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 font-medium">
+                                  (b) The amount of interest paid by the buyer in terms of section 16 of the MSMED Act, along with the amount of the payment made to the supplier beyond the appointed day during each accounting year.
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono align-top pt-2.5">-</td>
+                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 font-medium">
+                                  (c) The amount of interest due and payable for the period of delay in making payment (which have been paid but beyond the appointed day during the year) but without adding the interest specified under the MSMED Act.
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono align-top pt-2.5">-</td>
+                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 font-medium">
+                                  (d) The amount of interest accrued and remaining unpaid at the end of each accounting year.
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono align-top pt-2.5">-</td>
+                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 font-medium">
+                                  (e) The amount of further interest remaining due and payable even in the succeeding years, until such date when the interest dues above are actually paid to the small enterprise, for the purpose of disallowance of a deductible expenditure under section 23 of the MSMED Act.
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono align-top pt-2.5">-</td>
+                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       )}
                     </div>

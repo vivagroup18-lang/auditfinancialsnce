@@ -165,9 +165,9 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* III. Total Revenue */}
+            {/* III. Total Income */}
             <tr className="bg-slate-100/70 font-bold text-slate-950">
-              <td className="py-3 px-6 uppercase tracking-wide">III. TOTAL REVENUE (I + II)</td>
+              <td className="py-3 px-6 uppercase tracking-wide">III. TOTAL INCOME (I + II)</td>
               <td className="py-3 px-2 text-center"></td>
               <td className="py-3 px-4 text-right font-mono text-sm text-blue-900 font-bold border-t border-b border-slate-300">
                 {formatINR(profitAndLoss.totalRevenue)}
@@ -180,16 +180,25 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
             {/* IV. Expenses Section Header */}
             <tr className="bg-slate-100/80 font-bold text-slate-950">
               <td colSpan={4} className="py-2.5 px-4 text-xs tracking-wide">
-                IV. EXPENSES
+                IV. EXPENSES:
               </td>
             </tr>
 
-            {/* (a) Cost of Goods Sold - Note 21 */}
+            {/* (a) Cost of goods sold - Note 21 */}
             <tr className="hover:bg-slate-50 transition-colors">
               <td className="py-2.5 px-8 text-slate-800 font-medium">
-                (a) Cost of goods sold
+                Cost of goods sold
+                <span className="block text-[11px] text-slate-500 font-normal pl-4">
+                  (a) Cost of materials consumed: {formatINR(profitAndLoss.costOfRawMaterialsConsumed)}
+                </span>
+                <span className="block text-[11px] text-slate-500 font-normal pl-4">
+                  (b) Purchases of Stock-in-Trade: {formatINR(profitAndLoss.purchasesOfStockInTrade || 0)}
+                </span>
+                <span className="block text-[11px] text-slate-500 font-normal pl-4">
+                  (c) Changes in inventories of Finished Goods, WIP &amp; Stock: {formatINR(profitAndLoss.changesInInventories)}
+                </span>
               </td>
-              <td className="py-2.5 px-2 text-center">
+              <td className="py-2.5 px-2 text-center align-top pt-3">
                 <button
                   onClick={() => onSelectNote(21)}
                   className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition inline-flex items-center gap-1"
@@ -198,17 +207,17 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
                   21 <ExternalLink className="w-2.5 h-2.5" />
                 </button>
               </td>
-              <td className="py-2.5 px-4 text-right font-mono text-slate-900 font-semibold">
+              <td className="py-2.5 px-4 text-right font-mono text-slate-900 font-semibold align-top pt-3">
                 {formatINR(profitAndLoss.costOfGoodsSold)}
               </td>
-              <td className="py-2.5 px-4 text-right font-mono text-slate-500 font-semibold">
+              <td className="py-2.5 px-4 text-right font-mono text-slate-500 font-semibold align-top pt-3">
                 {formatPY(prev.costOfGoodsSold)}
               </td>
             </tr>
 
             {/* (b) Employee Benefits Expense - Note 22 */}
             <tr className="hover:bg-slate-50 transition-colors">
-              <td className="py-2.5 px-8 text-slate-800 font-medium">(b) Employee benefits expense</td>
+              <td className="py-2.5 px-8 text-slate-800 font-medium">Employee benefits expense</td>
               <td className="py-2.5 px-2 text-center">
                 <button
                   onClick={() => onSelectNote(22)}
@@ -228,7 +237,7 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
 
             {/* (c) Finance Costs - Note 23 */}
             <tr className="hover:bg-slate-50 transition-colors">
-              <td className="py-2.5 px-8 text-slate-800 font-medium">(c) Finance costs</td>
+              <td className="py-2.5 px-8 text-slate-800 font-medium">Finance costs</td>
               <td className="py-2.5 px-2 text-center">
                 <button
                   onClick={() => onSelectNote(23)}
@@ -248,7 +257,7 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
 
             {/* (d) Depreciation and Amortization Expense - Note 24 */}
             <tr className="hover:bg-slate-50 transition-colors">
-              <td className="py-2.5 px-8 text-slate-800 font-medium">(d) Depreciation and amortization expense</td>
+              <td className="py-2.5 px-8 text-slate-800 font-medium">Depreciation and amortization expense</td>
               <td className="py-2.5 px-2 text-center">
                 <button
                   onClick={() => onSelectNote(24)}
@@ -269,7 +278,7 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
             {/* (e) Other Expenses - Note 25 */}
             <tr className="hover:bg-slate-50 transition-colors">
               <td className="py-2.5 px-8 text-slate-800 font-medium">
-                (e) Other expenses
+                Other expenses
               </td>
               <td className="py-2.5 px-2 text-center">
                 <button
@@ -300,10 +309,10 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* V. Profit before exceptional items, partners' remuneration and tax (III - IV) */}
+            {/* V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV) */}
             <tr className="bg-slate-50/70 font-semibold text-slate-900">
               <td className="py-2.5 px-6">
-                V. Profit / (loss) before exceptional items, partners' remuneration and tax (III - IV)
+                V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV)
               </td>
               <td className="py-2.5 px-2 text-center">-</td>
               <td className="py-2.5 px-4 text-right font-mono font-semibold">
@@ -314,9 +323,9 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* VI. Exceptional items */}
+            {/* VI. Exceptional items (specify nature & provide note/delete if none) */}
             <tr className="hover:bg-slate-50 transition-colors text-slate-700">
-              <td className="py-2 px-8">VI. Exceptional items</td>
+              <td className="py-2 px-8">VI. Exceptional items (specify nature &amp; provide note/delete if none)</td>
               <td className="py-2 px-2 text-center">-</td>
               <td className="py-2 px-4 text-right font-mono">
                 {profitAndLoss.exceptionalItems ? formatINR(profitAndLoss.exceptionalItems) : '-'}
@@ -326,10 +335,10 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* VII. Profit before extraordinary items, partners' remuneration and tax (V - VI) */}
+            {/* VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI) */}
             <tr className="hover:bg-slate-50 transition-colors text-slate-700">
               <td className="py-2 px-8">
-                VII. Profit / (loss) before extraordinary items, partners' remuneration and tax (V - VI)
+                VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI)
               </td>
               <td className="py-2.5 px-2 text-center">-</td>
               <td className="py-2.5 px-4 text-right font-mono font-medium">
@@ -340,9 +349,9 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* VIII. Extraordinary items */}
+            {/* VIII. Extraordinary Items (specify nature & provide note/delete if none) */}
             <tr className="hover:bg-slate-50 transition-colors text-slate-700">
-              <td className="py-2 px-8">VIII. Extraordinary items</td>
+              <td className="py-2 px-8">VIII. Extraordinary Items (specify nature &amp; provide note/delete if none)</td>
               <td className="py-2 px-2 text-center">-</td>
               <td className="py-2 px-4 text-right font-mono">
                 {profitAndLoss.extraordinaryItems ? formatINR(profitAndLoss.extraordinaryItems) : '-'}
@@ -352,10 +361,10 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* IX. Profit before partners' remuneration and tax (VII - VIII) */}
+            {/* IX. Profit before, partners' remuneration and tax (VII-VIII) */}
             <tr className="bg-amber-50/60 font-bold text-amber-950 border-t border-b border-amber-200">
               <td className="py-2.5 px-6">
-                IX. Profit before partners' remuneration and tax (VII - VIII)
+                IX. Profit before, partners' remuneration and tax (VII-VIII)
               </td>
               <td className="py-2.5 px-2 text-center">-</td>
               <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-900">
@@ -366,11 +375,11 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* X. Partners' remuneration* */}
+            {/* X. Partners’ remuneration* */}
             <tr className="bg-emerald-50/50 hover:bg-emerald-50 transition-colors font-semibold text-emerald-950">
               <td className="py-2.5 px-6">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span>X. Partners' remuneration*</span>
+                  <span>X. Partners’ remuneration*</span>
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                     Sec 40(b) Statutory Line
                   </span>
@@ -394,9 +403,9 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* XI. Profit Before Tax (PBT) (IX - X) */}
+            {/* XI. Profit before tax (IX- X) */}
             <tr className="bg-slate-100 font-black text-slate-950 border-t-2 border-b-2 border-slate-300">
-              <td className="py-3 px-6 text-sm">XI. PROFIT BEFORE TAX (PBT) (IX - X)</td>
+              <td className="py-3 px-6 text-sm">XI. PROFIT BEFORE TAX (IX - X)</td>
               <td className="py-3 px-2 text-center">-</td>
               <td className="py-3 px-4 text-right font-mono text-sm font-black text-slate-950">
                 {formatINR(profitAndLoss.profitBeforeTax)}
@@ -412,7 +421,7 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
             </tr>
             <tr className="hover:bg-slate-50 transition-colors">
               <td className="py-2 px-10 text-slate-700">
-                (1) Current tax ({config.taxRatePercent || 30}% Income Tax provision)
+                Current tax
               </td>
               <td className="py-2 px-2 text-center">
                 <button
@@ -431,7 +440,17 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
             <tr className="hover:bg-slate-50 transition-colors">
-              <td className="py-2 px-10 text-slate-700">(2) Deferred tax charge / (benefit)</td>
+              <td className="py-2 px-10 text-slate-700">Excess/ Short provision of tax relating to earlier years</td>
+              <td className="py-2 px-2 text-center">-</td>
+              <td className="py-2 px-4 text-right font-mono text-slate-900">
+                {profitAndLoss.excessShortTaxEarlierYears ? formatINR(profitAndLoss.excessShortTaxEarlierYears) : '-'}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">
+                {prev.excessShortTaxEarlierYears ? formatPY(prev.excessShortTaxEarlierYears) : '-'}
+              </td>
+            </tr>
+            <tr className="hover:bg-slate-50 transition-colors">
+              <td className="py-2 px-10 text-slate-700">Deferred tax charge/ (benefit)</td>
               <td className="py-2 px-2 text-center">
                 <button
                   onClick={() => onSelectNote(6)}
@@ -449,10 +468,10 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* XIII. Profit for Continuing Operations */}
+            {/* XIII. Profit/(Loss) for the period from continuing operations (XI-XII) */}
             <tr className="hover:bg-slate-50 transition-colors font-medium text-slate-800">
               <td className="py-2 px-6">
-                XIII. Profit / (Loss) for the period from continuing operations (XI - XII)
+                XIII. Profit/(Loss) for the period from continuing operations (XI-XII)
               </td>
               <td className="py-2 px-2 text-center">-</td>
               <td className="py-2 px-4 text-right font-mono font-bold text-slate-900">
@@ -463,10 +482,40 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* XVII. Profit After Tax */}
+            {/* XIV. Profit/(loss) from discontinuing operations */}
+            <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+              <td className="py-2 px-6">XIV. Profit/(loss) from discontinuing operations</td>
+              <td className="py-2 px-2 text-center">-</td>
+              <td className="py-2 px-4 text-right font-mono">
+                {profitAndLoss.profitFromDiscontinuingOps ? formatINR(profitAndLoss.profitFromDiscontinuingOps) : '-'}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
+            </tr>
+
+            {/* XV. Tax expense of discontinuing operations */}
+            <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+              <td className="py-2 px-6">XV. Tax expense of discontinuing operations</td>
+              <td className="py-2 px-2 text-center">-</td>
+              <td className="py-2 px-4 text-right font-mono">
+                {profitAndLoss.taxExpenseDiscontinuingOps ? formatINR(profitAndLoss.taxExpenseDiscontinuingOps) : '-'}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
+            </tr>
+
+            {/* XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV) */}
+            <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+              <td className="py-2 px-6">XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV)</td>
+              <td className="py-2 px-2 text-center">-</td>
+              <td className="py-2 px-4 text-right font-mono">
+                {profitAndLoss.profitFromDiscontinuingOpsAfterTax ? formatINR(profitAndLoss.profitFromDiscontinuingOpsAfterTax) : '-'}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
+            </tr>
+
+            {/* XVII. Profit/(Loss) for the year (XIII+XVI) */}
             <tr className="bg-slate-900 text-white font-bold text-xs">
               <td className="py-3 px-6 uppercase tracking-wide text-sm">
-                XVII. PROFIT / (LOSS) FOR THE YEAR (PAT)
+                XVII. PROFIT / (LOSS) FOR THE YEAR (XIII + XVI)
               </td>
               <td className="py-3 px-2 text-center">-</td>
               <td className="py-3 px-4 text-right font-mono text-base text-emerald-300 font-bold">
@@ -474,6 +523,18 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
               <td className="py-3 px-4 text-right font-mono text-base text-emerald-400/80 font-bold">
                 {formatPY(prev.profitAfterTax)}
+              </td>
+            </tr>
+
+            {/* ICAI Guidance Note Statutory Disclosures & Footnotes */}
+            <tr className="bg-slate-50/70 text-slate-500 text-[11px] italic">
+              <td colSpan={4} className="py-2 px-6">
+                * wherever applicable
+              </td>
+            </tr>
+            <tr className="bg-slate-50 text-slate-700 font-semibold text-xs border-t border-slate-200">
+              <td colSpan={4} className="py-2.5 px-6">
+                The accompanying notes are an integral part of the financial statements
               </td>
             </tr>
           </tbody>

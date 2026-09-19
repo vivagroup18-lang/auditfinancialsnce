@@ -1,4 +1,4 @@
-import { BalanceSheetData, MappedLedger, NoteScheduleData, ProfitAndLossData, EntityConfig, AuditException } from '../types';
+import { BalanceSheetData, MappedLedger, NoteScheduleData, ProfitAndLossData, EntityConfig, AuditException, PartnerCapitalRecord } from '../types';
 import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
 
 interface SinglePeriodResult {
@@ -47,6 +47,138 @@ export function isPartnersRemunerationItem(item: { accountName?: string; subCate
   }
 
   return false;
+}
+
+/**
+ * Computes the statutory 10-column partner capital account reconciliation table
+ * as prescribed on Page 6 of the ICAI Guidance Note on Financial Statements of Non-Corporate Entities:
+ * Sr. No. | Name of Partner/ Proprietor/ Owner | Share of profit/ (loss) (%) | As at 1st April 20XX (Opening Balance) | Capital Introduced/contributed during the year | Remuneration for the year | Interest for the year | Withdrawals during the year | Share of Profit / Loss for the year | As at 31st March 20XX (Closing Balance)
+ */
+export function computeOwnersCapitalTable(
+  schedule: NoteScheduleData,
+  config: EntityConfig,
+  profitAndLoss: Omit<ProfitAndLossData, 'previousYear'>,
+  isPY: boolean = false
+): PartnerCapitalRecord[] {
+  const isProprietorship = config.entityType === 'Sole Proprietorship';
+  const totalClosing = schedule.totalAmount || 0;
+  const pat = profitAndLoss.profitAfterTax || 0;
+  const remuneration = profitAndLoss.partnersRemuneration || 0;
+
+  // Detect interest on partners capital from schedule or Note 23
+  let interestOnCapital = 0;
+  schedule.items.forEach((it) => {
+    const n = it.accountName.toLowerCase();
+    if (n.includes('interest on capital') || n.includes('interest on partner') || n.includes('partner interest')) {
+      interestOnCapital += Math.abs(it.displayBalance !== undefined ? it.displayBalance : it.netBalance);
+    }
+  });
+
+  // Check if configured partners exist
+  let partnerConfigs = config.partners && config.partners.length > 0 ? [...config.partners] : [];
+
+  if (partnerConfigs.length === 0) {
+    // Attempt to discover partner names from mapped items in Note 3
+    const partnerNames = new Set<string>();
+    schedule.items.forEach((it) => {
+      const name = it.accountName;
+      if (
+        it.accountCode?.startsWith('VIRT-') ||
+        name.toLowerCase().includes('statutory') ||
+        name.toLowerCase().includes('net profit') ||
+        name.toLowerCase().includes('net loss')
+      ) {
+        return;
+      }
+      const cleaned = name
+        .replace(/(capital\s*a\/c|capital\s*account|current\s*a\/c|current\s*account|drawings\s*a\/c|drawings|partner)/gi, '')
+        .replace(/[-–:_]/g, '')
+        .trim();
+      if (cleaned.length >= 2 && !cleaned.toLowerCase().includes('total') && !cleaned.toLowerCase().includes('surplus')) {
+        partnerNames.add(cleaned);
+      }
+    });
+
+    if (partnerNames.size >= 1 && !isProprietorship) {
+      const arr = Array.from(partnerNames);
+      const equalShare = Math.round((100 / arr.length) * 100) / 100;
+      partnerConfigs = arr.map((name, idx) => ({
+        name: name,
+        profitSharePercent: idx === arr.length - 1 ? Math.round((100 - equalShare * (arr.length - 1)) * 100) / 100 : equalShare,
+      }));
+    } else if (isProprietorship) {
+      partnerConfigs = [
+        {
+          name: config.entityName ? `${config.entityName} (Proprietor)` : 'Proprietor',
+          profitSharePercent: 100,
+        },
+      ];
+    } else {
+      // Default to 2 partners with 50-50 share for Partnership Firm / LLP
+      partnerConfigs = [
+        { name: 'Partner 1', profitSharePercent: 50 },
+        { name: 'Partner 2', profitSharePercent: 50 },
+      ];
+    }
+  }
+
+  // Sum up withdrawals from debit items in Note 3
+  let totalDrawings = 0;
+  let totalIntroduced = 0;
+  schedule.items.forEach((it) => {
+    if (it.accountCode?.startsWith('VIRT-')) return;
+    const isDebit = ((it.originalDebit || 0) > (it.originalCredit || 0)) || it.accountName.toLowerCase().includes('drawing');
+    const bal = Math.abs(it.displayBalance !== undefined ? it.displayBalance : it.netBalance);
+    if (isDebit) {
+      totalDrawings += bal;
+    } else {
+      if (it.subCategory?.toLowerCase().includes('introduced') || it.accountName.toLowerCase().includes('introduced')) {
+        totalIntroduced += bal;
+      }
+    }
+  });
+
+  // Calculate opening balance so the equation holds:
+  // Closing = Opening + Introduced + Remuneration + Interest - Drawings + ProfitShare
+  // => Opening = Closing - Introduced - Remuneration - Interest + Drawings - ProfitShare
+  const totalOpening = totalClosing - totalIntroduced - remuneration - interestOnCapital + totalDrawings - pat;
+
+  const records: PartnerCapitalRecord[] = partnerConfigs.map((p, idx) => {
+    const ratio = (p.profitSharePercent || (100 / partnerConfigs.length)) / 100;
+
+    const pRemun = p.remuneration !== undefined ? p.remuneration : Math.round(remuneration * ratio);
+    const pInterest = p.interestOnCapital !== undefined ? p.interestOnCapital : Math.round(interestOnCapital * ratio);
+    const pDrawings = p.withdrawals !== undefined ? p.withdrawals : Math.round(totalDrawings * ratio);
+    const pIntroduced = p.capitalIntroduced !== undefined ? p.capitalIntroduced : Math.round(totalIntroduced * ratio);
+    const pProfitShare = Math.round(pat * ratio * 100) / 100;
+    const pOpening = p.openingBalance !== undefined ? p.openingBalance : Math.round(totalOpening * ratio * 100) / 100;
+
+    const pClosing = Math.round((pOpening + pIntroduced + pRemun + pInterest - pDrawings + pProfitShare) * 100) / 100;
+
+    return {
+      srNo: idx + 1,
+      partnerName: p.name,
+      profitSharePercent: p.profitSharePercent || Math.round(100 / partnerConfigs.length),
+      openingBalance: pOpening,
+      capitalIntroduced: pIntroduced,
+      remuneration: pRemun,
+      interestOnCapital: pInterest,
+      withdrawals: pDrawings,
+      shareOfProfit: pProfitShare,
+      closingBalance: pClosing,
+    };
+  });
+
+  // Reconcile rounding discrepancy with totalClosing on the last partner
+  const computedTotalClosing = records.reduce((sum, r) => sum + r.closingBalance, 0);
+  const diff = Math.round((totalClosing - computedTotalClosing) * 100) / 100;
+  if (Math.abs(diff) > 0 && records.length > 0) {
+    const lastRec = records[records.length - 1];
+    lastRec.closingBalance = Math.round((lastRec.closingBalance + diff) * 100) / 100;
+    lastRec.openingBalance = Math.round((lastRec.openingBalance + diff) * 100) / 100;
+  }
+
+  return records;
 }
 
 /**
@@ -649,6 +781,12 @@ export function computePeriodTotals(
       }
     });
     noteSchedules[3].totalAmount = totalCapital;
+    noteSchedules[3].partnerCapitalTable = computeOwnersCapitalTable(
+      noteSchedules[3],
+      config,
+      profitAndLoss,
+      periodLabel === 'Previous Period'
+    );
   }
 
   // Recompute Note 4 total with correct signed balances
@@ -1046,6 +1184,10 @@ export function computeFinancialStatements(
             });
           }
         });
+
+        if (noteNo === 3 && pySched) {
+          cySched.pyPartnerCapitalTable = pySched.partnerCapitalTable;
+        }
       } else {
         cySched.previousYearAmount = 0;
       }

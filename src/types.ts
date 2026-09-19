@@ -84,18 +84,24 @@ export interface NoteScheduleData {
   subTotals: Record<string, number>;
   pySubTotals?: Record<string, number>;
   statutoryNotes?: string[];
+  partnerCapitalTable?: PartnerCapitalRecord[];
+  pyPartnerCapitalTable?: PartnerCapitalRecord[];
 }
 
 export interface PartnerCapitalRecord {
   srNo: number;
   partnerName: string;
   profitSharePercent: number;
+  profitShareRatio?: string;
   openingBalance: number;
   capitalIntroduced: number;
   remuneration: number;
+  partnersRemuneration?: number;
   interestOnCapital: number;
   withdrawals: number;
+  drawings?: number;
   shareOfProfit: number;
+  shareOfProfitOrLoss?: number;
   closingBalance: number;
 }
 
@@ -310,6 +316,15 @@ export interface EntityConfig {
   taxRatePercent: number;
   transferProfitTo: 'reserves' | 'partners_capital' | 'proprietor_capital';
   yearEndAdjustments?: YearEndAdjustments;
+  partners?: Array<{
+    name: string;
+    profitSharePercent?: number;
+    openingBalance?: number;
+    capitalIntroduced?: number;
+    remuneration?: number;
+    interestOnCapital?: number;
+    withdrawals?: number;
+  }>;
 }
 
 export interface Company {

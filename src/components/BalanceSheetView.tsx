@@ -393,23 +393,15 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
             <tr className="font-semibold text-slate-900 bg-slate-50/40">
               <td className="py-2 px-6" colSpan={4}>(1) Non-current assets</td>
             </tr>
-            <tr className="hover:bg-slate-50 transition-colors">
-              <td className="py-2 px-10 text-slate-700">
-                (a) Property, Plant and Equipment and Intangible assets
-                <span className="block text-[11px] text-slate-500 font-normal pl-4">
-                  (i) Property, Plant and Equipment (Net Block): {formatINR(balanceSheet.propertyPlantEquipment)}
-                </span>
-                <span className="block text-[11px] text-slate-500 font-normal pl-4">
-                  (ii) Intangible assets: {formatINR(balanceSheet.intangibleAssets || 0)}
-                </span>
-                <span className="block text-[11px] text-slate-500 font-normal pl-4">
-                  (iii) Capital work-in-progress: {formatINR(balanceSheet.capitalWorkInProgress || 0)}
-                </span>
-                <span className="block text-[11px] text-slate-500 font-normal pl-4">
-                  (iv) Intangible assets under development: {formatINR(balanceSheet.intangibleAssetUnderDevelopment || 0)}
-                </span>
+            {/* Property, Plant and Equipment and Intangible assets */}
+            <tr className="font-semibold text-slate-900 bg-slate-50/20">
+              <td className="py-2 px-10 text-slate-800" colSpan={4}>
+                Property, Plant and Equipment and Intangible assets
               </td>
-              <td className="py-2 px-2 text-center align-top pt-3">
+            </tr>
+            <tr className="hover:bg-slate-50 transition-colors">
+              <td className="py-2 px-14 text-slate-700">Property, Plant and Equipment</td>
+              <td className="py-2 px-2 text-center">
                 <button
                   onClick={() => onSelectNote(11)}
                   className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition inline-flex items-center gap-1"
@@ -418,11 +410,65 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
                   11 <ExternalLink className="w-2.5 h-2.5" />
                 </button>
               </td>
-              <td className="py-2 px-4 text-right font-mono text-slate-900 align-top pt-3">
-                {formatINR((balanceSheet.propertyPlantEquipment || 0) + (balanceSheet.intangibleAssets || 0) + (balanceSheet.capitalWorkInProgress || 0))}
+              <td className="py-2 px-4 text-right font-mono text-slate-900">
+                {formatINR(balanceSheet.propertyPlantEquipment)}
               </td>
-              <td className="py-2 px-4 text-right font-mono text-slate-500 align-top pt-3">
-                {formatINR((prev.propertyPlantEquipment || 0) + (prev.intangibleAssets || 0) + (prev.capitalWorkInProgress || 0))}
+              <td className="py-2 px-4 text-right font-mono text-slate-500">
+                {formatPY(prev.propertyPlantEquipment)}
+              </td>
+            </tr>
+            <tr className="hover:bg-slate-50 transition-colors">
+              <td className="py-2 px-14 text-slate-700">Intangible assets</td>
+              <td className="py-2 px-2 text-center">
+                <button
+                  onClick={() => onSelectNote(11)}
+                  className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition inline-flex items-center gap-1"
+                  title="View Note 11: Intangible Assets"
+                >
+                  11 <ExternalLink className="w-2.5 h-2.5" />
+                </button>
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-900">
+                {formatINR(balanceSheet.intangibleAssets || 0)}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">
+                {formatPY(prev.intangibleAssets || 0)}
+              </td>
+            </tr>
+            <tr className="hover:bg-slate-50 transition-colors">
+              <td className="py-2 px-14 text-slate-700">Capital work in progress</td>
+              <td className="py-2 px-2 text-center">
+                <button
+                  onClick={() => onSelectNote(11)}
+                  className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition inline-flex items-center gap-1"
+                  title="View Note 11: Capital Work in Progress"
+                >
+                  11 <ExternalLink className="w-2.5 h-2.5" />
+                </button>
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-900">
+                {formatINR(balanceSheet.capitalWorkInProgress || 0)}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">
+                {formatPY(prev.capitalWorkInProgress || 0)}
+              </td>
+            </tr>
+            <tr className="hover:bg-slate-50 transition-colors">
+              <td className="py-2 px-14 text-slate-700">Intangible asset under development</td>
+              <td className="py-2 px-2 text-center">
+                <button
+                  onClick={() => onSelectNote(11)}
+                  className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition inline-flex items-center gap-1"
+                  title="View Note 11: Intangible Assets under Development"
+                >
+                  11 <ExternalLink className="w-2.5 h-2.5" />
+                </button>
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-900">
+                {formatINR(balanceSheet.intangibleAssetUnderDevelopment || 0)}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">
+                {formatPY(prev.intangibleAssetUnderDevelopment || 0)}
               </td>
             </tr>
             <tr className="hover:bg-slate-50 transition-colors">
@@ -646,6 +692,41 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
               </td>
               <td className="py-3 px-4 text-right font-mono text-sm text-emerald-400/80">
                 {formatPY(prev.totalAssets)}
+              </td>
+            </tr>
+
+            {/* Statutory References as per ICAI Page 3 */}
+            <tr className="bg-slate-50/80 text-slate-700 font-semibold text-xs border-t border-slate-200">
+              <td className="py-2.5 px-6">Brief about the Entity</td>
+              <td className="py-2.5 px-2 text-center">
+                <button
+                  onClick={() => onSelectNote(1)}
+                  className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition inline-flex items-center gap-1"
+                  title="View Note 1: Brief about the Entity"
+                >
+                  1 <ExternalLink className="w-2.5 h-2.5" />
+                </button>
+              </td>
+              <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+              <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+            </tr>
+            <tr className="bg-slate-50/80 text-slate-700 font-semibold text-xs">
+              <td className="py-2.5 px-6">Summary of significant accounting policies</td>
+              <td className="py-2.5 px-2 text-center">
+                <button
+                  onClick={() => onSelectNote(2)}
+                  className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition inline-flex items-center gap-1"
+                  title="View Note 2: Significant Accounting Policies"
+                >
+                  2 <ExternalLink className="w-2.5 h-2.5" />
+                </button>
+              </td>
+              <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+              <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+            </tr>
+            <tr className="bg-slate-50 text-slate-700 font-semibold text-xs border-t border-slate-200">
+              <td colSpan={4} className="py-2.5 px-6">
+                The accompanying notes are an integral part of the financial statements
               </td>
             </tr>
           </tbody>

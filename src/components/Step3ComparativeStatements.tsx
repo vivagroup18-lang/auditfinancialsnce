@@ -220,10 +220,22 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   </td>
                 </tr>
 
-                {/* Owners Funds */}
-                <tr className="bg-slate-50 font-bold text-slate-900">
-                  <td className="py-2 px-4 pl-6">(1) Owners' Funds / Partners' Capital</td>
-                  <td className="py-2 px-3 text-center">3</td>
+                {/* (1) Owners' funds */}
+                <tr className="bg-slate-50/60 font-bold text-slate-900">
+                  <td colSpan={6} className="py-2 px-4 pl-6">(1) Owners' funds</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-10">(a) Owners' Capital account</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(3)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 3: Owners' / Partners' Capital Account"
+                    >
+                      3
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(bs.ownersCapital)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.ownersCapital)}</td>
                   {(() => {
@@ -236,11 +248,18 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                     );
                   })()}
                 </tr>
-
-                {/* Reserves & Surplus */}
                 <tr>
-                  <td className="py-2 px-4 pl-6">(2) Reserves and Surplus</td>
-                  <td className="py-2 px-3 text-center">4</td>
+                  <td className="py-2 px-4 pl-10">(b) Reserves and surplus</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(4)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 4: Reserves and Surplus"
+                    >
+                      4
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(bs.reservesAndSurplus)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.reservesAndSurplus)}</td>
                   {(() => {
@@ -254,15 +273,24 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* Non-Current Liabilities */}
-                <tr className="bg-slate-50 font-bold text-slate-900">
+                {/* (2) Non-Current Liabilities */}
+                <tr className="bg-slate-50/60 font-bold text-slate-900">
                   <td colSpan={6} className="py-2 px-4 pl-6">
-                    (3) Non-Current Liabilities
+                    (2) Non-current liabilities
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Long-term borrowings</td>
-                  <td className="py-2 px-3 text-center">5</td>
+                  <td className="py-2 px-4 pl-10">(a) Long-term borrowings</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(5)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 5: Long-Term Borrowings"
+                    >
+                      5
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(bs.longTermBorrowings)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.longTermBorrowings)}</td>
                   {(() => {
@@ -276,8 +304,41 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Other long-term liabilities &amp; provisions</td>
-                  <td className="py-2 px-3 text-center">6</td>
+                  <td className="py-2 px-4 pl-10">(b) Deferred tax liabilities (Net)</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(6)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 6: Deferred Tax Liabilities"
+                    >
+                      6
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.deferredTaxLiabilities || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.deferredTaxLiabilities || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.deferredTaxLiabilities || 0, bs.previousYear?.deferredTaxLiabilities || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-10">(c) Other long-term liabilities</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(7)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 7: Other Long-Term Liabilities"
+                    >
+                      7
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(bs.otherLongTermLiabilities)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.otherLongTermLiabilities)}</td>
                   {(() => {
@@ -290,16 +351,49 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                     );
                   })()}
                 </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-10">(d) Long-term provisions</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(8)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 8: Provisions (Long-Term Portion)"
+                    >
+                      8
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.longTermProvisions || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.longTermProvisions || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.longTermProvisions || 0, bs.previousYear?.longTermProvisions || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
 
-                {/* Current Liabilities */}
-                <tr className="bg-slate-50 font-bold text-slate-900">
+                {/* (3) Current Liabilities */}
+                <tr className="bg-slate-50/60 font-bold text-slate-900">
                   <td colSpan={6} className="py-2 px-4 pl-6">
-                    (4) Current Liabilities
+                    (3) Current liabilities
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Short-term borrowings</td>
-                  <td className="py-2 px-3 text-center">7</td>
+                  <td className="py-2 px-4 pl-10">(a) Short-term borrowings</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(5)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 5: Short-Term Borrowings"
+                    >
+                      5
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(bs.shortTermBorrowings)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.shortTermBorrowings)}</td>
                   {(() => {
@@ -313,23 +407,49 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Trade payables (Creditors)</td>
-                  <td className="py-2 px-3 text-center">8</td>
-                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.tradePayables)}</td>
-                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.tradePayables)}</td>
+                  <td className="py-2 px-4 pl-10">
+                    <div>(b) Trade payables</div>
+                    <div className="text-[11px] text-slate-500 font-normal pl-3">
+                      (A) total outstanding dues of micro & small enterprises: {formatINR(bs.tradePayablesMsme || 0)}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-normal pl-3">
+                      (B) total outstanding dues of other creditors: {formatINR(bs.tradePayablesOther || bs.tradePayables)}
+                    </div>
+                  </td>
+                  <td className="py-2 px-3 text-center align-top pt-2.5">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(9)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 9: Trade Payables"
+                    >
+                      9
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono align-top pt-2.5">{formatINR(bs.tradePayables)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500 align-top pt-2.5">{formatPY(bs.previousYear?.tradePayables)}</td>
                   {(() => {
                     const v = getVariance(bs.tradePayables, bs.previousYear?.tradePayables);
                     return (
                       <>
-                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
-                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                        <td className="py-2 px-4 text-right font-mono align-top pt-2.5">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold align-top pt-2.5">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
                       </>
                     );
                   })()}
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Other current liabilities</td>
-                  <td className="py-2 px-3 text-center">9</td>
+                  <td className="py-2 px-4 pl-10">(c) Other current liabilities</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(10)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 10: Other Current Liabilities"
+                    >
+                      10
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(bs.otherCurrentLiabilities)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.otherCurrentLiabilities)}</td>
                   {(() => {
@@ -343,8 +463,17 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Short-term provisions</td>
-                  <td className="py-2 px-3 text-center">10</td>
+                  <td className="py-2 px-4 pl-10">(d) Short-term provisions</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(8)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 8: Provisions (Short-Term Portion)"
+                    >
+                      8
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(bs.shortTermProvisions)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.shortTermProvisions)}</td>
                   {(() => {
@@ -360,7 +489,7 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
 
                 {/* Total Equity & Liabilities */}
                 <tr className="bg-emerald-100 font-black text-emerald-950 text-xs border-t-2 border-b-2 border-emerald-300">
-                  <td className="py-3 px-4">TOTAL EQUITY AND LIABILITIES</td>
+                  <td className="py-3 px-4 uppercase tracking-wide">TOTAL EQUITY AND LIABILITIES</td>
                   <td className="py-3 px-3 text-center">-</td>
                   <td className="py-3 px-4 text-right font-mono font-bold">{formatINR(bs.totalEquityAndLiabilities)}</td>
                   <td className="py-3 px-4 text-right font-mono font-bold text-slate-700">{formatPY(bs.previousYear?.totalEquityAndLiabilities)}</td>
@@ -382,15 +511,29 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   </td>
                 </tr>
 
-                {/* Property Plant & Equipment */}
-                <tr className="bg-slate-50 font-bold text-slate-900">
+                {/* (1) Non-current assets */}
+                <tr className="bg-slate-50/60 font-bold text-slate-900">
                   <td colSpan={6} className="py-2 px-4 pl-6">
-                    (1) Non-Current Assets
+                    (1) Non-current assets
+                  </td>
+                </tr>
+                <tr className="bg-slate-50/30 font-semibold text-slate-800">
+                  <td colSpan={6} className="py-1.5 px-4 pl-8">
+                    (a) Property, Plant and Equipment and Intangible assets
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Property, Plant and Equipment</td>
-                  <td className="py-2 px-3 text-center">11</td>
+                  <td className="py-2 px-4 pl-12">(i) Property, Plant and Equipment</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(11)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 11: Property, Plant and Equipment"
+                    >
+                      11
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(bs.propertyPlantEquipment)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.propertyPlantEquipment)}</td>
                   {(() => {
@@ -404,22 +547,165 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Non-current investments &amp; other non-current assets</td>
-                  <td className="py-2 px-3 text-center">12</td>
-                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.nonCurrentInvestments + bs.longTermLoansAndAdvances + bs.otherNonCurrentAssets)}</td>
-                  <td className="py-2 px-4 text-right font-mono text-slate-500">
-                    {formatPY(
-                      (bs.previousYear?.nonCurrentInvestments || 0) +
-                      (bs.previousYear?.longTermLoansAndAdvances || 0) +
-                      (bs.previousYear?.otherNonCurrentAssets || 0)
-                    )}
+                  <td className="py-2 px-4 pl-12">(ii) Intangible assets</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(11)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 11: Intangible Assets"
+                    >
+                      11
+                    </button>
                   </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.intangibleAssets || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.intangibleAssets || 0)}</td>
                   {(() => {
-                    const cyVal = bs.nonCurrentInvestments + bs.longTermLoansAndAdvances + bs.otherNonCurrentAssets;
-                    const pyVal = (bs.previousYear?.nonCurrentInvestments || 0) +
-                                  (bs.previousYear?.longTermLoansAndAdvances || 0) +
-                                  (bs.previousYear?.otherNonCurrentAssets || 0);
-                    const v = getVariance(cyVal, pyVal);
+                    const v = getVariance(bs.intangibleAssets || 0, bs.previousYear?.intangibleAssets || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-12">(iii) Capital work in progress</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(11)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 11: Capital Work in Progress"
+                    >
+                      11
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.capitalWorkInProgress || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.capitalWorkInProgress || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.capitalWorkInProgress || 0, bs.previousYear?.capitalWorkInProgress || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-12">(iv) Intangible asset under development</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(11)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 11: Intangible Asset under Development"
+                    >
+                      11
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.intangibleAssetUnderDevelopment || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.intangibleAssetUnderDevelopment || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.intangibleAssetUnderDevelopment || 0, bs.previousYear?.intangibleAssetUnderDevelopment || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(b) Non-current investments</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(12)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 12: Investments (Non-Current)"
+                    >
+                      12
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.nonCurrentInvestments || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.nonCurrentInvestments || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.nonCurrentInvestments || 0, bs.previousYear?.nonCurrentInvestments || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(c) Deferred tax assets (net)</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(6)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 6: Deferred Tax Assets"
+                    >
+                      6
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.deferredTaxAssets || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.deferredTaxAssets || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.deferredTaxAssets || 0, bs.previousYear?.deferredTaxAssets || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(d) Long-term loans and advances</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(13)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 13: Loans and Advances (Long-Term)"
+                    >
+                      13
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.longTermLoansAndAdvances || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.longTermLoansAndAdvances || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.longTermLoansAndAdvances || 0, bs.previousYear?.longTermLoansAndAdvances || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(e) Other non-current assets</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(14)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 14: Other Non-Current Assets"
+                    >
+                      14
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.otherNonCurrentAssets || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.otherNonCurrentAssets || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.otherNonCurrentAssets || 0, bs.previousYear?.otherNonCurrentAssets || 0);
                     return (
                       <>
                         <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
@@ -429,72 +715,148 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* Current Assets */}
-                <tr className="bg-slate-50 font-bold text-slate-900">
+                {/* (2) Current Assets */}
+                <tr className="bg-slate-50/60 font-bold text-slate-900">
                   <td colSpan={6} className="py-2 px-4 pl-6">
-                    (2) Current Assets
+                    (2) Current assets
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">Inventories</td>
-                  <td className="py-2 px-3 text-center">15</td>
-                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.inventories)}</td>
-                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.inventories)}</td>
-                  {(() => {
-                    const v = getVariance(bs.inventories, bs.previousYear?.inventories);
-                    return (
-                      <>
-                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
-                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
-                      </>
-                    );
-                  })()}
-                </tr>
-                <tr>
-                  <td className="py-2 px-4 pl-10">Trade receivables (Debtors)</td>
-                  <td className="py-2 px-3 text-center">16</td>
-                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.tradeReceivables)}</td>
-                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.tradeReceivables)}</td>
-                  {(() => {
-                    const v = getVariance(bs.tradeReceivables, bs.previousYear?.tradeReceivables);
-                    return (
-                      <>
-                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
-                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
-                      </>
-                    );
-                  })()}
-                </tr>
-                <tr>
-                  <td className="py-2 px-4 pl-10">Cash and bank balances</td>
-                  <td className="py-2 px-3 text-center">17</td>
-                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.cashAndBankBalances)}</td>
-                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.cashAndBankBalances)}</td>
-                  {(() => {
-                    const v = getVariance(bs.cashAndBankBalances, bs.previousYear?.cashAndBankBalances);
-                    return (
-                      <>
-                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
-                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
-                      </>
-                    );
-                  })()}
-                </tr>
-                <tr>
-                  <td className="py-2 px-4 pl-10">Short-term loans, advances &amp; other current assets</td>
-                  <td className="py-2 px-3 text-center">18</td>
-                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.shortTermLoansAndAdvances + bs.otherCurrentAssets)}</td>
-                  <td className="py-2 px-4 text-right font-mono text-slate-500">
-                    {formatPY(
-                      (bs.previousYear?.shortTermLoansAndAdvances || 0) +
-                      (bs.previousYear?.otherCurrentAssets || 0)
-                    )}
+                  <td className="py-2 px-4 pl-8">(a) Current investments</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(12)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 12: Investments (Current Portion)"
+                    >
+                      12
+                    </button>
                   </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.currentInvestments || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.currentInvestments || 0)}</td>
                   {(() => {
-                    const cyVal = bs.shortTermLoansAndAdvances + bs.otherCurrentAssets;
-                    const pyVal = (bs.previousYear?.shortTermLoansAndAdvances || 0) +
-                                  (bs.previousYear?.otherCurrentAssets || 0);
-                    const v = getVariance(cyVal, pyVal);
+                    const v = getVariance(bs.currentInvestments || 0, bs.previousYear?.currentInvestments || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(b) Inventories</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(15)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 15: Inventories"
+                    >
+                      15
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.inventories || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.inventories || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.inventories || 0, bs.previousYear?.inventories || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(c) Trade receivables</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(16)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 16: Trade Receivables"
+                    >
+                      16
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.tradeReceivables || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.tradeReceivables || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.tradeReceivables || 0, bs.previousYear?.tradeReceivables || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(d) Cash and bank balances</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(17)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 17: Cash and Bank Balances"
+                    >
+                      17
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.cashAndBankBalances || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.cashAndBankBalances || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.cashAndBankBalances || 0, bs.previousYear?.cashAndBankBalances || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(e) Short-term loans and advances</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(13)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 13: Loans and Advances (Short-Term Portion)"
+                    >
+                      13
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.shortTermLoansAndAdvances || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.shortTermLoansAndAdvances || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.shortTermLoansAndAdvances || 0, bs.previousYear?.shortTermLoansAndAdvances || 0);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-8">(f) Other current assets</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(18)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 18: Other Current Assets"
+                    >
+                      18
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(bs.otherCurrentAssets || 0)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(bs.previousYear?.otherCurrentAssets || 0)}</td>
+                  {(() => {
+                    const v = getVariance(bs.otherCurrentAssets || 0, bs.previousYear?.otherCurrentAssets || 0);
                     return (
                       <>
                         <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
@@ -506,7 +868,7 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
 
                 {/* Total Assets */}
                 <tr className="bg-emerald-100 font-black text-emerald-950 text-xs border-t-2 border-b-2 border-emerald-300">
-                  <td className="py-3 px-4">TOTAL ASSETS</td>
+                  <td className="py-3 px-4 uppercase tracking-wide">TOTAL ASSETS</td>
                   <td className="py-3 px-3 text-center">-</td>
                   <td className="py-3 px-4 text-right font-mono font-bold">{formatINR(bs.totalAssets)}</td>
                   <td className="py-3 px-4 text-right font-mono font-bold text-slate-700">{formatPY(bs.previousYear?.totalAssets)}</td>
@@ -519,6 +881,47 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                       </>
                     );
                   })()}
+                </tr>
+
+                {/* Statutory References as per ICAI Page 3 */}
+                <tr className="bg-slate-50/80 text-slate-700 font-semibold text-xs border-t border-slate-200">
+                  <td className="py-2.5 px-4 pl-6">Brief about the Entity</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(1)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 1: Brief about the Entity"
+                    >
+                      1
+                    </button>
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+                </tr>
+                <tr className="bg-slate-50/80 text-slate-700 font-semibold text-xs">
+                  <td className="py-2.5 px-4 pl-6">Summary of significant accounting policies</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(2)}
+                      className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 2: Significant Accounting Policies"
+                    >
+                      2
+                    </button>
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">-</td>
+                </tr>
+                <tr className="bg-slate-50 text-slate-600 font-medium text-[11px] italic">
+                  <td colSpan={6} className="py-2 px-4">
+                    The accompanying notes are an integral part of the financial statements
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -566,7 +969,16 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                 {/* Revenue */}
                 <tr className="font-semibold">
                   <td className="py-2.5 px-4 pl-6">I. Revenue from Operations</td>
-                  <td className="py-2.5 px-3 text-center">19</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(19)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 19: Revenue from Operations"
+                    >
+                      19
+                    </button>
+                  </td>
                   <td className="py-2.5 px-4 text-right font-mono">{formatINR(pl.revenueFromOperations)}</td>
                   <td className="py-2.5 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.revenueFromOperations)}</td>
                   {(() => {
@@ -583,7 +995,16 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                 {/* Other Income */}
                 <tr className="font-semibold">
                   <td className="py-2.5 px-4 pl-6">II. Other Income</td>
-                  <td className="py-2.5 px-3 text-center">20</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(20)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 20: Other Income"
+                    >
+                      20
+                    </button>
+                  </td>
                   <td className="py-2.5 px-4 text-right font-mono">{formatINR(pl.otherIncome)}</td>
                   <td className="py-2.5 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.otherIncome)}</td>
                   {(() => {
@@ -597,17 +1018,17 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* Total Revenue */}
+                {/* Total Income */}
                 <tr className="bg-slate-100 font-bold text-slate-900 border-t border-b border-slate-200">
-                  <td className="py-2.5 px-4">III. TOTAL REVENUE (I + II)</td>
+                  <td className="py-2.5 px-4 uppercase tracking-wide">III. TOTAL INCOME (I + II)</td>
                   <td className="py-2.5 px-3 text-center">-</td>
-                  <td className="py-2.5 px-4 text-right font-mono">{formatINR(pl.totalRevenue)}</td>
-                  <td className="py-2.5 px-4 text-right font-mono text-slate-700">{formatPY(pl.previousYear?.totalRevenue)}</td>
+                  <td className="py-2.5 px-4 text-right font-mono font-bold">{formatINR(pl.totalRevenue)}</td>
+                  <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.totalRevenue)}</td>
                   {(() => {
                     const v = getVariance(pl.totalRevenue, pl.previousYear?.totalRevenue);
                     return (
                       <>
-                        <td className="py-2.5 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
                         <td className="py-2.5 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
                       </>
                     );
@@ -616,28 +1037,57 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
 
                 {/* EXPENSES */}
                 <tr className="bg-slate-50 font-bold text-slate-900">
-                  <td colSpan={6} className="py-2 px-4">
-                    IV. EXPENSES
+                  <td colSpan={6} className="py-2 px-4 uppercase tracking-wide">
+                    IV. EXPENSES:
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-8">Cost of materials consumed / purchases</td>
-                  <td className="py-2 px-3 text-center">21</td>
-                  <td className="py-2 px-4 text-right font-mono">{formatINR(pl.costOfMaterialsConsumed)}</td>
-                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.costOfMaterialsConsumed)}</td>
+                  <td className="py-2 px-4 pl-8">
+                    <div>Cost of goods sold</div>
+                    <div className="text-[11px] text-slate-500 font-normal pl-3">
+                      (a) Cost of materials consumed: {formatINR(pl.costOfRawMaterialsConsumed)}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-normal pl-3">
+                      (b) Purchases of Stock-in-Trade: {formatINR(pl.purchasesOfStockInTrade || 0)}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-normal pl-3">
+                      (c) Changes in inventories of finished goods, WIP & Stock: {formatINR(pl.changesInInventories)}
+                    </div>
+                  </td>
+                  <td className="py-2 px-3 text-center align-top pt-2.5">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(21)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 21: Cost of Goods Sold"
+                    >
+                      21
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono align-top pt-2.5">{formatINR(pl.costOfGoodsSold)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500 align-top pt-2.5">{formatPY(pl.previousYear?.costOfGoodsSold)}</td>
                   {(() => {
-                    const v = getVariance(pl.costOfMaterialsConsumed, pl.previousYear?.costOfMaterialsConsumed);
+                    const v = getVariance(pl.costOfGoodsSold, pl.previousYear?.costOfGoodsSold);
                     return (
                       <>
-                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
-                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                        <td className="py-2 px-4 text-right font-mono align-top pt-2.5">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold align-top pt-2.5">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
                       </>
                     );
                   })()}
                 </tr>
                 <tr>
                   <td className="py-2 px-4 pl-8">Employee benefits expense</td>
-                  <td className="py-2 px-3 text-center">22</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(22)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 22: Employee Benefits Expense"
+                    >
+                      22
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(pl.employeeBenefitsExpense)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.employeeBenefitsExpense)}</td>
                   {(() => {
@@ -652,7 +1102,16 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                 </tr>
                 <tr>
                   <td className="py-2 px-4 pl-8">Finance costs</td>
-                  <td className="py-2 px-3 text-center">23</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(23)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 23: Finance Costs"
+                    >
+                      23
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(pl.financeCosts)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.financeCosts)}</td>
                   {(() => {
@@ -667,7 +1126,16 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                 </tr>
                 <tr>
                   <td className="py-2 px-4 pl-8">Depreciation and amortization expense</td>
-                  <td className="py-2 px-3 text-center">24</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(24)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 24: Depreciation and Amortization Expense"
+                    >
+                      24
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(pl.depreciationExpense)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.depreciationExpense)}</td>
                   {(() => {
@@ -682,7 +1150,16 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                 </tr>
                 <tr>
                   <td className="py-2 px-4 pl-8">Other expenses</td>
-                  <td className="py-2 px-3 text-center">25</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(25)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 25: Other Expenses"
+                    >
+                      25
+                    </button>
+                  </td>
                   <td className="py-2 px-4 text-right font-mono">{formatINR(pl.otherExpenses)}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.otherExpenses)}</td>
                   {(() => {
@@ -698,24 +1175,26 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
 
                 {/* Total Expenses */}
                 <tr className="bg-slate-100 font-bold text-slate-900 border-t border-b border-slate-200">
-                  <td className="py-2.5 px-4">TOTAL EXPENSES</td>
+                  <td className="py-2.5 px-4 uppercase tracking-wide">TOTAL EXPENSES (IV)</td>
                   <td className="py-2.5 px-3 text-center">-</td>
-                  <td className="py-2.5 px-4 text-right font-mono">{formatINR(pl.totalExpenses)}</td>
-                  <td className="py-2.5 px-4 text-right font-mono text-slate-700">{formatPY(pl.previousYear?.totalExpenses)}</td>
+                  <td className="py-2.5 px-4 text-right font-mono font-bold">{formatINR(pl.totalExpenses)}</td>
+                  <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.totalExpenses)}</td>
                   {(() => {
                     const v = getVariance(pl.totalExpenses, pl.previousYear?.totalExpenses);
                     return (
                       <>
-                        <td className="py-2.5 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
                         <td className="py-2.5 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
                       </>
                     );
                   })()}
                 </tr>
 
-                {/* V. Profit before exceptional items, partners' remuneration and tax */}
+                {/* V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV) */}
                 <tr className="font-semibold text-slate-900 bg-slate-50/70">
-                  <td className="py-2.5 px-4">V. Profit / (loss) before exceptional items, partners' remuneration and tax (III - IV)</td>
+                  <td className="py-2.5 px-4 pl-6">
+                    V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV)
+                  </td>
                   <td className="py-2.5 px-3 text-center">-</td>
                   <td className="py-2.5 px-4 text-right font-mono font-semibold">{formatINR(pl.profitBeforeExceptionalAndTax)}</td>
                   <td className="py-2.5 px-4 text-right font-mono text-slate-500 font-semibold">{formatPY(pl.previousYear?.profitBeforeExceptionalAndTax)}</td>
@@ -730,9 +1209,64 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* IX. Profit before partners' remuneration and tax */}
+                {/* VI. Exceptional items */}
+                <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+                  <td className="py-2 px-4 pl-8">VI. Exceptional items (specify nature &amp; provide note/delete if none)</td>
+                  <td className="py-2 px-3 text-center">-</td>
+                  <td className="py-2 px-4 text-right font-mono">{pl.exceptionalItems ? formatINR(pl.exceptionalItems) : '-'}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{pl.previousYear?.exceptionalItems ? formatPY(pl.previousYear.exceptionalItems) : '-'}</td>
+                  {(() => {
+                    const v = getVariance(pl.exceptionalItems, pl.previousYear?.exceptionalItems);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+
+                {/* VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI) */}
+                <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+                  <td className="py-2 px-4 pl-6">
+                    VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI)
+                  </td>
+                  <td className="py-2.5 px-3 text-center">-</td>
+                  <td className="py-2.5 px-4 text-right font-mono font-medium">{formatINR(pl.profitBeforeExtraordinaryAndTax)}</td>
+                  <td className="py-2.5 px-4 text-right font-mono text-slate-500 font-medium">{formatPY(pl.previousYear?.profitBeforeExtraordinaryAndTax)}</td>
+                  {(() => {
+                    const v = getVariance(pl.profitBeforeExtraordinaryAndTax, pl.previousYear?.profitBeforeExtraordinaryAndTax);
+                    return (
+                      <>
+                        <td className="py-2.5 px-4 text-right font-mono font-medium">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2.5 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+
+                {/* VIII. Extraordinary Items */}
+                <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+                  <td className="py-2 px-4 pl-8">VIII. Extraordinary Items (specify nature &amp; provide note/delete if none)</td>
+                  <td className="py-2 px-3 text-center">-</td>
+                  <td className="py-2 px-4 text-right font-mono">{pl.extraordinaryItems ? formatINR(pl.extraordinaryItems) : '-'}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{pl.previousYear?.extraordinaryItems ? formatPY(pl.previousYear.extraordinaryItems) : '-'}</td>
+                  {(() => {
+                    const v = getVariance(pl.extraordinaryItems, pl.previousYear?.extraordinaryItems);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+
+                {/* IX. Profit before, partners' remuneration and tax (VII-VIII) */}
                 <tr className="bg-amber-50/60 font-bold text-amber-950 border-t border-b border-amber-200">
-                  <td className="py-2.5 px-4">IX. Profit before partners' remuneration and tax (VII - VIII)</td>
+                  <td className="py-2.5 px-4 pl-6">
+                    IX. Profit before, partners' remuneration and tax (VII-VIII)
+                  </td>
                   <td className="py-2.5 px-3 text-center">-</td>
                   <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-900">{formatINR(pl.profitBeforePartnersRemunerationAndTax)}</td>
                   <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.profitBeforePartnersRemunerationAndTax)}</td>
@@ -747,16 +1281,23 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* X. Partners' remuneration* */}
+                {/* X. Partners’ remuneration* */}
                 <tr className="bg-emerald-50/50 hover:bg-emerald-50 font-semibold text-emerald-950">
-                  <td className="py-2.5 px-4 flex items-center gap-2">
-                    <span>X. Partners' remuneration*</span>
+                  <td className="py-2.5 px-4 pl-6 flex items-center gap-2">
+                    <span>X. Partners’ remuneration*</span>
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                       Sec 40(b)
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-center">
-                    <span className="font-bold text-emerald-800 text-[10px] bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">*</span>
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(22)}
+                      className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 hover:bg-emerald-200 text-[10px] font-black transition border border-emerald-300 cursor-pointer inline-flex items-center"
+                      title="View Note 22: Partners' Remuneration"
+                    >
+                      *
+                    </button>
                   </td>
                   <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-900">
                     {pl.partnersRemuneration > 0 ? formatINR(pl.partnersRemuneration) : '-'}
@@ -775,9 +1316,9 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* XI. Profit Before Tax */}
+                {/* XI. Profit before tax (IX- X) */}
                 <tr className="font-black text-slate-950 bg-slate-100 border-t-2 border-b-2 border-slate-300">
-                  <td className="py-3 px-4">XI. PROFIT BEFORE TAX (PBT) (IX - X)</td>
+                  <td className="py-3 px-4 uppercase tracking-wide">XI. PROFIT BEFORE TAX (IX - X)</td>
                   <td className="py-3 px-3 text-center">-</td>
                   <td className="py-3 px-4 text-right font-mono font-black">{formatINR(pl.profitBeforeTax)}</td>
                   <td className="py-3 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.profitBeforeTax)}</td>
@@ -792,17 +1333,67 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* Tax Expense */}
+                {/* XII. Tax Expense */}
+                <tr className="font-semibold text-slate-900 bg-slate-50/40">
+                  <td colSpan={6} className="py-2 px-4 pl-6">XII. Tax expense:</td>
+                </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-8">VI. Tax expense (Current Tax Provision)</td>
-                  <td className="py-2 px-3 text-center">-</td>
-                  <td className="py-2 px-4 text-right font-mono">{formatINR(pl.totalTaxExpense)}</td>
+                  <td className="py-2 px-4 pl-10">(1) Current tax</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(8)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 8: Current Tax Provision"
+                    >
+                      8
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(pl.currentTax)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.currentTax)}</td>
                   {(() => {
-                    const pyTax = pl.previousYear ? ((pl.previousYear.currentTax || 0) + (pl.previousYear.deferredTaxCharge || 0)) : undefined;
-                    const v = getVariance(pl.totalTaxExpense, pyTax);
+                    const v = getVariance(pl.currentTax, pl.previousYear?.currentTax);
                     return (
                       <>
-                        <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(pyTax)}</td>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-10">(2) Excess/ Short provision of tax relating to earlier years</td>
+                  <td className="py-2 px-3 text-center">-</td>
+                  <td className="py-2 px-4 text-right font-mono">{pl.excessShortTaxEarlierYears ? formatINR(pl.excessShortTaxEarlierYears) : '-'}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{pl.previousYear?.excessShortTaxEarlierYears ? formatPY(pl.previousYear.excessShortTaxEarlierYears) : '-'}</td>
+                  {(() => {
+                    const v = getVariance(pl.excessShortTaxEarlierYears, pl.previousYear?.excessShortTaxEarlierYears);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+                <tr>
+                  <td className="py-2 px-4 pl-10">(3) Deferred tax charge/ (benefit)</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNote(6)}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 text-[11px] font-bold transition cursor-pointer"
+                      title="View Note 6: Deferred Tax"
+                    >
+                      6
+                    </button>
+                  </td>
+                  <td className="py-2 px-4 text-right font-mono">{formatINR(pl.deferredTax)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">{formatPY(pl.previousYear?.deferredTax)}</td>
+                  {(() => {
+                    const v = getVariance(pl.deferredTax, pl.previousYear?.deferredTax);
+                    return (
+                      <>
                         <td className="py-2 px-4 text-right font-mono">{v ? formatINR(v.diff) : '-'}</td>
                         <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
                       </>
@@ -810,11 +1401,62 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* Profit After Tax */}
+                {/* XIII. Profit/(Loss) for the period from continuing operations (XI-XII) */}
+                <tr className="hover:bg-slate-50 transition-colors font-semibold text-slate-800">
+                  <td className="py-2 px-4 pl-6">
+                    XIII. Profit/(Loss) for the period from continuing operations (XI-XII)
+                  </td>
+                  <td className="py-2 px-3 text-center">-</td>
+                  <td className="py-2 px-4 text-right font-mono font-bold text-slate-900">{formatINR(pl.profitFromContinuingOps)}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500 font-bold">{formatPY(pl.previousYear?.profitAfterTax)}</td>
+                  {(() => {
+                    const v = getVariance(pl.profitFromContinuingOps, pl.previousYear?.profitAfterTax);
+                    return (
+                      <>
+                        <td className="py-2 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
+                        <td className="py-2 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                      </>
+                    );
+                  })()}
+                </tr>
+
+                {/* XIV. Profit/(loss) from discontinuing operations */}
+                <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+                  <td className="py-2 px-4 pl-6">XIV. Profit/(loss) from discontinuing operations</td>
+                  <td className="py-2 px-3 text-center">-</td>
+                  <td className="py-2 px-4 text-right font-mono">{pl.profitFromDiscontinuingOps ? formatINR(pl.profitFromDiscontinuingOps) : '-'}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
+                  <td className="py-2 px-4 text-right font-mono">-</td>
+                  <td className="py-2 px-4 text-right font-bold">-</td>
+                </tr>
+
+                {/* XV. Tax expense of discontinuing operations */}
+                <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+                  <td className="py-2 px-4 pl-6">XV. Tax expense of discontinuing operations</td>
+                  <td className="py-2 px-3 text-center">-</td>
+                  <td className="py-2 px-4 text-right font-mono">{pl.taxExpenseDiscontinuingOps ? formatINR(pl.taxExpenseDiscontinuingOps) : '-'}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
+                  <td className="py-2 px-4 text-right font-mono">-</td>
+                  <td className="py-2 px-4 text-right font-bold">-</td>
+                </tr>
+
+                {/* XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV) */}
+                <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+                  <td className="py-2 px-4 pl-6">XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV)</td>
+                  <td className="py-2 px-3 text-center">-</td>
+                  <td className="py-2 px-4 text-right font-mono">{pl.profitFromDiscontinuingOpsAfterTax ? formatINR(pl.profitFromDiscontinuingOpsAfterTax) : '-'}</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
+                  <td className="py-2 px-4 text-right font-mono">-</td>
+                  <td className="py-2 px-4 text-right font-bold">-</td>
+                </tr>
+
+                {/* XVII. Profit/(Loss) for the year (XIII+XVI) */}
                 <tr className="bg-emerald-100 font-black text-emerald-950 text-xs border-t-2 border-b-2 border-emerald-300">
-                  <td className="py-3 px-4">VII. PROFIT FOR THE YEAR (PAT)</td>
+                  <td className="py-3 px-4 uppercase tracking-wide">
+                    XVII. PROFIT / (LOSS) FOR THE YEAR (XIII + XVI)
+                  </td>
                   <td className="py-3 px-3 text-center">-</td>
-                  <td className="py-3 px-4 text-right font-mono font-bold">{formatINR(pl.profitAfterTax)}</td>
+                  <td className="py-3 px-4 text-right font-mono font-bold text-emerald-950">{formatINR(pl.profitAfterTax)}</td>
                   <td className="py-3 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.profitAfterTax)}</td>
                   {(() => {
                     const v = getVariance(pl.profitAfterTax, pl.previousYear?.profitAfterTax);
@@ -825,6 +1467,18 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                       </>
                     );
                   })()}
+                </tr>
+
+                {/* ICAI Guidance Note Statutory Disclosures & Footnotes */}
+                <tr className="bg-slate-50/70 text-slate-500 text-[11px] italic">
+                  <td colSpan={6} className="py-2 px-4">
+                    * wherever applicable
+                  </td>
+                </tr>
+                <tr className="bg-slate-50 text-slate-700 font-semibold text-xs border-t border-slate-200">
+                  <td colSpan={6} className="py-2.5 px-4">
+                    The accompanying notes are an integral part of the financial statements
+                  </td>
                 </tr>
               </tbody>
             </table>
