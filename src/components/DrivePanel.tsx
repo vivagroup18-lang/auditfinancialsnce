@@ -35,6 +35,8 @@ import {
   trashDriveFile,
   findOrCreateEntityFolder,
   isGoogleAuthExpired,
+  isGoogleDriveApiDisabled,
+  extractDriveActivationUrl,
   type DriveFile,
   type DriveAbout,
 } from '../services/driveService';
@@ -110,6 +112,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
     type: 'success' | 'error' | 'info';
     text: string;
     driveLink?: string;
+    activationUrl?: string;
   } | null>(null);
   const [isExportingToDrive, setIsExportingToDrive] = useState(false);
   const [isBackingUpToDrive, setIsBackingUpToDrive] = useState(false);
@@ -133,6 +136,33 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
     actionType: 'trash',
   });
 
+  // Centralized Drive error handler
+  const handleDriveCatch = useCallback(
+    (err: any, fallbackMessage: string) => {
+      if (isGoogleAuthExpired(err)) {
+        console.warn(`[DrivePanel] Google Drive session expired: ${fallbackMessage}`);
+        onSignOut();
+        setStatusMessage({
+          type: 'error',
+          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
+        });
+      } else if (isGoogleDriveApiDisabled(err)) {
+        setStatusMessage({
+          type: 'error',
+          text: 'Google Drive API is disabled in your Google Cloud Project (471811229038). Please click the button below to enable it in the Google Cloud Console.',
+          activationUrl: extractDriveActivationUrl(err),
+        });
+      } else {
+        console.warn(`[DrivePanel] ${fallbackMessage}:`, err?.message || err);
+        setStatusMessage({
+          type: 'error',
+          text: `${fallbackMessage}: ${err?.message || err}`,
+        });
+      }
+    },
+    [onSignOut]
+  );
+
   // Load Google Drive About & Quota
   const loadAboutInfo = useCallback(async () => {
     if (!accessToken) return;
@@ -141,20 +171,11 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       const data = await getDriveAbout(accessToken);
       setAboutData(data);
     } catch (err: any) {
-      if (isGoogleAuthExpired(err)) {
-        console.warn('[DrivePanel] Google Drive session expired.');
-        onSignOut();
-        setStatusMessage({
-          type: 'error',
-          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
-        });
-      } else {
-        console.warn('[DrivePanel] Unable to load Drive quota:', err?.message || err);
-      }
+      handleDriveCatch(err, 'Unable to load Drive quota');
     } finally {
       setLoadingAbout(false);
     }
-  }, [accessToken, onSignOut]);
+  }, [accessToken, handleDriveCatch]);
 
   // Fetch Drive Files
   const fetchFiles = useCallback(async () => {
@@ -169,24 +190,11 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       });
       setFiles(res.files);
     } catch (err: any) {
-      if (isGoogleAuthExpired(err)) {
-        console.warn('[DrivePanel] Google Drive session expired while fetching files.');
-        onSignOut();
-        setStatusMessage({
-          type: 'error',
-          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
-        });
-      } else {
-        console.warn('[DrivePanel] Unable to list files:', err?.message || err);
-        setStatusMessage({
-          type: 'error',
-          text: `Error loading Drive files: ${err.message || err}`,
-        });
-      }
+      handleDriveCatch(err, 'Error loading Drive files');
     } finally {
       setLoadingFiles(false);
     }
-  }, [accessToken, currentFolderId, filterType, searchQuery, onSignOut]);
+  }, [accessToken, currentFolderId, filterType, searchQuery, handleDriveCatch]);
 
   // Initial load when token changes or folder/filter changes
   useEffect(() => {
@@ -270,19 +278,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       });
       fetchFiles();
     } catch (err: any) {
-      if (isGoogleAuthExpired(err)) {
-        console.warn('[DrivePanel] Google Drive session expired.');
-        onSignOut();
-        setStatusMessage({
-          type: 'error',
-          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
-        });
-      } else {
-        setStatusMessage({
-          type: 'error',
-          text: `Failed to create folder: ${err.message || err}`,
-        });
-      }
+      handleDriveCatch(err, 'Failed to create folder');
     } finally {
       setIsCreatingFolder(false);
     }
@@ -342,20 +338,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       fetchFiles();
       loadAboutInfo();
     } catch (err: any) {
-      if (isGoogleAuthExpired(err)) {
-        console.warn('[DrivePanel] Google Drive session expired.');
-        onSignOut();
-        setStatusMessage({
-          type: 'error',
-          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
-        });
-      } else {
-        console.warn('[DrivePanel] Drive export error:', err?.message || err);
-        setStatusMessage({
-          type: 'error',
-          text: `Failed to export to Google Drive: ${err.message || err}`,
-        });
-      }
+      handleDriveCatch(err, 'Failed to export to Google Drive');
     } finally {
       setIsExportingToDrive(false);
     }
@@ -411,20 +394,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       fetchFiles();
       loadAboutInfo();
     } catch (err: any) {
-      if (isGoogleAuthExpired(err)) {
-        console.warn('[DrivePanel] Google Drive session expired.');
-        onSignOut();
-        setStatusMessage({
-          type: 'error',
-          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
-        });
-      } else {
-        console.warn('[DrivePanel] Drive backup error:', err?.message || err);
-        setStatusMessage({
-          type: 'error',
-          text: `Failed to save backup to Drive: ${err.message || err}`,
-        });
-      }
+      handleDriveCatch(err, 'Failed to save backup to Drive');
     } finally {
       setIsBackingUpToDrive(false);
     }
@@ -456,19 +426,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       fetchFiles();
       loadAboutInfo();
     } catch (err: any) {
-      if (isGoogleAuthExpired(err)) {
-        console.warn('[DrivePanel] Google Drive session expired.');
-        onSignOut();
-        setStatusMessage({
-          type: 'error',
-          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
-        });
-      } else {
-        setStatusMessage({
-          type: 'error',
-          text: `Upload failed: ${err.message || err}`,
-        });
-      }
+      handleDriveCatch(err, 'Upload failed');
     } finally {
       setIsUploadingLocal(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -510,20 +468,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
         text: `Imported ${rows.length} accounts from "${file.name}" as ${isPY ? 'Previous Year' : 'Current Year'} Trial Balance!`,
       });
     } catch (err: any) {
-      if (isGoogleAuthExpired(err)) {
-        console.warn('[DrivePanel] Google Drive session expired.');
-        onSignOut();
-        setStatusMessage({
-          type: 'error',
-          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
-        });
-      } else {
-        console.warn('[DrivePanel] Import from Drive error:', err?.message || err);
-        setStatusMessage({
-          type: 'error',
-          text: `Could not import file: ${err.message || err}`,
-        });
-      }
+      handleDriveCatch(err, 'Could not import file');
     } finally {
       setDownloadingFileId(null);
       setConfirmModal({ isOpen: false, actionType: 'trash' });
@@ -542,19 +487,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       fetchFiles();
       loadAboutInfo();
     } catch (err: any) {
-      if (isGoogleAuthExpired(err)) {
-        console.warn('[DrivePanel] Google Drive session expired.');
-        onSignOut();
-        setStatusMessage({
-          type: 'error',
-          text: 'Google Drive session has expired. Please click "Connect Google Drive" below to reconnect.',
-        });
-      } else {
-        setStatusMessage({
-          type: 'error',
-          text: `Failed to delete file: ${err.message || err}`,
-        });
-      }
+      handleDriveCatch(err, 'Failed to delete file');
     } finally {
       setConfirmModal({ isOpen: false, actionType: 'trash' });
     }
@@ -789,6 +722,22 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
                   <span>Open file in Google Drive</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
+              )}
+              {statusMessage.activationUrl && (
+                <div className="mt-2.5 space-y-1.5">
+                  <a
+                    href={statusMessage.activationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition"
+                  >
+                    <span>Enable Google Drive API in Cloud Console</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <p className="text-[11px] text-slate-600">
+                    Click &ldquo;Enable&rdquo; in Google Cloud Console, wait 1&ndash;2 minutes for Google propagation, then retry your action.
+                  </p>
+                </div>
               )}
             </div>
           </div>

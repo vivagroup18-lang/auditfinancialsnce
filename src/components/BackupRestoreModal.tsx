@@ -31,6 +31,8 @@ import {
   listDriveFiles,
   downloadDriveFile,
   isGoogleAuthExpired,
+  isGoogleDriveApiDisabled,
+  extractDriveActivationUrl,
   type DriveFile,
 } from '../services/driveService';
 import { googleSignIn, googleLogout } from '../firebase';
@@ -63,6 +65,7 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'cloud' | 'local'>('cloud');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [driveApiDisabledUrl, setDriveApiDisabledUrl] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isSavingToCloud, setIsSavingToCloud] = useState(false);
@@ -103,11 +106,14 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
         pageSize: 15,
       });
       setCloudBackups(result.files || []);
+      setDriveApiDisabledUrl(null);
     } catch (err: any) {
       if (isGoogleAuthExpired(err)) {
         console.warn('[BackupRestoreModal] Google Drive access token has expired or is invalid.');
         if (onSignOut) onSignOut();
         setErrorMsg('Your Google Workspace session has expired. Please click "Reconnect Google Drive" to refresh your session.');
+      } else if (isGoogleDriveApiDisabled(err)) {
+        setDriveApiDisabledUrl(extractDriveActivationUrl(err));
       } else {
         console.warn('[BackupRestoreModal] Unable to load cloud backups:', err?.message || err);
       }
@@ -154,6 +160,7 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
 
     setIsSavingToCloud(true);
     setErrorMsg(null);
+    setDriveApiDisabledUrl(null);
     setSuccessMsg(null);
     setSavedCloudLink(null);
 
@@ -195,6 +202,9 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
         console.warn('[BackupRestoreModal] Cloud backup failed: Google session expired or invalid.');
         if (onSignOut) onSignOut();
         setErrorMsg('Your Google Workspace session has expired. Please click "Reconnect Google Drive" to refresh your session and save your backup.');
+      } else if (isGoogleDriveApiDisabled(err)) {
+        const activationUrl = extractDriveActivationUrl(err);
+        setDriveApiDisabledUrl(activationUrl);
       } else {
         console.warn('[BackupRestoreModal] Cloud backup error:', err?.message || err);
         setErrorMsg(`Failed to save backup to Google Drive: ${err.message || 'Unknown error'}`);
@@ -267,6 +277,9 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
         console.warn('[BackupRestoreModal] Download backup failed: Google session expired or invalid.');
         if (onSignOut) onSignOut();
         setErrorMsg('Your Google Workspace session has expired. Please click "Reconnect Google Drive" to refresh your session.');
+      } else if (isGoogleDriveApiDisabled(err)) {
+        const activationUrl = extractDriveActivationUrl(err);
+        setDriveApiDisabledUrl(activationUrl);
       } else {
         console.warn('[BackupRestoreModal] Error downloading drive backup:', err?.message || err);
         setErrorMsg(`Failed to download backup from Google Drive: ${err.message || 'Unknown error'}`);
@@ -381,7 +394,67 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
             </div>
           )}
 
-          {errorMsg && (
+          {driveApiDisabledUrl && (
+            <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl shadow-xs space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 border border-amber-200 text-amber-800 rounded-lg shrink-0 mt-0.5">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        One-Time Action: Enable Google Drive API
+                      </h4>
+                      <span className="text-[10px] bg-amber-200 text-amber-900 font-mono px-2 py-0.5 rounded-full font-bold">
+                        Project 471811229038
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      Google Cloud requires the <strong>Google Drive API</strong> to be enabled once in project <code>471811229038</code> before files can be stored or read from Google Drive.
+                    </p>
+                    <div className="pt-1.5 flex flex-wrap items-center gap-2.5">
+                      <a
+                        href={driveApiDisabledUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Enable Google Drive API in Cloud Console ↗</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDriveApiDisabledUrl(null);
+                          setErrorMsg(null);
+                          handleSaveWorkspaceToDrive();
+                        }}
+                        className="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold rounded-lg transition"
+                      >
+                        Retry Backup
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-slate-600 bg-amber-100/70 p-2.5 rounded-lg mt-2 border border-amber-200 space-y-0.5">
+                      <div className="font-semibold text-slate-800">Quick 3-step activation:</div>
+                      <div>1. Click the blue button above to open your Google Cloud Console.</div>
+                      <div>2. Click the blue <strong>"Enable"</strong> button on the page.</div>
+                      <div>3. Return here and click <strong>"Retry Backup"</strong> (allow ~1-2 min for Google to sync).</div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDriveApiDisabledUrl(null)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!driveApiDisabledUrl && errorMsg && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl flex items-start justify-between gap-3">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />

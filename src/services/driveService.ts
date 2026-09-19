@@ -26,6 +26,54 @@ export function isGoogleAuthExpired(err: any): boolean {
   );
 }
 
+export class GoogleDriveApiDisabledError extends Error {
+  status: number;
+  projectId: string;
+  activationUrl: string;
+  constructor(
+    projectId = '471811229038',
+    activationUrl?: string,
+    status = 403
+  ) {
+    const url =
+      activationUrl ||
+      `https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${projectId}`;
+    super(
+      `Google Drive API is disabled in Google Cloud project (${projectId}). Please enable it in Google Cloud Console.`
+    );
+    this.name = 'GoogleDriveApiDisabledError';
+    this.status = status;
+    this.projectId = projectId;
+    this.activationUrl = url;
+  }
+}
+
+export function isGoogleDriveApiDisabled(err: any): boolean {
+  if (!err) return false;
+  if (err instanceof GoogleDriveApiDisabledError || err.name === 'GoogleDriveApiDisabledError') return true;
+  const msg = String(err.message || err);
+  return (
+    msg.includes('SERVICE_DISABLED') ||
+    msg.includes('Google Drive API has not been used') ||
+    msg.includes('accessNotConfigured') ||
+    (msg.includes('drive.googleapis.com') && (msg.includes('disabled') || msg.includes('Enable it')))
+  );
+}
+
+export function extractDriveActivationUrl(err: any): string {
+  if (err && typeof err === 'object' && err.activationUrl) {
+    return err.activationUrl;
+  }
+  const msg = String(err?.message || err || '');
+  const urlMatch = msg.match(/https:\/\/[^\s"',)]+/);
+  if (urlMatch && urlMatch[0].includes('drive.googleapis.com')) {
+    return urlMatch[0];
+  }
+  const projMatch = msg.match(/project(?:s\/|\s+)(\d+)/i);
+  const projId = projMatch ? projMatch[1] : '471811229038';
+  return `https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${projId}`;
+}
+
 function handleDriveError(res: Response, errorBody: string, actionDesc: string): never {
   if (
     res.status === 401 ||
@@ -38,6 +86,24 @@ function handleDriveError(res: Response, errorBody: string, actionDesc: string):
       res.status
     );
   }
+
+  if (
+    errorBody.includes('SERVICE_DISABLED') ||
+    errorBody.includes('Google Drive API has not been used') ||
+    errorBody.includes('accessNotConfigured') ||
+    (res.status === 403 && errorBody.includes('drive.googleapis.com'))
+  ) {
+    const projMatch = errorBody.match(/project(?:s\/|\s+)(\d+)/i);
+    const projId = projMatch ? projMatch[1] : '471811229038';
+    const urlMatch = errorBody.match(/https:\/\/[^\s"',)]+/);
+    const activationUrl =
+      urlMatch && urlMatch[0].includes('drive.googleapis.com')
+        ? urlMatch[0]
+        : `https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${projId}`;
+
+    throw new GoogleDriveApiDisabledError(projId, activationUrl, res.status);
+  }
+
   throw new Error(`Failed to ${actionDesc} (${res.status}): ${errorBody}`);
 }
 
