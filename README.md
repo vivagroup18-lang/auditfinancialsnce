@@ -82,6 +82,29 @@ npm run build
 
 ---
 
+## 🐳 Docker & Google Cloud Deployment
+
+The repository includes a production-grade multi-stage `Dockerfile` configured for Google Cloud Run:
+
+### Run Locally with Docker
+```bash
+docker build -t nceauditfinancials:latest .
+docker run -p 8080:8080 nceauditfinancials:latest
+```
+
+### Deploy to Google Cloud Run
+See detailed instructions in [GCP_DEPLOYMENT.md](GCP_DEPLOYMENT.md).
+```bash
+# 1-command deployment via Google Cloud SDK
+gcloud run deploy nceauditfinancials \
+  --source . \
+  --region asia-south1 \
+  --allow-unauthenticated \
+  --port 8080
+```
+
+---
+
 ## 📋 Repository Structure
 
 ```
@@ -114,6 +137,9 @@ nceauditfinancials/
 │   ├── firebase.ts                          # Firebase Authentication & App Config
 │   ├── types.ts                             # Core TypeScript Interfaces
 │   └── main.tsx                             # Application Entrypoint
+├── Dockerfile                               # Production multi-stage Dockerfile for Cloud Run
+├── GCP_DEPLOYMENT.md                        # Google Cloud Run deployment guide
+├── cloudbuild.yaml                          # Google Cloud Build pipeline
 ├── package.json
 ├── tsconfig.json
 └── vite.config.ts
