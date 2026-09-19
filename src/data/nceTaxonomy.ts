@@ -353,6 +353,10 @@ export const NCE_NOTE_DEFINITIONS: NoteDefinition[] = [
       '(b) Contribution to provident and other funds',
       '(c) Gratuity expenses',
       '(d) Staff welfare expenses',
+      '(e) Partners\' remuneration / Salary to partners (Disclosed at Line X of P&L)',
+    ],
+    mandatoryDisclosures: [
+      'Separate disclosure of Partners\' remuneration on the face of P&L (Line X) and partner-wise breakup under Sec 40(b)',
     ],
   },
   {
@@ -411,6 +415,7 @@ export const NCE_NOTE_DEFINITIONS: NoteDefinition[] = [
       '(v) Provision for diminution in value of investments',
       '(w) Provision for doubtful debts',
       '(x) Miscellaneous expenses',
+      '(y) Partners\' remuneration / Salary to partners (Disclosed at Line X of P&L)',
     ],
   },
 ];

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Search, ChevronDown, ChevronRight, FileText, CheckCircle2, Building, ShieldCheck, DollarSign, Box, Calculator } from 'lucide-react';
 import { NoteScheduleData, EntityConfig } from '../types';
 import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
+import { isPartnersRemunerationItem } from '../utils/financialCalculations';
 
 interface NotesViewProps {
   noteSchedules: Record<number, NoteScheduleData>;
@@ -361,7 +362,14 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                       {item.accountCode || '-'}
                                     </td>
                                     <td className="py-2.5 px-3 font-medium text-slate-900">
-                                      {item.accountName}
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span>{item.accountName}</span>
+                                        {isPartnersRemunerationItem(item) && (
+                                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                            Line X: Partners' Remuneration
+                                          </span>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="py-2.5 px-3 text-slate-600 text-[11px]">
                                       {item.subCategory}

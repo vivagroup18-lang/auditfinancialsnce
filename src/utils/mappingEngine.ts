@@ -176,6 +176,34 @@ export function classifyLedgerAccount(accountName: string, netDebit: number, net
     };
   }
 
+  // I. Partners' Remuneration / Salary to Partners (Face of P&L Line X)
+  if (
+    (name.includes('partner') && (name.includes('remuneration') || name.includes('salary') || name.includes('allowance') || name.includes('bonus'))) ||
+    name.includes('remuneration to partner') ||
+    name.includes('remuneration paid to partner') ||
+    name.includes('remuneration of partner') ||
+    name.includes('partners remuneration') ||
+    name.includes('partner remuneration') ||
+    name.includes('partner\'s remuneration') ||
+    name.includes('partners\' remuneration') ||
+    name.includes('partner salary') ||
+    name.includes('partners salary') ||
+    name.includes('salary to partner') ||
+    name.includes('salary paid to partner') ||
+    (name.startsWith('remuneration') && !name.includes('director') && !name.includes('auditor')) ||
+    (name.includes('remuneration') && (name.includes('proprietor') || name.includes('member') || name.includes('partner')))
+  ) {
+    return {
+      noteNumber: 22,
+      noteName: 'Employee Benefits Expense',
+      subCategory: '(e) Partners\' remuneration / Salary to partners (Disclosed at Line X of P&L)',
+      statement: 'ProfitAndLoss',
+      nature: 'Expense',
+      confidence: 0.99,
+      reasoning: 'ICAI Non-Corporate Entity Rule: Partners\' remuneration is identified for distinct Line X disclosure on the face of Statement of Profit and Loss.',
+    };
+  }
+
   // ==========================================
   // TIER 2: CONTEXTUAL MULTI-WORD COMBINATIONS
   // ==========================================

@@ -138,10 +138,10 @@ Statutory Note Categories:
 - Note 19: Revenue from Operations (Sale of manufactured goods, sale of services, turnover, job work)
 - Note 20: Other Income (Interest income on FDs, miscellaneous operating income, scrap sale, discounts received)
 - Note 21: Cost of Goods Sold (Raw materials consumed, direct factory costs, purchases of stock-in-trade, changes in inventory, freight inward, job work charges)
-- Note 22: Employee Benefits Expense (Salaries, wages, bonus, PF/ESI contributions, staff welfare, gratuity expense)
-- Note 23: Finance Cost (Bank term loan interest, CC interest, bank charges, borrowing costs, loan processing charges)
+- Note 22: Employee Benefits Expense (Salaries, wages, bonus, PF/ESI contributions, staff welfare, gratuity expense) and Partners' Remuneration. CRITICAL: If a ledger represents Partners' Remuneration, Partner Salary, or Remuneration to Partners, assign noteNumber: 22 with subCategory: "(e) Partners' remuneration / Salary to partners (Disclosed at Line X of P&L)" and linkedStatementItem: "X. Partners' remuneration*".
+- Note 23: Finance Cost (Bank term loan interest, CC interest, bank charges, borrowing costs, loan processing charges, interest on partners capital)
 - Note 24: Depreciation and Amortization Expense (Depreciation on tangible assets, amortization of software/intangibles)
-- Note 25: Other Expenses (Auditor remuneration, rent, power & fuel, repairs, insurance, travelling, communication, legal & professional fees, printing & stationery, miscellaneous expenses)
+- Note 25: Other Expenses (Auditor remuneration, rent, power & fuel, repairs, insurance, travelling, communication, legal & professional fees, printing & stationery, miscellaneous expenses - NOTE: DO NOT place Partners Remuneration here; Partners Remuneration must be under Note 22 for Line X disclosure)
 
 ${promptContext}
 
@@ -371,8 +371,8 @@ Statutory Note Categories:
 - Note 19: Revenue from Operations
 - Note 20: Other Income
 - Note 21: Cost of Goods Sold (Raw materials, Purchases, Direct factory expenses, Inward freight)
-- Note 22: Employee Benefits Expense (Salaries, Bonus, PF/ESI)
-- Note 23: Finance Cost (Bank Interest, Processing Fees, Bank Charges)
+- Note 22: Employee Benefits Expense (Salaries, Bonus, PF/ESI) & Partners' Remuneration (Face of P&L Line X)
+- Note 23: Finance Cost (Bank Interest, Processing Fees, Bank Charges, Interest on Partners' Capital)
 - Note 24: Depreciation and Amortization Expense
 - Note 25: Other Expenses (Audit Fees, Rent, Legal, Repairs, Outward freight, Admin)
 

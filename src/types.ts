@@ -211,6 +211,7 @@ export interface ProfitAndLossData {
   extraordinaryItems: number;
   profitBeforePartnersRemunerationAndTax: number; // (VII - VIII)
   partnersRemuneration: number; // Partners' remuneration*
+  partnersRemunerationItems?: MappedLedger[];
   profitBeforeTax: number; // (IX - X)
 
   // Tax expense
@@ -249,6 +250,7 @@ export interface ProfitAndLossData {
     extraordinaryItems: number;
     profitBeforePartnersRemunerationAndTax: number;
     partnersRemuneration: number;
+    partnersRemunerationItems?: MappedLedger[];
     profitBeforeTax: number;
     currentTax: number;
     excessShortTaxEarlierYears: number;

@@ -1193,6 +1193,21 @@ export function buildAttractiveExcelWorkbook({
     { isGrandTotal: true }
   );
 
+  // Footnote for Line X: Partners' Remuneration
+  if (profitAndLoss.partnersRemuneration > 0 || (profitAndLoss.previousYear?.partnersRemuneration && profitAndLoss.previousYear.partnersRemuneration > 0)) {
+    plRows.push(new Array(plColCount).fill(textCell('', { border: {} })));
+    plRowHeights.push({ hpt: 6 });
+
+    const footnoteRow = new Array(plColCount).fill(null).map(() => textCell('', { border: {} }));
+    footnoteRow[0] = textCell(
+      "* In terms of Section 40(b) of the Income-tax Act, 1961, remuneration paid/payable to working partners has been calculated in accordance with the terms of the Partnership Deed.",
+      { italic: true, sz: 9, color: '374151', border: {} }
+    );
+    plRows.push(footnoteRow);
+    plRowHeights.push({ hpt: 16 });
+    plMerges.push({ s: { r: plRows.length - 1, c: 0 }, e: { r: plRows.length - 1, c: plColCount - 1 } });
+  }
+
   appendSignOffBlock(plRows, entityConfig, currentPeriod, plColCount, plRowHeights);
 
   const wsPL = XLSX.utils.aoa_to_sheet(plRows);
@@ -1512,6 +1527,71 @@ export function buildAttractiveExcelWorkbook({
     ], 24);
 
     // Spacer
+    addNotesRow(new Array(notesColCount).fill(textCell('', { border: {} })), 12);
+  }
+
+  // Statutory Disclosure: Partners' Remuneration (Line X of P&L & Section 40(b))
+  if (profitAndLoss.partnersRemuneration > 0 || (profitAndLoss.previousYear?.partnersRemuneration && profitAndLoss.previousYear.partnersRemuneration > 0)) {
+    const ribbonRowIdx = notesRows.length;
+    const ribbonRow: any[] = [];
+    for (let c = 0; c < notesColCount; c++) {
+      let content = '';
+      if (c === 0) content = "STATUTORY DISCLOSURE: PARTNERS' REMUNERATION (LINE X OF P&L & SECTION 40(b))";
+      ribbonRow.push(
+        textCell(content, {
+          bold: true,
+          sz: 10.5,
+          color: PALETTE.white,
+          bg: PALETTE.navyMedium,
+          align: 'left',
+          border: {
+            top: { style: 'medium', color: { rgb: PALETTE.navyDark } },
+            bottom: { style: 'medium', color: { rgb: PALETTE.navyDark } },
+          },
+        })
+      );
+    }
+    addNotesRow(ribbonRow, 24);
+    notesMerges.push({ s: { r: ribbonRowIdx, c: 0 }, e: { r: ribbonRowIdx, c: notesColCount - 1 } });
+
+    // Narrative Row
+    const narrRowIdx = notesRows.length;
+    const narrative = "Disclosure: Remuneration paid or payable to working partners is determined in accordance with the Partnership Deed and complies with the statutory ceiling prescribed under Section 40(b) of the Income-tax Act, 1961.";
+    const narrRow: any[] = [];
+    for (let c = 0; c < notesColCount; c++) {
+      narrRow.push(textCell(c === 0 ? narrative : '', { italic: true, sz: 9.5, color: '334155', bg: PALETTE.white }));
+    }
+    addNotesRow(narrRow, 24);
+    notesMerges.push({ s: { r: narrRowIdx, c: 0 }, e: { r: narrRowIdx, c: notesColCount - 1 } });
+
+    // Partner Remuneration Ledgers
+    if (profitAndLoss.partnersRemunerationItems && profitAndLoss.partnersRemunerationItems.length > 0) {
+      profitAndLoss.partnersRemunerationItems.forEach((it, itIdx) => {
+        const balCY = it.displayBalance !== undefined ? Math.abs(it.displayBalance) : Math.abs(it.netBalance);
+        const balPY = Math.abs(it.previousYearBalance || 0);
+        const bg = itIdx % 2 === 1 ? PALETTE.zebraOdd : PALETTE.white;
+
+        addNotesRow([
+          textCell("Line X", { align: 'center', sz: 9, color: '047857', bold: true, bg }),
+          textCell(it.accountCode || '-', { align: 'center', sz: 9.5, color: '64748B', bg }),
+          textCell(it.accountName, { bold: true, sz: 10, bg }),
+          textCell("Partners' Remuneration (Sec 40(b))", { sz: 9.5, color: '047857', bg }),
+          numCell(balCY),
+          numCell(balPY),
+        ], 20);
+      });
+    }
+
+    // Schedule Total Row
+    addNotesRow([
+      textCell('', { bg: PALETTE.grandTotalBg }),
+      textCell('', { bg: PALETTE.grandTotalBg }),
+      textCell("Total Partners' Remuneration (Disclosed at Line X of Statement of P&L)", { bold: true, sz: 10.5, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
+      textCell("P&L Line X Total", { bold: true, sz: 9.5, bg: PALETTE.grandTotalBg, color: '475569' }),
+      numCell(profitAndLoss.partnersRemuneration, { isGrandTotal: true }),
+      numCell(profitAndLoss.previousYear?.partnersRemuneration || 0, { isGrandTotal: true }),
+    ], 24);
+
     addNotesRow(new Array(notesColCount).fill(textCell('', { border: {} })), 12);
   }
 

@@ -300,11 +300,105 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* V. Profit Before Tax */}
-            <tr className="bg-slate-50/90 font-bold text-slate-900">
-              <td className="py-3 px-6 text-sm">V. PROFIT / (LOSS) BEFORE TAX (III - IV)</td>
-              <td className="py-3 px-2 text-center"></td>
-              <td className="py-3 px-4 text-right font-mono text-sm font-bold">
+            {/* V. Profit before exceptional items, partners' remuneration and tax (III - IV) */}
+            <tr className="bg-slate-50/70 font-semibold text-slate-900">
+              <td className="py-2.5 px-6">
+                V. Profit / (loss) before exceptional items, partners' remuneration and tax (III - IV)
+              </td>
+              <td className="py-2.5 px-2 text-center">-</td>
+              <td className="py-2.5 px-4 text-right font-mono font-semibold">
+                {formatINR(profitAndLoss.profitBeforeExceptionalAndTax)}
+              </td>
+              <td className="py-2.5 px-4 text-right font-mono text-slate-500 font-semibold">
+                {formatPY(prev.profitBeforeExceptionalAndTax)}
+              </td>
+            </tr>
+
+            {/* VI. Exceptional items */}
+            <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+              <td className="py-2 px-8">VI. Exceptional items</td>
+              <td className="py-2 px-2 text-center">-</td>
+              <td className="py-2 px-4 text-right font-mono">
+                {profitAndLoss.exceptionalItems ? formatINR(profitAndLoss.exceptionalItems) : '-'}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">
+                {prev.exceptionalItems ? formatPY(prev.exceptionalItems) : '-'}
+              </td>
+            </tr>
+
+            {/* VII. Profit before extraordinary items, partners' remuneration and tax (V - VI) */}
+            <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+              <td className="py-2 px-8">
+                VII. Profit / (loss) before extraordinary items, partners' remuneration and tax (V - VI)
+              </td>
+              <td className="py-2.5 px-2 text-center">-</td>
+              <td className="py-2.5 px-4 text-right font-mono font-medium">
+                {formatINR(profitAndLoss.profitBeforeExtraordinaryAndTax)}
+              </td>
+              <td className="py-2.5 px-4 text-right font-mono text-slate-500 font-medium">
+                {formatPY(prev.profitBeforeExtraordinaryAndTax)}
+              </td>
+            </tr>
+
+            {/* VIII. Extraordinary items */}
+            <tr className="hover:bg-slate-50 transition-colors text-slate-700">
+              <td className="py-2 px-8">VIII. Extraordinary items</td>
+              <td className="py-2 px-2 text-center">-</td>
+              <td className="py-2 px-4 text-right font-mono">
+                {profitAndLoss.extraordinaryItems ? formatINR(profitAndLoss.extraordinaryItems) : '-'}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500">
+                {prev.extraordinaryItems ? formatPY(prev.extraordinaryItems) : '-'}
+              </td>
+            </tr>
+
+            {/* IX. Profit before partners' remuneration and tax (VII - VIII) */}
+            <tr className="bg-amber-50/60 font-bold text-amber-950 border-t border-b border-amber-200">
+              <td className="py-2.5 px-6">
+                IX. Profit before partners' remuneration and tax (VII - VIII)
+              </td>
+              <td className="py-2.5 px-2 text-center">-</td>
+              <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-900">
+                {formatINR(profitAndLoss.profitBeforePartnersRemunerationAndTax)}
+              </td>
+              <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-600">
+                {formatPY(prev.profitBeforePartnersRemunerationAndTax)}
+              </td>
+            </tr>
+
+            {/* X. Partners' remuneration* */}
+            <tr className="bg-emerald-50/50 hover:bg-emerald-50 transition-colors font-semibold text-emerald-950">
+              <td className="py-2.5 px-6">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>X. Partners' remuneration*</span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Sec 40(b) Statutory Line
+                  </span>
+                </div>
+              </td>
+              <td className="py-2.5 px-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => onSelectNote(22)}
+                  className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 hover:bg-emerald-200 text-[10px] font-black transition border border-emerald-300 inline-flex items-center gap-1"
+                  title="View Note 22: Partners' Remuneration & Employee Benefits"
+                >
+                  * <ExternalLink className="w-2.5 h-2.5" />
+                </button>
+              </td>
+              <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-900">
+                {profitAndLoss.partnersRemuneration > 0 ? formatINR(profitAndLoss.partnersRemuneration) : '-'}
+              </td>
+              <td className="py-2.5 px-4 text-right font-mono text-slate-500 font-semibold">
+                {prev.partnersRemuneration > 0 ? formatPY(prev.partnersRemuneration) : '-'}
+              </td>
+            </tr>
+
+            {/* XI. Profit Before Tax (PBT) (IX - X) */}
+            <tr className="bg-slate-100 font-black text-slate-950 border-t-2 border-b-2 border-slate-300">
+              <td className="py-3 px-6 text-sm">XI. PROFIT BEFORE TAX (PBT) (IX - X)</td>
+              <td className="py-3 px-2 text-center">-</td>
+              <td className="py-3 px-4 text-right font-mono text-sm font-black text-slate-950">
                 {formatINR(profitAndLoss.profitBeforeTax)}
               </td>
               <td className="py-3 px-4 text-right font-mono text-sm font-bold text-slate-600">
@@ -312,9 +406,9 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* VI. Tax Expense */}
+            {/* XII. Tax Expense */}
             <tr className="font-semibold text-slate-900 bg-slate-50/40">
-              <td className="py-2 px-6" colSpan={4}>VI. Tax expense:</td>
+              <td className="py-2 px-6" colSpan={4}>XII. Tax expense:</td>
             </tr>
             <tr className="hover:bg-slate-50 transition-colors">
               <td className="py-2 px-10 text-slate-700">
@@ -337,7 +431,7 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
             <tr className="hover:bg-slate-50 transition-colors">
-              <td className="py-2 px-10 text-slate-700">(2) Deferred tax</td>
+              <td className="py-2 px-10 text-slate-700">(2) Deferred tax charge / (benefit)</td>
               <td className="py-2 px-2 text-center">
                 <button
                   onClick={() => onSelectNote(6)}
@@ -355,12 +449,26 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
               </td>
             </tr>
 
-            {/* VII. Profit After Tax */}
+            {/* XIII. Profit for Continuing Operations */}
+            <tr className="hover:bg-slate-50 transition-colors font-medium text-slate-800">
+              <td className="py-2 px-6">
+                XIII. Profit / (Loss) for the period from continuing operations (XI - XII)
+              </td>
+              <td className="py-2 px-2 text-center">-</td>
+              <td className="py-2 px-4 text-right font-mono font-bold text-slate-900">
+                {formatINR(profitAndLoss.profitFromContinuingOps)}
+              </td>
+              <td className="py-2 px-4 text-right font-mono text-slate-500 font-bold">
+                {formatPY(prev.profitAfterTax)}
+              </td>
+            </tr>
+
+            {/* XVII. Profit After Tax */}
             <tr className="bg-slate-900 text-white font-bold text-xs">
               <td className="py-3 px-6 uppercase tracking-wide text-sm">
-                VII. PROFIT / (LOSS) FOR THE PERIOD (V - VI)
+                XVII. PROFIT / (LOSS) FOR THE YEAR (PAT)
               </td>
-              <td className="py-3 px-2 text-center"></td>
+              <td className="py-3 px-2 text-center">-</td>
               <td className="py-3 px-4 text-right font-mono text-base text-emerald-300 font-bold">
                 {formatINR(profitAndLoss.profitAfterTax)}
               </td>
@@ -370,6 +478,113 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
             </tr>
           </tbody>
         </table>
+      </div>
+
+      {/* Partners' Remuneration Statutory Disclosure & Section 40(b) Analysis Card */}
+      <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-2xl p-5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+            <h3 className="font-bold text-emerald-950 text-sm">
+              * Statutory Disclosure: Partners' Remuneration (Line X) &amp; Section 40(b) Analysis
+            </h3>
+          </div>
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900 border border-emerald-300">
+            Income Tax Act, 1961 • Sec 40(b) Compliance
+          </span>
+        </div>
+
+        <p className="text-xs text-emerald-900 leading-relaxed">
+          Under the ICAI Guidance Note for Non-Corporate Entities (Partnerships, LLPs, HUFs), remuneration to working partners is shown as a distinct deduction on the face of the Statement of Profit and Loss (Line X) rather than lumped into Other Expenses or Employee Benefits.
+        </p>
+
+        {/* Ledgers Breakdown */}
+        {profitAndLoss.partnersRemunerationItems && profitAndLoss.partnersRemunerationItems.length > 0 ? (
+          <div className="bg-white/90 rounded-xl border border-emerald-200 overflow-hidden text-xs">
+            <div className="px-3.5 py-2 bg-emerald-100/60 font-bold text-emerald-950 flex items-center justify-between">
+              <span>Classified Partners' Remuneration Ledger Accounts:</span>
+              <span className="font-mono font-black text-emerald-900">
+                Total: {formatINR(profitAndLoss.partnersRemuneration)}
+              </span>
+            </div>
+            <div className="divide-y divide-emerald-100">
+              {profitAndLoss.partnersRemunerationItems.map((item, idx) => (
+                <div key={item.id || idx} className="px-3.5 py-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span className="font-medium text-slate-900">{item.accountName}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      (Assigned to Note {item.noteNumber}: {item.subCategory})
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-emerald-950">
+                    {formatINR(Math.abs(item.displayBalance !== undefined ? item.displayBalance : item.netBalance))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+            <div>
+              <span className="font-bold">No Partners' Remuneration Ledger Mapped Yet:</span>
+              <span className="ml-1 text-amber-800">
+                If your trial balance contains partners' remuneration or salary accounts, ensure they are classified with subcategory "Partners' remuneration" or Note 22 so they appear on Line X.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onSelectNote(22)}
+              className="px-2.5 py-1 rounded bg-amber-200 hover:bg-amber-300 text-amber-950 font-bold transition text-[11px] shrink-0 ml-3"
+            >
+              Review Mapping
+            </button>
+          </div>
+        )}
+
+        {/* Section 40(b) Maximum Allowable Deduction Calculator */}
+        {profitAndLoss.profitBeforePartnersRemunerationAndTax !== undefined && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1 text-xs">
+            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Book Profit (Line IX)</span>
+              <span className="font-mono font-bold text-slate-900 text-sm">
+                {formatINR(profitAndLoss.profitBeforePartnersRemunerationAndTax)}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Sec 40(b) Allowable Cap</span>
+              {(() => {
+                const bp = Math.max(0, profitAndLoss.profitBeforePartnersRemunerationAndTax);
+                const cap = bp <= 300000 
+                  ? Math.max(150000, bp * 0.9) 
+                  : Math.max(150000, 300000 * 0.9) + (bp - 300000) * 0.6;
+                return (
+                  <span className="font-mono font-bold text-emerald-800 text-sm">
+                    {formatINR(cap)}
+                  </span>
+                );
+              })()}
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Compliance Status</span>
+              {(() => {
+                const bp = Math.max(0, profitAndLoss.profitBeforePartnersRemunerationAndTax);
+                const cap = bp <= 300000 
+                  ? Math.max(150000, bp * 0.9) 
+                  : Math.max(150000, 300000 * 0.9) + (bp - 300000) * 0.6;
+                const actual = profitAndLoss.partnersRemuneration;
+                const isWithinLimit = actual <= cap;
+                return (
+                  <span className={`font-bold text-xs ${isWithinLimit ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {actual === 0 ? 'No remuneration charged' : (isWithinLimit ? '✓ Fully allowable under Sec 40(b)' : '⚠ Remuneration exceeds Sec 40(b) limits')}
+                  </span>
+                );
+              })()}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footnote */}

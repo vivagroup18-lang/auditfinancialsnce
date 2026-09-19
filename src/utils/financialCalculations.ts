@@ -11,6 +11,45 @@ interface SinglePeriodResult {
 }
 
 /**
+ * Helper to identify whether a ledger account is Partners' Remuneration / Salary
+ */
+export function isPartnersRemunerationItem(item: { accountName?: string; subCategory?: string }): boolean {
+  const name = (item.accountName || '').toLowerCase().trim();
+  const sub = (item.subCategory || '').toLowerCase().trim();
+
+  if (
+    sub.includes('partners\' remuneration') ||
+    sub.includes('partners remuneration') ||
+    sub.includes('partner remuneration') ||
+    sub.includes('salary to partner') ||
+    sub.includes('salary to partners')
+  ) {
+    return true;
+  }
+
+  if (
+    (name.includes('partner') && (name.includes('remuneration') || name.includes('salary') || name.includes('allowance') || name.includes('bonus'))) ||
+    name.includes('remuneration to partner') ||
+    name.includes('remuneration paid to partner') ||
+    name.includes('remuneration of partner') ||
+    name.includes('partners remuneration') ||
+    name.includes('partner remuneration') ||
+    name.includes('partner\'s remuneration') ||
+    name.includes('partners\' remuneration') ||
+    name.includes('partner salary') ||
+    name.includes('partners salary') ||
+    name.includes('salary to partner') ||
+    name.includes('salary paid to partner') ||
+    (name.startsWith('remuneration') && !name.includes('director') && !name.includes('auditor')) ||
+    (name.includes('remuneration') && (name.includes('proprietor') || name.includes('member') || name.includes('partner')))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Computes statutory statements and note schedules for a single period (CY or PY)
  */
 export function computePeriodTotals(
@@ -396,20 +435,57 @@ export function computePeriodTotals(
 
   const costOfGoodsSold = noteSchedules[21]?.totalAmount ?? (costOfRawMaterialsConsumed + purchasesOfStockInTrade + changesInInventories);
 
-  // Note 22: Employee benefits expense
+  // Note 22: Employee benefits expense & Line X: Partners' remuneration
   let employeeBenefitsExpense = 0;
   let partnersRemuneration = 0;
+  const partnersRemunerationItems: MappedLedger[] = [];
 
+  // 1. Scan Note 22: Separate Employee Benefits vs Partners' Remuneration
   noteSchedules[22]?.items.forEach((it) => {
     const bal = it.displayBalance !== undefined ? it.displayBalance : it.netBalance;
-    if (it.accountName.toLowerCase().includes('partner') && it.accountName.toLowerCase().includes('remuneration')) {
-      partnersRemuneration += bal;
+    if (isPartnersRemunerationItem(it)) {
+      partnersRemuneration += Math.abs(bal);
+      partnersRemunerationItems.push(it);
     } else {
       employeeBenefitsExpense += bal;
     }
   });
-  if (employeeBenefitsExpense === 0 && noteSchedules[22]?.totalAmount) {
-    employeeBenefitsExpense = noteSchedules[22].totalAmount;
+
+  // 2. Scan Note 25: If user or auto-mapping mapped partners' remuneration to Note 25,
+  // extract it cleanly so it is NOT lumped into Other Expenses and NOT deducted before Line IX!
+  let otherExpenses = 0;
+  noteSchedules[25]?.items.forEach((it) => {
+    const bal = it.displayBalance !== undefined ? it.displayBalance : it.netBalance;
+    if (isPartnersRemunerationItem(it)) {
+      partnersRemuneration += Math.abs(bal);
+      partnersRemunerationItems.push(it);
+    } else {
+      otherExpenses += bal;
+    }
+  });
+
+  // 3. Scan all remaining schedules (e.g. Note 3, 10, or unmapped) to catch any stray partners' remuneration expense
+  Object.keys(noteSchedules).forEach((key) => {
+    const n = Number(key);
+    if (n !== 22 && n !== 25 && noteSchedules[n]) {
+      noteSchedules[n].items.forEach((it) => {
+        if (isPartnersRemunerationItem(it) && !partnersRemunerationItems.some((p) => p.id === it.id || p.accountName === it.accountName)) {
+          const bal = it.displayBalance !== undefined ? it.displayBalance : it.netBalance;
+          if (it.statement === 'ProfitAndLoss' || it.originalDebit > 0) {
+            partnersRemuneration += Math.abs(bal);
+            partnersRemunerationItems.push(it);
+          }
+        }
+      });
+    }
+  });
+
+  // Re-align schedule totalAmounts so Note 22 and Note 25 reflect true Operating Expenses
+  if (noteSchedules[22]) {
+    noteSchedules[22].totalAmount = employeeBenefitsExpense;
+  }
+  if (noteSchedules[25]) {
+    noteSchedules[25].totalAmount = otherExpenses;
   }
 
   // Note 23: Finance costs
@@ -418,10 +494,7 @@ export function computePeriodTotals(
   // Note 24: Depreciation and amortization expense
   const depreciationExpense = noteSchedules[24]?.totalAmount || 0;
 
-  // Note 25: Other expenses
-  const otherExpenses = noteSchedules[25]?.totalAmount || 0;
-
-  // Total expenses
+  // Total expenses (Strictly Operating & Administrative Expenses EXCLUDING Partners' Remuneration)
   const totalExpenses = costOfGoodsSold + employeeBenefitsExpense + financeCosts + depreciationExpense + otherExpenses;
 
   // Step calculations as per ICAI format
@@ -472,6 +545,7 @@ export function computePeriodTotals(
     extraordinaryItems,
     profitBeforePartnersRemunerationAndTax,
     partnersRemuneration,
+    partnersRemunerationItems,
     profitBeforeTax,
     currentTax,
     excessShortTaxEarlierYears,
@@ -909,6 +983,7 @@ export function computeFinancialStatements(
       extraordinaryItems: py.profitAndLoss.extraordinaryItems,
       profitBeforePartnersRemunerationAndTax: py.profitAndLoss.profitBeforePartnersRemunerationAndTax,
       partnersRemuneration: py.profitAndLoss.partnersRemuneration,
+      partnersRemunerationItems: py.profitAndLoss.partnersRemunerationItems || [],
       profitBeforeTax: py.profitAndLoss.profitBeforeTax,
       currentTax: py.profitAndLoss.currentTax,
       excessShortTaxEarlierYears: py.profitAndLoss.excessShortTaxEarlierYears,
