@@ -1,0 +1,30 @@
+steps:
+  # Step 1: Build Docker container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/auditfinancials:$COMMIT_SHA', '-t', 'gcr.io/$PROJECT_ID/auditfinancials:latest', '.']
+
+  # Step 2: Push container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/auditfinancials:latest']
+
+  # Step 3: Deploy container image to Cloud Run with Gemini API Key
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'auditfinancials'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/auditfinancials:latest'
+      - '--region'
+      - 'asia-east1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--set-env-vars'
+      - 'GEMINI_API_KEY=AQ.Ab8RN6IAPwIQy4k5WPBABJ4D2wIbwAA-U8r0jB74Y__mI5JOGw'
+
+images:
+  - 'gcr.io/$PROJECT_ID/auditfinancials:latest'
