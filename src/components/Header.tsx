@@ -446,67 +446,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right: Health Status, Primary Actions, Tools & Account Hub */}
+          {/* Right: Primary Actions, Tools & Account Hub */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Unified Audit Health Indicator */}
-            <div className="hidden lg:flex items-center gap-1.5 text-xs shrink-0">
-              <div
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition shadow-xs whitespace-nowrap ${
-                  isTallyBalanced && isBSBalanced
-                    ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
-                    : 'bg-rose-950/80 border-rose-500/70 text-rose-300 animate-pulse'
-                }`}
-              >
-                {isTallyBalanced && isBSBalanced ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Statements Tallied</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                    <span>
-                      {!isTallyBalanced
-                        ? `TB Diff: ₹${Math.abs(tallyDifference).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-                        : `BS Diff: ₹${Math.abs(bsDifference).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-                    </span>
-                  </>
-                )}
-              </div>
-
-              {exceptionCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('audit_report')}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-950/60 border border-amber-500/50 text-amber-300 hover:bg-amber-900/60 transition text-xs font-semibold shadow-xs whitespace-nowrap cursor-pointer"
-                  title="View audit exceptions and notes flags"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>{exceptionCount} Flags</span>
-                </button>
-              ) : (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-medium whitespace-nowrap">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>0 Flags</span>
-                </div>
-              )}
-            </div>
-
-            <div className="h-4 w-px bg-slate-800 hidden xl:block shrink-0" />
-
-            {/* Adjustments */}
-            {onOpenYearEndAdjustments && (
-              <button
-                type="button"
-                onClick={onOpenYearEndAdjustments}
-                className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition shadow-xs whitespace-nowrap"
-                title="Closing stock valuation and year-end audit adjustments"
-              >
-                <Box className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Adjustments</span>
-              </button>
-            )}
-
             {/* AI Mapping */}
             <button
               type="button"
@@ -807,79 +748,149 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* 5-Step Progressive Workflow Stepper Navigation */}
-        <nav className="flex items-center space-x-1 sm:space-x-1.5 overflow-x-auto py-2 scrollbar-none border-t border-slate-800/80 text-xs">
-          {/* Saved Companies Tab */}
-          <button
-            type="button"
-            onClick={() => {
-              if (onDashboardViewChange) onDashboardViewChange('companies');
-              setActiveTab('companies');
-            }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-semibold whitespace-nowrap transition cursor-pointer border ${
-              dashboardView === 'companies'
-                ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Saved Companies</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900/80 text-slate-300 font-mono border border-slate-700/50">
-              {companies.length}
-            </span>
-          </button>
+        {/* Subnav: 5-Step Progressive Workflow Stepper & Audit Health Indicator */}
+        <div className="flex items-center justify-between py-2 border-t border-slate-800/80 text-xs gap-3">
+          {/* Stepper Navigation */}
+          <nav className="flex items-center space-x-1 sm:space-x-1.5 overflow-x-auto scrollbar-none min-w-0">
+            {/* Saved Companies Tab */}
+            <button
+              type="button"
+              onClick={() => {
+                if (onDashboardViewChange) onDashboardViewChange('companies');
+                setActiveTab('companies');
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl font-semibold whitespace-nowrap transition cursor-pointer border ${
+                dashboardView === 'companies'
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Saved Companies</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900/80 text-slate-300 font-mono border border-slate-700/50">
+                {companies.length}
+              </span>
+            </button>
 
-          <div className="h-4 w-px bg-slate-800 mx-1 shrink-0" />
+            <div className="h-4 w-px bg-slate-800 mx-1 shrink-0" />
 
-          {/* 5 Stepper Buttons with Chevron Connectors */}
-          {[
-            { step: 1, id: 'step1', label: '1. Current Year (CY)', icon: LayoutDashboard },
-            { step: 2, id: 'step2', label: '2. Previous Year (PY)', icon: FileSpreadsheet },
-            { step: 3, id: 'step3', label: '3. Comparative Statements', icon: Building2 },
-            { step: 4, id: 'step4', label: '4. Notes & Audit', icon: AlertTriangle, badge: exceptionCount },
-            { step: 5, id: 'step5', label: '5. Generate Report', icon: Download },
-          ].map((tab, idx) => {
-            const isActive = dashboardView === 'workspace' && workspaceStep === tab.step;
-            return (
-              <React.Fragment key={tab.id}>
-                {idx > 0 && (
-                  <ChevronRight className="w-3 h-3 text-slate-700 shrink-0 hidden sm:block" />
+            {/* 5 Stepper Buttons with Chevron Connectors */}
+            {[
+              { step: 1, id: 'step1', label: '1. Current Year (CY)', icon: LayoutDashboard },
+              { step: 2, id: 'step2', label: '2. Previous Year (PY)', icon: FileSpreadsheet },
+              { step: 3, id: 'step3', label: '3. Comparative Statements', icon: Building2 },
+              { step: 4, id: 'step4', label: '4. Notes & Audit', icon: AlertTriangle, badge: exceptionCount },
+              { step: 5, id: 'step5', label: '5. Generate Report', icon: Download },
+            ].map((tab, idx) => {
+              const isActive = dashboardView === 'workspace' && workspaceStep === tab.step;
+              return (
+                <React.Fragment key={tab.id}>
+                  {idx > 0 && (
+                    <ChevronRight className="w-3 h-3 text-slate-700 shrink-0 hidden sm:block" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onDashboardViewChange) onDashboardViewChange('workspace');
+                      if (onWorkspaceStepChange) onWorkspaceStepChange(tab.step as any);
+                      setActiveTab(tab.id);
+                    }}
+                    className={`group flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium whitespace-nowrap transition cursor-pointer border ${
+                      isActive
+                        ? 'bg-slate-800 text-white font-bold border-emerald-500/50 shadow-sm ring-1 ring-emerald-500/20'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border-transparent'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black transition shrink-0 ${
+                        isActive
+                          ? 'bg-emerald-500 text-slate-950 shadow-xs'
+                          : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'
+                      }`}
+                    >
+                      {tab.step}
+                    </span>
+                    <span className={isActive ? 'text-slate-100' : 'text-slate-400 group-hover:text-slate-200'}>
+                      {tab.label}
+                    </span>
+                    {tab.badge !== undefined && tab.badge > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-950 text-amber-300 border border-amber-700/60 shrink-0">
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </nav>
+
+          {/* Right: Live Audit Health Indicator & Adjustments */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
+            {/* Unified Audit Health Indicator */}
+            <div className="flex items-center gap-1.5 text-xs shrink-0">
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition shadow-xs whitespace-nowrap ${
+                  isTallyBalanced && isBSBalanced
+                    ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                    : 'bg-rose-950/80 border-rose-500/70 text-rose-300 animate-pulse'
+                }`}
+              >
+                {isTallyBalanced && isBSBalanced ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Statements Tallied</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    <span>
+                      {!isTallyBalanced
+                        ? `TB Diff: ₹${Math.abs(tallyDifference).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                        : `BS Diff: ₹${Math.abs(bsDifference).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+                    </span>
+                  </>
                 )}
+              </div>
+
+              {exceptionCount > 0 ? (
                 <button
                   type="button"
                   onClick={() => {
                     if (onDashboardViewChange) onDashboardViewChange('workspace');
-                    if (onWorkspaceStepChange) onWorkspaceStepChange(tab.step as any);
-                    setActiveTab(tab.id);
+                    if (onWorkspaceStepChange) onWorkspaceStepChange(4);
+                    setActiveTab('audit_report');
                   }}
-                  className={`group flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium whitespace-nowrap transition cursor-pointer border ${
-                    isActive
-                      ? 'bg-slate-800 text-white font-bold border-emerald-500/50 shadow-sm ring-1 ring-emerald-500/20'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border-transparent'
-                  }`}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-950/60 border border-amber-500/50 text-amber-300 hover:bg-amber-900/60 transition text-xs font-semibold shadow-xs whitespace-nowrap cursor-pointer"
+                  title="View audit exceptions and notes flags (Jump to Step 4: Notes & Audit)"
                 >
-                  <span
-                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black transition shrink-0 ${
-                      isActive
-                        ? 'bg-emerald-500 text-slate-950 shadow-xs'
-                        : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'
-                    }`}
-                  >
-                    {tab.step}
-                  </span>
-                  <span className={isActive ? 'text-slate-100' : 'text-slate-400 group-hover:text-slate-200'}>
-                    {tab.label}
-                  </span>
-                  {tab.badge !== undefined && tab.badge > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-950 text-amber-300 border border-amber-700/60 shrink-0">
-                      {tab.badge}
-                    </span>
-                  )}
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>{exceptionCount} Flags</span>
                 </button>
-              </React.Fragment>
-            );
-          })}
-        </nav>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-medium whitespace-nowrap">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>0 Flags</span>
+                </div>
+              )}
+            </div>
+
+            {/* Adjustments Button */}
+            {onOpenYearEndAdjustments && (
+              <>
+                <div className="h-4 w-px bg-slate-800 mx-0.5 shrink-0" />
+                <button
+                  type="button"
+                  onClick={onOpenYearEndAdjustments}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition shadow-xs whitespace-nowrap cursor-pointer"
+                  title="Closing stock valuation and year-end audit adjustments"
+                >
+                  <Box className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Adjustments</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </header>
   );
