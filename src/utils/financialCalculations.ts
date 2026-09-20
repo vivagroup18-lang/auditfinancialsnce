@@ -366,20 +366,20 @@ export function computeOwnersCapitalTable(
   // Sole Proprietorship fallback
   if (isProprietorship) {
     const propName = config.entityName ? `${config.entityName} (Proprietor)` : 'Proprietor';
-    const pOpening = Math.round((totalClosing - remuneration - interestOnCapital - pat) * 100) / 100;
+    const pOpening = Math.round((totalClosing - interestOnCapital - pat) * 100) / 100;
     return [
       {
         srNo: 1,
         partnerName: propName,
         profitSharePercent: 100,
         profitShareRatio: '100%',
-        remunerationSharePercent: 100,
-        remunerationShareRatio: '100%',
+        remunerationSharePercent: 0,
+        remunerationShareRatio: '-',
         isWorkingPartner: true,
         isDesignatedPartner: false,
         openingBalance: pOpening,
         capitalIntroduced: 0,
-        remuneration: remuneration,
+        remuneration: 0,
         interestOnCapital: interestOnCapital,
         withdrawals: 0,
         shareOfProfit: pat,
@@ -824,7 +824,7 @@ export function computePeriodTotals(
   // Note 22: Employee benefits expense & Line X: Partners' remuneration
   let employeeBenefitsExpense = 0;
   let partnersRemuneration = 0;
-  const partnersRemunerationItems: MappedLedger[] = [];
+  let partnersRemunerationItems: MappedLedger[] = [];
 
   // 1. Scan Note 22: Separate Employee Benefits vs Partners' Remuneration
   noteSchedules[22]?.items.forEach((it) => {
@@ -880,6 +880,13 @@ export function computePeriodTotals(
   // Note 24: Depreciation and amortization expense
   const depreciationExpense = noteSchedules[24]?.totalAmount || 0;
 
+  // If Sole Proprietorship, ensure partnersRemuneration is strictly 0 (no Sec 40(b) concept)
+  const isProprietorshipEntity = config.entityType === 'Sole Proprietorship';
+  if (isProprietorshipEntity) {
+    partnersRemuneration = 0;
+    partnersRemunerationItems = [];
+  }
+
   // Total expenses (Strictly Operating & Administrative Expenses EXCLUDING Partners' Remuneration)
   const totalExpenses = costOfGoodsSold + employeeBenefitsExpense + financeCosts + depreciationExpense + otherExpenses;
 
@@ -890,7 +897,7 @@ export function computePeriodTotals(
   const profitBeforeExtraordinaryAndTax = profitBeforeExceptionalAndTax - exceptionalItems;
   const extraordinaryItems = 0;
   const profitBeforePartnersRemunerationAndTax = profitBeforeExtraordinaryAndTax - extraordinaryItems;
-  const profitBeforeTax = profitBeforePartnersRemunerationAndTax - partnersRemuneration;
+  const profitBeforeTax = isProprietorshipEntity ? profitBeforePartnersRemunerationAndTax : (profitBeforePartnersRemunerationAndTax - partnersRemuneration);
 
   // Tax expense — for Partnership Firms & Sole Proprietorships where profit is transferred to partners' capital,
   // do not auto-charge corporate tax unless explicitly specified or provided as a tax provision ledger

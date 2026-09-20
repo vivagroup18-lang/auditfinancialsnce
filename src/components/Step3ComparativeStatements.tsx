@@ -47,6 +47,7 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
   const pl = computedFinancials.profitAndLoss;
   const schedules = computedFinancials.noteSchedules;
 
+  const isProprietor = config.entityType === 'Sole Proprietorship';
   const cyYear = config.financialYear;
   const pyYear = config.previousFinancialYear || '2023-24';
   const hasPY = bs.isPreviousYearUploaded;
@@ -225,7 +226,13 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   <td colSpan={6} className="py-2 px-4 pl-6">(1) Owners' funds</td>
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">(a) Owners' Capital account</td>
+                  <td className="py-2 px-4 pl-10">
+                    {config.entityType === 'Partnership Firm' || config.entityType === 'LLP'
+                      ? "(a) Partners' Capital accounts"
+                      : isProprietor
+                      ? "(a) Proprietor's Capital account"
+                      : "(a) Owners' Capital account"}
+                  </td>
                   <td className="py-2 px-3 text-center">
                     <button
                       type="button"
@@ -1193,7 +1200,9 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                 {/* V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV) */}
                 <tr className="font-semibold text-slate-900 bg-slate-50/70">
                   <td className="py-2.5 px-4 pl-6">
-                    V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV)
+                    {isProprietor
+                      ? "V. Profit/(loss) before exceptional and extraordinary items and tax (III- IV)"
+                      : "V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV)"}
                   </td>
                   <td className="py-2.5 px-3 text-center">-</td>
                   <td className="py-2.5 px-4 text-right font-mono font-semibold">{formatINR(pl.profitBeforeExceptionalAndTax)}</td>
@@ -1228,8 +1237,10 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
 
                 {/* VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI) */}
                 <tr className="hover:bg-slate-50 transition-colors text-slate-700">
-                  <td className="py-2 px-4 pl-6">
-                    VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI)
+                  <td className="py-2.5 px-4 pl-6">
+                    {isProprietor
+                      ? "VII. Profit/(loss) before extraordinary items and tax (V-VI)"
+                      : "VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI)"}
                   </td>
                   <td className="py-2.5 px-3 text-center">-</td>
                   <td className="py-2.5 px-4 text-right font-mono font-medium">{formatINR(pl.profitBeforeExtraordinaryAndTax)}</td>
@@ -1262,80 +1273,101 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* IX. Profit before, partners' remuneration and tax (VII-VIII) */}
-                <tr className="bg-amber-50/60 font-bold text-amber-950 border-t border-b border-amber-200">
-                  <td className="py-2.5 px-4 pl-6">
-                    IX. Profit before, partners' remuneration and tax (VII-VIII)
-                  </td>
-                  <td className="py-2.5 px-3 text-center">-</td>
-                  <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-900">{formatINR(pl.profitBeforePartnersRemunerationAndTax)}</td>
-                  <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.profitBeforePartnersRemunerationAndTax)}</td>
-                  {(() => {
-                    const v = getVariance(pl.profitBeforePartnersRemunerationAndTax, pl.previousYear?.profitBeforePartnersRemunerationAndTax);
-                    return (
-                      <>
-                        <td className="py-2.5 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
-                        <td className="py-2.5 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
-                      </>
-                    );
-                  })()}
-                </tr>
+                {/* Proprietor: IX. PROFIT BEFORE TAX (VII - VIII) */}
+                {isProprietor ? (
+                  <tr className="font-black text-slate-950 bg-slate-100 border-t-2 border-b-2 border-slate-300">
+                    <td className="py-3 px-4 uppercase tracking-wide">IX. PROFIT BEFORE TAX (VII - VIII)</td>
+                    <td className="py-3 px-3 text-center">-</td>
+                    <td className="py-3 px-4 text-right font-mono font-black">{formatINR(pl.profitBeforeTax)}</td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.profitBeforeTax)}</td>
+                    {(() => {
+                      const v = getVariance(pl.profitBeforeTax, pl.previousYear?.profitBeforeTax);
+                      return (
+                        <>
+                          <td className="py-3 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
+                          <td className="py-3 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                        </>
+                      );
+                    })()}
+                  </tr>
+                ) : (
+                  <>
+                    {/* Non-Proprietor: IX. Profit before, partners' remuneration and tax (VII-VIII) */}
+                    <tr className="bg-amber-50/60 font-bold text-amber-950 border-t border-b border-amber-200">
+                      <td className="py-2.5 px-4 pl-6">
+                        IX. Profit before, partners' remuneration and tax (VII-VIII)
+                      </td>
+                      <td className="py-2.5 px-3 text-center">-</td>
+                      <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-900">{formatINR(pl.profitBeforePartnersRemunerationAndTax)}</td>
+                      <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.profitBeforePartnersRemunerationAndTax)}</td>
+                      {(() => {
+                        const v = getVariance(pl.profitBeforePartnersRemunerationAndTax, pl.previousYear?.profitBeforePartnersRemunerationAndTax);
+                        return (
+                          <>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
+                            <td className="py-2.5 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                          </>
+                        );
+                      })()}
+                    </tr>
 
-                {/* X. Partners’ remuneration* */}
-                <tr className="bg-emerald-50/50 hover:bg-emerald-50 font-semibold text-emerald-950">
-                  <td className="py-2.5 px-4 pl-6 flex items-center gap-2">
-                    <span>X. Partners’ remuneration*</span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                      Sec 40(b)
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 text-center">
-                    <button
-                      type="button"
-                      onClick={() => onSelectNote(22)}
-                      className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 hover:bg-emerald-200 text-[10px] font-black transition border border-emerald-300 cursor-pointer inline-flex items-center"
-                      title="View Note 22: Partners' Remuneration"
-                    >
-                      *
-                    </button>
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-900">
-                    {pl.partnersRemuneration > 0 ? formatINR(pl.partnersRemuneration) : '-'}
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-mono text-slate-600 font-semibold">
-                    {pl.previousYear?.partnersRemuneration ? formatPY(pl.previousYear.partnersRemuneration) : '-'}
-                  </td>
-                  {(() => {
-                    const v = getVariance(pl.partnersRemuneration, pl.previousYear?.partnersRemuneration);
-                    return (
-                      <>
-                        <td className="py-2.5 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
-                        <td className="py-2.5 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
-                      </>
-                    );
-                  })()}
-                </tr>
+                    {/* X. Partners’ remuneration* */}
+                    <tr className="bg-emerald-50/50 hover:bg-emerald-50 font-semibold text-emerald-950">
+                      <td className="py-2.5 px-4 pl-6 flex items-center gap-2">
+                        <span>X. Partners’ remuneration*</span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Sec 40(b)
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => onSelectNote(22)}
+                          className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 hover:bg-emerald-200 text-[10px] font-black transition border border-emerald-300 cursor-pointer inline-flex items-center"
+                          title="View Note 22: Partners' Remuneration"
+                        >
+                          *
+                        </button>
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-900">
+                        {pl.partnersRemuneration > 0 ? formatINR(pl.partnersRemuneration) : '-'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-slate-600 font-semibold">
+                        {pl.previousYear?.partnersRemuneration ? formatPY(pl.previousYear.partnersRemuneration) : '-'}
+                      </td>
+                      {(() => {
+                        const v = getVariance(pl.partnersRemuneration, pl.previousYear?.partnersRemuneration);
+                        return (
+                          <>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
+                            <td className="py-2.5 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                          </>
+                        );
+                      })()}
+                    </tr>
 
-                {/* XI. Profit before tax (IX- X) */}
-                <tr className="font-black text-slate-950 bg-slate-100 border-t-2 border-b-2 border-slate-300">
-                  <td className="py-3 px-4 uppercase tracking-wide">XI. PROFIT BEFORE TAX (IX - X)</td>
-                  <td className="py-3 px-3 text-center">-</td>
-                  <td className="py-3 px-4 text-right font-mono font-black">{formatINR(pl.profitBeforeTax)}</td>
-                  <td className="py-3 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.profitBeforeTax)}</td>
-                  {(() => {
-                    const v = getVariance(pl.profitBeforeTax, pl.previousYear?.profitBeforeTax);
-                    return (
-                      <>
-                        <td className="py-3 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
-                        <td className="py-3 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
-                      </>
-                    );
-                  })()}
-                </tr>
+                    {/* XI. Profit before tax (IX- X) */}
+                    <tr className="font-black text-slate-950 bg-slate-100 border-t-2 border-b-2 border-slate-300">
+                      <td className="py-3 px-4 uppercase tracking-wide">XI. PROFIT BEFORE TAX (IX - X)</td>
+                      <td className="py-3 px-3 text-center">-</td>
+                      <td className="py-3 px-4 text-right font-mono font-black">{formatINR(pl.profitBeforeTax)}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-700">{formatPY(pl.previousYear?.profitBeforeTax)}</td>
+                      {(() => {
+                        const v = getVariance(pl.profitBeforeTax, pl.previousYear?.profitBeforeTax);
+                        return (
+                          <>
+                            <td className="py-3 px-4 text-right font-mono font-bold">{v ? formatINR(v.diff) : '-'}</td>
+                            <td className="py-3 px-4 text-right font-bold">{v ? `${v.pct > 0 ? '+' : ''}${v.pct}%` : '-'}</td>
+                          </>
+                        );
+                      })()}
+                    </tr>
+                  </>
+                )}
 
-                {/* XII. Tax Expense */}
+                {/* Tax Expense: Line X for Proprietorship, Line XII for non-proprietorship */}
                 <tr className="font-semibold text-slate-900 bg-slate-50/40">
-                  <td colSpan={6} className="py-2 px-4 pl-6">XII. Tax expense:</td>
+                  <td colSpan={6} className="py-2 px-4 pl-6">{isProprietor ? "X. Tax expense:" : "XII. Tax expense:"}</td>
                 </tr>
                 <tr>
                   <td className="py-2 px-4 pl-10">(1) Current tax</td>
@@ -1401,10 +1433,12 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* XIII. Profit/(Loss) for the period from continuing operations (XI-XII) */}
+                {/* Continuing operations: Line XI for Proprietorship, Line XIII for non-proprietorship */}
                 <tr className="hover:bg-slate-50 transition-colors font-semibold text-slate-800">
                   <td className="py-2 px-4 pl-6">
-                    XIII. Profit/(Loss) for the period from continuing operations (XI-XII)
+                    {isProprietor
+                      ? "XI. Profit/(Loss) for the period from continuing operations (IX - X)"
+                      : "XIII. Profit/(Loss) for the period from continuing operations (XI-XII)"}
                   </td>
                   <td className="py-2 px-3 text-center">-</td>
                   <td className="py-2 px-4 text-right font-mono font-bold text-slate-900">{formatINR(pl.profitFromContinuingOps)}</td>
@@ -1420,9 +1454,11 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
 
-                {/* XIV. Profit/(loss) from discontinuing operations */}
+                {/* Discontinuing operations */}
                 <tr className="hover:bg-slate-50 transition-colors text-slate-700">
-                  <td className="py-2 px-4 pl-6">XIV. Profit/(loss) from discontinuing operations</td>
+                  <td className="py-2 px-4 pl-6">
+                    {isProprietor ? "XII. Profit/(loss) from discontinuing operations" : "XIV. Profit/(loss) from discontinuing operations"}
+                  </td>
                   <td className="py-2 px-3 text-center">-</td>
                   <td className="py-2 px-4 text-right font-mono">{pl.profitFromDiscontinuingOps ? formatINR(pl.profitFromDiscontinuingOps) : '-'}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
@@ -1430,9 +1466,10 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   <td className="py-2 px-4 text-right font-bold">-</td>
                 </tr>
 
-                {/* XV. Tax expense of discontinuing operations */}
                 <tr className="hover:bg-slate-50 transition-colors text-slate-700">
-                  <td className="py-2 px-4 pl-6">XV. Tax expense of discontinuing operations</td>
+                  <td className="py-2 px-4 pl-6">
+                    {isProprietor ? "XIII. Tax expense of discontinuing operations" : "XV. Tax expense of discontinuing operations"}
+                  </td>
                   <td className="py-2 px-3 text-center">-</td>
                   <td className="py-2 px-4 text-right font-mono">{pl.taxExpenseDiscontinuingOps ? formatINR(pl.taxExpenseDiscontinuingOps) : '-'}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
@@ -1440,9 +1477,12 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   <td className="py-2 px-4 text-right font-bold">-</td>
                 </tr>
 
-                {/* XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV) */}
                 <tr className="hover:bg-slate-50 transition-colors text-slate-700">
-                  <td className="py-2 px-4 pl-6">XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV)</td>
+                  <td className="py-2 px-4 pl-6">
+                    {isProprietor
+                      ? "XIV. Profit/(loss) from discontinuing operations (after tax) (XII-XIII)"
+                      : "XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV)"}
+                  </td>
                   <td className="py-2 px-3 text-center">-</td>
                   <td className="py-2 px-4 text-right font-mono">{pl.profitFromDiscontinuingOpsAfterTax ? formatINR(pl.profitFromDiscontinuingOpsAfterTax) : '-'}</td>
                   <td className="py-2 px-4 text-right font-mono text-slate-500">-</td>
@@ -1450,10 +1490,12 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   <td className="py-2 px-4 text-right font-bold">-</td>
                 </tr>
 
-                {/* XVII. Profit/(Loss) for the year (XIII+XVI) */}
+                {/* Final Profit for the year */}
                 <tr className="bg-emerald-100 font-black text-emerald-950 text-xs border-t-2 border-b-2 border-emerald-300">
                   <td className="py-3 px-4 uppercase tracking-wide">
-                    XVII. PROFIT / (LOSS) FOR THE YEAR (XIII + XVI)
+                    {isProprietor
+                      ? "XV. PROFIT / (LOSS) FOR THE YEAR (XI + XIV)"
+                      : "XVII. PROFIT / (LOSS) FOR THE YEAR (XIII + XVI)"}
                   </td>
                   <td className="py-3 px-3 text-center">-</td>
                   <td className="py-3 px-4 text-right font-mono font-bold text-emerald-950">{formatINR(pl.profitAfterTax)}</td>

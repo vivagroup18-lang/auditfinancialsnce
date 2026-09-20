@@ -139,9 +139,11 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
                   <span>
                     {config.entityType === 'Partnership Firm' || config.entityType === 'LLP'
                       ? "(a) Partners' Capital Accounts"
+                      : config.entityType === 'Sole Proprietorship'
+                      ? "(a) Proprietor's Capital Account"
                       : "(a) Owners' Capital Account"}
                   </span>
-                  {config.partners && config.partners.length > 0 && (
+                  {(config.entityType === 'Partnership Firm' || config.entityType === 'LLP') && config.partners && config.partners.length > 0 && (
                     <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
                       <Users className="w-2.5 h-2.5 text-emerald-600" />
                       <span>{config.partners.length} {config.partners.length === 1 ? 'Partner' : 'Partners'}</span>
@@ -153,7 +155,13 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
                 <button
                   onClick={() => onSelectNote(3)}
                   className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold transition inline-flex items-center gap-1"
-                  title="View Note 3: Owners' Capital Account"
+                  title={
+                    config.entityType === 'Sole Proprietorship'
+                      ? "View Note 3: Proprietor's Capital Account"
+                      : config.entityType === 'Partnership Firm' || config.entityType === 'LLP'
+                      ? "View Note 3: Partners' Capital Accounts"
+                      : "View Note 3: Owners' Capital Account"
+                  }
                 >
                   3 <ExternalLink className="w-2.5 h-2.5" />
                 </button>

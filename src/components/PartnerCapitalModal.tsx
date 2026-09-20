@@ -50,6 +50,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
   profitAndLoss,
   initialPeriod = 'CY',
 }) => {
+  const isProprietor = config.entityType === 'Sole Proprietorship';
   const [activeTab, setActiveTab] = useState<'schedule' | 'upload' | 'ledger_mapping'>('schedule');
   const [period, setPeriod] = useState<'CY' | 'PY'>(initialPeriod);
 
@@ -114,6 +115,27 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
           };
         })
       );
+    } else if (isProprietor) {
+      // Default 1 proprietor
+      setCyRows([
+        {
+          srNo: 1,
+          partnerName: config.entityName || 'Proprietor',
+          profitSharePercent: 100,
+          profitShareRatio: '100%',
+          remunerationSharePercent: 0,
+          remunerationShareRatio: '-',
+          isWorkingPartner: true,
+          isDesignatedPartner: false,
+          openingBalance: 0,
+          capitalIntroduced: 0,
+          remuneration: 0,
+          interestOnCapital: 0,
+          withdrawals: 0,
+          shareOfProfit: 0,
+          closingBalance: 0,
+        },
+      ]);
     } else {
       // Default 2 partners
       setCyRows([
@@ -725,13 +747,21 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Owners' / Partners' Capital Account Statutory Schedule (Page 6)</span>
+                <span>
+                  {isProprietor
+                    ? "Proprietor's Capital Account Statutory Schedule (Page 6)"
+                    : config.entityType === 'LLP'
+                    ? "Partners' / Designated Partners' Capital Account Statutory Schedule (Page 6)"
+                    : "Owners' / Partners' Capital Account Statutory Schedule (Page 6)"}
+                </span>
                 <span className="text-[10px] bg-emerald-400/20 border border-emerald-400/30 text-emerald-200 px-2 py-0.5 rounded-full font-mono">
                   Note 3
                 </span>
               </h3>
               <p className="text-xs text-emerald-100/70">
-                Upload partner ledgers, map trial balance accounts, or fine-tune individual capital movements and PSR%.
+                {isProprietor
+                  ? "Upload proprietor ledger, map trial balance accounts, or fine-tune proprietor's capital movements."
+                  : "Upload partner ledgers, map trial balance accounts, or fine-tune individual capital movements and PSR%."}
               </p>
             </div>
           </div>
@@ -757,7 +787,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
               }`}
             >
               <Calculator className="w-3.5 h-3.5 text-emerald-600" />
-              <span>10-Column Schedule Grid</span>
+              <span>{isProprietor ? "8-Column Schedule Grid" : "10-Column Schedule Grid"}</span>
             </button>
             <button
               type="button"
@@ -769,7 +799,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
               }`}
             >
               <Upload className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Upload Partner Ledgers / Statement</span>
+              <span>{isProprietor ? "Upload Proprietor Statement / Ledger" : "Upload Partner Ledgers / Statement"}</span>
             </button>
             <button
               type="button"
@@ -841,20 +871,33 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
               <span className="text-slate-500">Schedule Total Closing Capital:</span>
               <span className="font-mono font-bold text-slate-900">{formatINR(totalScheduleClosing)}</span>
             </div>
-            <div className="w-px h-3.5 bg-slate-300"></div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-500">Profit Share (PSR%):</span>
-              <span className={`font-mono font-bold ${Math.abs(totalPsr - 100) < 0.1 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                {totalPsr}%
-              </span>
-            </div>
-            <div className="w-px h-3.5 bg-slate-300"></div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-500">Remun Share (RSR%):</span>
-              <span className={`font-mono font-bold ${Math.abs(totalRsr - 100) < 0.1 ? 'text-teal-700' : 'text-amber-700'}`}>
-                {totalRsr}%
-              </span>
-            </div>
+            {!isProprietor ? (
+              <>
+                <div className="w-px h-3.5 bg-slate-300"></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500">Profit Share (PSR%):</span>
+                  <span className={`font-mono font-bold ${Math.abs(totalPsr - 100) < 0.1 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {totalPsr}%
+                  </span>
+                </div>
+                <div className="w-px h-3.5 bg-slate-300"></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500">Remun Share (RSR%):</span>
+                  <span className={`font-mono font-bold ${Math.abs(totalRsr - 100) < 0.1 ? 'text-teal-700' : 'text-amber-700'}`}>
+                    {totalRsr}%
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-px h-3.5 bg-slate-300"></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Sole Proprietorship (100% Capital)
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -920,19 +963,21 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
               {/* Action Toolbar */}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleAddPartner}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-2xs transition"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Partner</span>
-                  </button>
+                  {!isProprietor && (
+                    <button
+                      type="button"
+                      onClick={handleAddPartner}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-2xs transition"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Partner</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleSyncFromNote3Ledgers}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-semibold text-xs rounded-lg transition"
-                    title="Extract partners and amounts from Note 3 Trial Balance accounts"
+                    title={isProprietor ? "Extract proprietor capital amounts from Note 3 Trial Balance accounts" : "Extract partners and amounts from Note 3 Trial Balance accounts"}
                   >
                     <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
                     <span>Sync from Note 3 Ledgers</span>
@@ -942,13 +987,13 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                       type="button"
                       onClick={handleDistributePAT}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-semibold text-xs rounded-lg transition"
-                      title="Distribute net profit after tax to partners based on PSR %"
+                      title={isProprietor ? "Credit net profit after tax to Proprietor's Capital" : "Distribute net profit after tax to partners based on PSR %"}
                     >
                       <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Distribute Net Profit ({formatINR(profitAndLoss.profitAfterTax)})</span>
+                      <span>{isProprietor ? `Credit Net Profit (${formatINR(profitAndLoss.profitAfterTax)})` : `Distribute Net Profit (${formatINR(profitAndLoss.profitAfterTax)})`}</span>
                     </button>
                   )}
-                  {profitAndLoss?.partnersRemuneration !== undefined && profitAndLoss.partnersRemuneration > 0 && (
+                  {!isProprietor && profitAndLoss?.partnersRemuneration !== undefined && profitAndLoss.partnersRemuneration > 0 && (
                     <button
                       type="button"
                       onClick={handleDistributeRemuneration}
@@ -967,23 +1012,29 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
 
               {/* Editable Table */}
               <div className="overflow-x-auto border border-emerald-300/80 rounded-xl shadow-xs">
-                <table className="w-full text-left text-[11px] border-collapse min-w-[960px]">
+                <table className={`w-full text-left text-[11px] border-collapse ${isProprietor ? 'min-w-[800px]' : 'min-w-[960px]'}`}>
                   <thead>
                     <tr className="bg-emerald-900 text-white font-semibold">
                       <th className="py-2.5 px-2 text-center w-10">Sr.</th>
-                      <th className="py-2.5 px-3 min-w-[160px]">Name of Partner/ Proprietor</th>
-                      <th className="py-2.5 px-2 text-center w-18" title="Profit Sharing Ratio">Profit (%)</th>
-                      <th className="py-2.5 px-2 text-center w-18" title="Remuneration Sharing Ratio u/s 40(b)">Remun (%)</th>
+                      <th className="py-2.5 px-3 min-w-[160px]">{isProprietor ? "Name of Proprietor" : "Name of Partner/ Proprietor"}</th>
+                      {!isProprietor && (
+                        <>
+                          <th className="py-2.5 px-2 text-center w-18" title="Profit Sharing Ratio">Profit (%)</th>
+                          <th className="py-2.5 px-2 text-center w-18" title="Remuneration Sharing Ratio u/s 40(b)">Remun (%)</th>
+                        </>
+                      )}
                       <th className="py-2.5 px-2 text-right w-26">As at 1st April (Opening)</th>
                       <th className="py-2.5 px-2 text-right w-24">Capital Introduced</th>
-                      <th className="py-2.5 px-2 text-right w-24">Remuneration</th>
-                      <th className="py-2.5 px-2 text-right w-22">Interest</th>
-                      <th className="py-2.5 px-2 text-right w-24">Withdrawals</th>
-                      <th className="py-2.5 px-2 text-right w-26">Share of Profit/Loss</th>
+                      {!isProprietor && (
+                        <th className="py-2.5 px-2 text-right w-24">Remuneration</th>
+                      )}
+                      <th className="py-2.5 px-2 text-right w-22">{isProprietor ? "Interest on Capital" : "Interest"}</th>
+                      <th className="py-2.5 px-2 text-right w-24">{isProprietor ? "Drawings / Withdrawals" : "Withdrawals"}</th>
+                      <th className="py-2.5 px-2 text-right w-26">{isProprietor ? "Net Profit / (Loss) for the year" : "Share of Profit/Loss"}</th>
                       <th className="py-2.5 px-2 text-right w-28 font-bold text-emerald-200 bg-emerald-950">
                         As at 31st March (Closing)
                       </th>
-                      <th className="py-2.5 px-2 text-center w-10"></th>
+                      {!isProprietor && <th className="py-2.5 px-2 text-center w-10"></th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-emerald-100 bg-emerald-50/15 text-slate-800">
@@ -998,35 +1049,39 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                             value={row.partnerName}
                             onChange={(e) => handleCellChange(idx, 'partnerName', e.target.value)}
                             className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-900 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                            placeholder="Partner Name"
+                            placeholder={isProprietor ? "Proprietor Name" : "Partner Name"}
                           />
                         </td>
-                        <td className="py-1.5 px-1 text-center">
-                          <div className="relative inline-flex items-center">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={row.profitSharePercent}
-                              onChange={(e) => handleCellChange(idx, 'profitSharePercent', e.target.value)}
-                              className="w-14 px-1 py-1 text-center bg-white border border-slate-200 rounded font-mono text-xs focus:ring-1 focus:ring-emerald-500"
-                            />
-                            <span className="text-[10px] text-slate-400 ml-0.5">%</span>
-                          </div>
-                        </td>
-                        <td className="py-1.5 px-1 text-center">
-                          <div className="relative inline-flex items-center">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={row.remunerationSharePercent !== undefined ? row.remunerationSharePercent : ''}
-                              placeholder={`${row.profitSharePercent || 0}`}
-                              onChange={(e) => handleCellChange(idx, 'remunerationSharePercent', e.target.value)}
-                              className="w-14 px-1 py-1 text-center bg-white border border-teal-200 rounded font-mono text-xs text-teal-900 focus:ring-1 focus:ring-teal-500"
-                              title="Remuneration Sharing % (defaults to Profit Share if blank)"
-                            />
-                            <span className="text-[10px] text-teal-600 ml-0.5">%</span>
-                          </div>
-                        </td>
+                        {!isProprietor && (
+                          <>
+                            <td className="py-1.5 px-1 text-center">
+                              <div className="relative inline-flex items-center">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={row.profitSharePercent}
+                                  onChange={(e) => handleCellChange(idx, 'profitSharePercent', e.target.value)}
+                                  className="w-14 px-1 py-1 text-center bg-white border border-slate-200 rounded font-mono text-xs focus:ring-1 focus:ring-emerald-500"
+                                />
+                                <span className="text-[10px] text-slate-400 ml-0.5">%</span>
+                              </div>
+                            </td>
+                            <td className="py-1.5 px-1 text-center">
+                              <div className="relative inline-flex items-center">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={row.remunerationSharePercent !== undefined ? row.remunerationSharePercent : ''}
+                                  placeholder={`${row.profitSharePercent || 0}`}
+                                  onChange={(e) => handleCellChange(idx, 'remunerationSharePercent', e.target.value)}
+                                  className="w-14 px-1 py-1 text-center bg-white border border-teal-200 rounded font-mono text-xs text-teal-900 focus:ring-1 focus:ring-teal-500"
+                                  title="Remuneration Sharing % (defaults to Profit Share if blank)"
+                                />
+                                <span className="text-[10px] text-teal-600 ml-0.5">%</span>
+                              </div>
+                            </td>
+                          </>
+                        )}
                         <td className="py-1.5 px-1 text-right">
                           <input
                             type="number"
@@ -1045,15 +1100,17 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                             className="w-full px-2 py-1 text-right bg-white border border-slate-200 rounded font-mono text-xs focus:ring-1 focus:ring-emerald-500"
                           />
                         </td>
-                        <td className="py-1.5 px-1 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={row.remuneration}
-                            onChange={(e) => handleCellChange(idx, 'remuneration', e.target.value)}
-                            className="w-full px-2 py-1 text-right bg-white border border-slate-200 rounded font-mono text-xs text-emerald-900 font-semibold focus:ring-1 focus:ring-emerald-500"
-                          />
-                        </td>
+                        {!isProprietor && (
+                          <td className="py-1.5 px-1 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={row.remuneration}
+                              onChange={(e) => handleCellChange(idx, 'remuneration', e.target.value)}
+                              className="w-full px-2 py-1 text-right bg-white border border-slate-200 rounded font-mono text-xs text-emerald-900 font-semibold focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </td>
+                        )}
                         <td className="py-1.5 px-1 text-right">
                           <input
                             type="number"
@@ -1090,16 +1147,18 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                             className="w-full px-2 py-1 text-right bg-white border border-emerald-300 rounded font-mono text-xs font-bold text-slate-950 focus:ring-1 focus:ring-emerald-600"
                           />
                         </td>
-                        <td className="py-1.5 px-1 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePartner(idx)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
-                            title="Delete Partner"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                        {!isProprietor && (
+                          <td className="py-1.5 px-1 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePartner(idx)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
+                              title="Delete Partner"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
 
@@ -1108,21 +1167,27 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                       <td colSpan={2} className="py-2.5 px-3 text-right uppercase tracking-wider">
                         Total ({period})
                       </td>
-                      <td className="py-2.5 px-2 text-center font-mono font-bold">
-                        {totalPsr}%
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono font-bold text-teal-800">
-                        {totalRsr}%
-                      </td>
+                      {!isProprietor && (
+                        <>
+                          <td className="py-2.5 px-2 text-center font-mono font-bold">
+                            {totalPsr}%
+                          </td>
+                          <td className="py-2.5 px-2 text-center font-mono font-bold text-teal-800">
+                            {totalRsr}%
+                          </td>
+                        </>
+                      )}
                       <td className="py-2.5 px-2 text-right font-mono font-bold">
                         {formatINR(totalOpening)}
                       </td>
                       <td className="py-2.5 px-2 text-right font-mono font-bold">
                         {formatINR(totalIntroduced)}
                       </td>
-                      <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-900">
-                        {formatINR(totalRemun)}
-                      </td>
+                      {!isProprietor && (
+                        <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-900">
+                          {formatINR(totalRemun)}
+                        </td>
+                      )}
                       <td className="py-2.5 px-2 text-right font-mono font-bold">
                         {formatINR(totalInterest)}
                       </td>
@@ -1135,7 +1200,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                       <td className="py-2.5 px-2 text-right font-mono font-black text-emerald-950 bg-emerald-200">
                         {formatINR(totalScheduleClosing)}
                       </td>
-                      <td></td>
+                      {!isProprietor && <td></td>}
                     </tr>
                   </tbody>
                 </table>

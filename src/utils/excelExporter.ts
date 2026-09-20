@@ -605,6 +605,7 @@ export function buildAttractiveExcelWorkbook({
 
   const entityName = entityConfig.entityName || 'NON-CORPORATE ENTITY';
   const entityType = entityConfig.entityType || 'Partnership Firm';
+  const isProprietor = entityType === 'Sole Proprietorship';
   const currentPeriod = entityConfig.reportingPeriod || 'March 31, 2025';
   const previousPeriod = entityConfig.previousReportingPeriod || 'March 31, 2024';
   const fyCY = entityConfig.financialYear || '2024-25';
@@ -942,7 +943,13 @@ export function buildAttractiveExcelWorkbook({
   addBsLine('I. EQUITY AND LIABILITIES', '', null, null, { isSection: true });
 
   addBsLine("(1) Owners' Funds", '', null, null, { isSubSection: true });
-  addBsLine("  (a) Owners' Capital Account", 3, balanceSheet.ownersCapital, balanceSheet.previousYear?.ownersCapital);
+  const bsCapitalLabel =
+    entityType === 'Partnership Firm' || entityType === 'LLP'
+      ? "  (a) Partners' Capital Accounts"
+      : isProprietor
+      ? "  (a) Proprietor's Capital Account"
+      : "  (a) Owners' Capital Account";
+  addBsLine(bsCapitalLabel, 3, balanceSheet.ownersCapital, balanceSheet.previousYear?.ownersCapital);
   addBsLine('  (b) Reserves and Surplus', 4, balanceSheet.reservesAndSurplus, balanceSheet.previousYear?.reservesAndSurplus);
   addBsLine("Sub-total: Owners' Funds", '', balanceSheet.totalOwnersFunds, balanceSheet.previousYear?.totalOwnersFunds, { isSubTotal: true });
 
@@ -1161,53 +1168,98 @@ export function buildAttractiveExcelWorkbook({
   plRows.push(new Array(plColCount).fill(textCell('', { border: {} })));
   plRowHeights.push({ hpt: 10 });
 
-  addPlLine(
-    "V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV)",
-    '',
-    profitAndLoss.profitBeforeExceptionalAndTax,
-    profitAndLoss.previousYear?.profitBeforeExceptionalAndTax,
-    { isSubTotal: true }
-  );
-  addPlLine('VI. Exceptional items (specify nature & provide note/delete if none)', '', profitAndLoss.exceptionalItems, profitAndLoss.previousYear?.exceptionalItems || 0);
-  addPlLine(
-    "VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI)",
-    '',
-    profitAndLoss.profitBeforeExtraordinaryAndTax,
-    profitAndLoss.previousYear?.profitBeforeExtraordinaryAndTax
-  );
-  addPlLine('VIII. Extraordinary Items (specify nature & provide note/delete if none)', '', profitAndLoss.extraordinaryItems, profitAndLoss.previousYear?.extraordinaryItems || 0);
-  addPlLine(
-    "IX. Profit before, partners' remuneration and tax (VII-VIII)",
-    '',
-    profitAndLoss.profitBeforePartnersRemunerationAndTax,
-    profitAndLoss.previousYear?.profitBeforePartnersRemunerationAndTax,
-    { isSubTotal: true }
-  );
-  addPlLine("X. Partners’ remuneration*", 22, profitAndLoss.partnersRemuneration, profitAndLoss.previousYear?.partnersRemuneration);
-  addPlLine('XI. Profit before tax (IX- X)', '', profitAndLoss.profitBeforeTax, profitAndLoss.previousYear?.profitBeforeTax, { isSubTotal: true });
+  if (isProprietor) {
+    addPlLine(
+      "V. Profit/(loss) before exceptional and extraordinary items and tax (III- IV)",
+      '',
+      profitAndLoss.profitBeforeExceptionalAndTax,
+      profitAndLoss.previousYear?.profitBeforeExceptionalAndTax,
+      { isSubTotal: true }
+    );
+    addPlLine('VI. Exceptional items (specify nature & provide note/delete if none)', '', profitAndLoss.exceptionalItems, profitAndLoss.previousYear?.exceptionalItems || 0);
+    addPlLine(
+      "VII. Profit/(loss) before extraordinary items and tax (V-VI)",
+      '',
+      profitAndLoss.profitBeforeExtraordinaryAndTax,
+      profitAndLoss.previousYear?.profitBeforeExtraordinaryAndTax
+    );
+    addPlLine('VIII. Extraordinary Items (specify nature & provide note/delete if none)', '', profitAndLoss.extraordinaryItems, profitAndLoss.previousYear?.extraordinaryItems || 0);
+    addPlLine(
+      "IX. PROFIT BEFORE TAX (VII-VIII)",
+      '',
+      profitAndLoss.profitBeforeTax,
+      profitAndLoss.previousYear?.profitBeforeTax,
+      { isSubTotal: true }
+    );
+    addPlLine('X. Tax expense:', '', null, null, { isSection: true });
+    addPlLine('  (1) Current tax', 8, profitAndLoss.currentTax, profitAndLoss.previousYear?.currentTax);
+    addPlLine('  (2) Excess/ Short provision of tax relating to earlier years', '', profitAndLoss.excessShortTaxEarlierYears, profitAndLoss.previousYear?.excessShortTaxEarlierYears || 0);
+    addPlLine('  (3) Deferred tax charge/ (benefit)', 6, profitAndLoss.deferredTax, profitAndLoss.previousYear?.deferredTax || 0);
+    addPlLine(
+      'XI. Profit/(Loss) for the period from continuing operations (IX-X)',
+      '',
+      profitAndLoss.profitFromContinuingOps,
+      profitAndLoss.previousYear?.profitAfterTax
+    );
+    addPlLine('XII. Profit/(loss) from discontinuing operations', '', profitAndLoss.profitFromDiscontinuingOps, 0);
+    addPlLine('XIII. Tax expense of discontinuing operations', '', profitAndLoss.taxExpenseDiscontinuingOps, 0);
+    addPlLine('XIV. Profit/(loss) from discontinuing operations (after tax) (XII-XIII)', '', profitAndLoss.profitFromDiscontinuingOpsAfterTax, 0);
+    addPlLine(
+      'XV. PROFIT / (LOSS) FOR THE YEAR (XI+XIV)',
+      '',
+      profitAndLoss.profitAfterTax,
+      profitAndLoss.previousYear?.profitAfterTax,
+      { isGrandTotal: true }
+    );
+  } else {
+    addPlLine(
+      "V. Profit/(loss) before exceptional and extraordinary items, partners' remuneration and tax (III- IV)",
+      '',
+      profitAndLoss.profitBeforeExceptionalAndTax,
+      profitAndLoss.previousYear?.profitBeforeExceptionalAndTax,
+      { isSubTotal: true }
+    );
+    addPlLine('VI. Exceptional items (specify nature & provide note/delete if none)', '', profitAndLoss.exceptionalItems, profitAndLoss.previousYear?.exceptionalItems || 0);
+    addPlLine(
+      "VII. Profit/(loss) before extraordinary items, partners' remuneration and tax (V-VI)",
+      '',
+      profitAndLoss.profitBeforeExtraordinaryAndTax,
+      profitAndLoss.previousYear?.profitBeforeExtraordinaryAndTax
+    );
+    addPlLine('VIII. Extraordinary Items (specify nature & provide note/delete if none)', '', profitAndLoss.extraordinaryItems, profitAndLoss.previousYear?.extraordinaryItems || 0);
+    addPlLine(
+      "IX. Profit before, partners' remuneration and tax (VII-VIII)",
+      '',
+      profitAndLoss.profitBeforePartnersRemunerationAndTax,
+      profitAndLoss.previousYear?.profitBeforePartnersRemunerationAndTax,
+      { isSubTotal: true }
+    );
+    addPlLine("X. Partners’ remuneration*", 22, profitAndLoss.partnersRemuneration, profitAndLoss.previousYear?.partnersRemuneration);
+    addPlLine('XI. Profit before tax (IX- X)', '', profitAndLoss.profitBeforeTax, profitAndLoss.previousYear?.profitBeforeTax, { isSubTotal: true });
 
-  addPlLine('XII. Tax expense:', '', null, null, { isSection: true });
-  addPlLine('  (1) Current tax', 8, profitAndLoss.currentTax, profitAndLoss.previousYear?.currentTax);
-  addPlLine('  (2) Excess/ Short provision of tax relating to earlier years', '', profitAndLoss.excessShortTaxEarlierYears, profitAndLoss.previousYear?.excessShortTaxEarlierYears || 0);
-  addPlLine('  (3) Deferred tax charge/ (benefit)', 6, profitAndLoss.deferredTax, profitAndLoss.previousYear?.deferredTax || 0);
+    addPlLine('XII. Tax expense:', '', null, null, { isSection: true });
+    addPlLine('  (1) Current tax', 8, profitAndLoss.currentTax, profitAndLoss.previousYear?.currentTax);
+    addPlLine('  (2) Excess/ Short provision of tax relating to earlier years', '', profitAndLoss.excessShortTaxEarlierYears, profitAndLoss.previousYear?.excessShortTaxEarlierYears || 0);
+    addPlLine('  (3) Deferred tax charge/ (benefit)', 6, profitAndLoss.deferredTax, profitAndLoss.previousYear?.deferredTax || 0);
 
-  addPlLine(
-    'XIII. Profit/(Loss) for the period from continuing operations (XI-XII)',
-    '',
-    profitAndLoss.profitFromContinuingOps,
-    profitAndLoss.previousYear?.profitAfterTax
-  );
-  addPlLine('XIV. Profit/(loss) from discontinuing operations', '', profitAndLoss.profitFromDiscontinuingOps, 0);
-  addPlLine('XV. Tax expense of discontinuing operations', '', profitAndLoss.taxExpenseDiscontinuingOps, 0);
-  addPlLine('XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV)', '', profitAndLoss.profitFromDiscontinuingOpsAfterTax, 0);
+    addPlLine(
+      'XIII. Profit/(Loss) for the period from continuing operations (XI-XII)',
+      '',
+      profitAndLoss.profitFromContinuingOps,
+      profitAndLoss.previousYear?.profitAfterTax
+    );
+    addPlLine('XIV. Profit/(loss) from discontinuing operations', '', profitAndLoss.profitFromDiscontinuingOps, 0);
+    addPlLine('XV. Tax expense of discontinuing operations', '', profitAndLoss.taxExpenseDiscontinuingOps, 0);
+    addPlLine('XVI. Profit/(loss) from discontinuing operations (after tax) (XIV-XV)', '', profitAndLoss.profitFromDiscontinuingOpsAfterTax, 0);
 
-  addPlLine(
-    'XVII. Profit/(Loss) for the year (XIII+XVI)',
-    '',
-    profitAndLoss.profitAfterTax,
-    profitAndLoss.previousYear?.profitAfterTax,
-    { isGrandTotal: true }
-  );
+    addPlLine(
+      'XVII. Profit/(Loss) for the year (XIII+XVI)',
+      '',
+      profitAndLoss.profitAfterTax,
+      profitAndLoss.previousYear?.profitAfterTax,
+      { isGrandTotal: true }
+    );
+  }
 
   // ICAI Guidance Note Statutory Disclosures & Footnotes
   plRows.push(new Array(plColCount).fill(textCell('', { border: {} })));
@@ -1228,8 +1280,8 @@ export function buildAttractiveExcelWorkbook({
   plRowHeights.push({ hpt: 20 });
   plMerges.push({ s: { r: plRows.length - 1, c: 0 }, e: { r: plRows.length - 1, c: plColCount - 1 } });
 
-  // Footnote for Line X: Partners' Remuneration under Section 40(b)
-  if (profitAndLoss.partnersRemuneration > 0 || (profitAndLoss.previousYear?.partnersRemuneration && profitAndLoss.previousYear.partnersRemuneration > 0)) {
+  // Footnote for Line X: Partners' Remuneration under Section 40(b) (Partnership & LLP Only)
+  if (!isProprietor && (profitAndLoss.partnersRemuneration > 0 || (profitAndLoss.previousYear?.partnersRemuneration && profitAndLoss.previousYear.partnersRemuneration > 0))) {
     const sec40bFootnote = new Array(plColCount).fill(null).map(() => textCell('', { border: {} }));
     sec40bFootnote[0] = textCell(
       "Note on Line X: In terms of Section 40(b) of the Income-tax Act, 1961, remuneration paid/payable to working partners has been calculated in accordance with the terms of the Partnership Deed and within the statutory limits.",
@@ -1561,13 +1613,16 @@ export function buildAttractiveExcelWorkbook({
     // ========================================================
     // SPECIAL STATUTORY DISCLOSURES FOR NOTE 3, 5, AND 9 (ICAI GUIDANCE NOTE)
     // ========================================================
-    // Note 3: Partner Capital Account Rollforward Schedule (Page 6)
+    // Note 3: Partner / Proprietor Capital Account Rollforward Schedule (Page 6)
     if (i === 3 && sched.partnerCapitalTable && sched.partnerCapitalTable.length > 0) {
       const capHdrIdx = notesRows.length;
       const capHdr: any[] = [];
+      const rollforwardTitle = isProprietor
+        ? "PROPRIETOR'S CAPITAL ACCOUNT RECONCILIATION ROLLFORWARD (ICAI GUIDANCE NOTE PAGE 6)"
+        : "PARTNERS' CAPITAL ACCOUNTS RECONCILIATION ROLLFORWARD (ICAI GUIDANCE NOTE PAGE 6)";
       for (let c = 0; c < notesColCount; c++) {
         capHdr.push(
-          textCell(c === 0 ? "PARTNERS' CAPITAL ACCOUNTS RECONCILIATION ROLLFORWARD (ICAI GUIDANCE NOTE PAGE 6)" : '', {
+          textCell(c === 0 ? rollforwardTitle : '', {
             bold: true,
             sz: 9.5,
             color: PALETTE.navyDark,
@@ -1588,9 +1643,12 @@ export function buildAttractiveExcelWorkbook({
 
         const pBannerIdx = notesRows.length;
         const pBanner: any[] = [];
+        const bannerText = isProprietor
+          ? `Proprietor: ${p.partnerName}`
+          : `Partner ${pIdx + 1}: ${p.partnerName}${dpBadge} [PSR: ${psrText} | Remuneration Share: ${rsrText}]`;
         for (let c = 0; c < notesColCount; c++) {
           pBanner.push(
-            textCell(c === 0 ? `Partner ${pIdx + 1}: ${p.partnerName}${dpBadge} [PSR: ${psrText} | Remuneration Share: ${rsrText}]` : '', {
+            textCell(c === 0 ? bannerText : '', {
               bold: true,
               sz: 9.5,
               color: '1E3A8A',
@@ -1601,14 +1659,22 @@ export function buildAttractiveExcelWorkbook({
         addNotesRow(pBanner, 20);
         notesMerges.push({ s: { r: pBannerIdx, c: 0 }, e: { r: pBannerIdx, c: notesColCount - 1 } });
 
-        const pLines: Array<[string, number, string]> = [
-          ['Opening Capital Balance as on April 1', p.openingBalance, 'Opening Balance'],
-          ['Add: Additional Capital Introduced during the year', p.capitalIntroduced, 'Capital Addition'],
-          ["Add: Partners' Remuneration for the year (Sec 40(b))", remunVal, 'Remuneration'],
-          ['Add: Interest on Capital credited for the year', p.interestOnCapital, 'Interest on Capital'],
-          ['Less: Drawings / Withdrawals during the year', -Math.abs(drawVal), 'Drawings'],
-          ['Add: Share of Profit / (Loss) for the year', profitVal, 'Profit Share'],
-        ];
+        const pLines: Array<[string, number, string]> = isProprietor
+          ? [
+              ['Opening Capital Balance as on April 1', p.openingBalance, 'Opening Balance'],
+              ['Add: Additional Capital Introduced during the year', p.capitalIntroduced, 'Capital Addition'],
+              ['Add: Interest on Capital credited for the year', p.interestOnCapital, 'Interest on Capital'],
+              ['Less: Drawings / Withdrawals during the year', -Math.abs(drawVal), 'Drawings'],
+              ['Add: Net Profit / (Loss) for the year', profitVal, 'Profit Share'],
+            ]
+          : [
+              ['Opening Capital Balance as on April 1', p.openingBalance, 'Opening Balance'],
+              ['Add: Additional Capital Introduced during the year', p.capitalIntroduced, 'Capital Addition'],
+              ["Add: Partners' Remuneration for the year (Sec 40(b))", remunVal, 'Remuneration'],
+              ['Add: Interest on Capital credited for the year', p.interestOnCapital, 'Interest on Capital'],
+              ['Less: Drawings / Withdrawals during the year', -Math.abs(drawVal), 'Drawings'],
+              ['Add: Share of Profit / (Loss) for the year', profitVal, 'Profit Share'],
+            ];
 
         pLines.forEach(([desc, amt, subCat], lIdx) => {
           const bg = lIdx % 2 === 1 ? PALETTE.zebraOdd : PALETTE.white;
@@ -1693,7 +1759,7 @@ export function buildAttractiveExcelWorkbook({
           textCell('Note 9', { align: 'center', sz: 9, color: '64748B', bg }),
           textCell(clause as string, { align: 'center', sz: 9.5, bold: true, color: PALETTE.navyAccent, bg }),
           textCell(desc as string, { sz: 9.5, color: '1E293B', bg }),
-          textCell('MSMED Clause', { sz: 9, color: '64748B', bg }),
+          textCell(desc.length > 30 ? 'MSMED Clause' : 'MSME Due', { sz: 9, color: '64748B', bg }),
           numCell(amt as number, { bg }),
           textCell('-', { align: 'right', sz: 9.5, color: '94A3B8', bg }),
         ], 22);
@@ -1704,8 +1770,8 @@ export function buildAttractiveExcelWorkbook({
     addNotesRow(new Array(notesColCount).fill(textCell('', { border: {} })), 12);
   }
 
-  // Statutory Disclosure: Partners' Remuneration (Line X of P&L & Section 40(b))
-  if (profitAndLoss.partnersRemuneration > 0 || (profitAndLoss.previousYear?.partnersRemuneration && profitAndLoss.previousYear.partnersRemuneration > 0)) {
+  // Statutory Disclosure: Partners' Remuneration (Line X of P&L & Section 40(b)) (Partnership & LLP Only)
+  if (!isProprietor && (profitAndLoss.partnersRemuneration > 0 || (profitAndLoss.previousYear?.partnersRemuneration && profitAndLoss.previousYear.partnersRemuneration > 0))) {
     const ribbonRowIdx = notesRows.length;
     const ribbonRow: any[] = [];
     for (let c = 0; c < notesColCount; c++) {
@@ -1828,34 +1894,52 @@ export function buildAttractiveExcelWorkbook({
   XLSX.utils.book_append_sheet(wb, wsMasterNotes, 'Notes 1 to 25');
 
   // ==========================================
-  // SHEET: PARTNERS' / OWNERS' CAPITAL ACCOUNT (NOTE 3 - 10-COLUMN SCHEDULE)
+  // SHEET: PARTNERS' / OWNERS' CAPITAL ACCOUNT (NOTE 3 - 8 OR 11-COLUMN SCHEDULE)
   // ==========================================
   const capRows: any[][] = [];
   const capRowHeights: Array<{ hpt?: number; hidden?: boolean }> = [];
-  const capColCount = 11;
+  const capColCount = isProprietor ? 8 : 11;
+  const capitalSheetName = isProprietor ? 'Proprietor Capital (Note 3)' : 'Partner Capital (Note 3)';
+  const capitalReportTitle = isProprietor ? "PROPRIETOR'S CAPITAL ACCOUNT" : "PARTNERS' CAPITAL ACCOUNT";
+
   appendExecutiveHeaderBanner(
     capRows,
     entityName,
-    "STATEMENT OF CHANGES IN PARTNERS' / OWNERS' CAPITAL ACCOUNTS (NOTE 3)",
+    isProprietor
+      ? "STATEMENT OF CHANGES IN PROPRIETOR'S CAPITAL ACCOUNT (NOTE 3)"
+      : "STATEMENT OF CHANGES IN PARTNERS' / OWNERS' CAPITAL ACCOUNTS (NOTE 3)",
     currentPeriod,
     previousPeriod,
     capColCount,
     capRowHeights
   );
 
-  capRows.push([
-    thCell('Sr. No.', 'center', PALETTE.navyPrimary),
-    thCell('Name of Partner / Owner', 'left', PALETTE.navyPrimary),
-    thCell('Profit Sharing Ratio (%)', 'center', PALETTE.navyPrimary),
-    thCell('Remuneration Share (%)', 'center', PALETTE.navyPrimary),
-    thCell(`Opening Balance\nas on 01.04.${fyCY.substring(0, 4)} (₹)`, 'right', PALETTE.navyPrimary),
-    thCell('Capital Introduced\nduring the year (₹)', 'right', PALETTE.navyPrimary),
-    thCell("Partners' Remuneration\n(Sec 40(b)) (₹)", 'right', PALETTE.navyPrimary),
-    thCell('Interest on Capital\nduring the year (₹)', 'right', PALETTE.navyPrimary),
-    thCell('Drawings /\nWithdrawals (₹)', 'right', PALETTE.navyPrimary),
-    thCell('Share of Profit /\n(Loss) for the year (₹)', 'right', PALETTE.navyPrimary),
-    thCell(`Closing Balance\nas on ${currentPeriod} (₹)`, 'right', PALETTE.navyPrimary),
-  ]);
+  if (isProprietor) {
+    capRows.push([
+      thCell('Sr. No.', 'center', PALETTE.navyPrimary),
+      thCell('Name of Proprietor', 'left', PALETTE.navyPrimary),
+      thCell(`Opening Balance\nas on 01.04.${fyCY.substring(0, 4)} (₹)`, 'right', PALETTE.navyPrimary),
+      thCell('Capital Introduced\nduring the year (₹)', 'right', PALETTE.navyPrimary),
+      thCell('Interest on Capital\nduring the year (₹)', 'right', PALETTE.navyPrimary),
+      thCell('Drawings /\nWithdrawals (₹)', 'right', PALETTE.navyPrimary),
+      thCell('Net Profit /\n(Loss) for the year (₹)', 'right', PALETTE.navyPrimary),
+      thCell(`Closing Balance\nas on ${currentPeriod} (₹)`, 'right', PALETTE.navyPrimary),
+    ]);
+  } else {
+    capRows.push([
+      thCell('Sr. No.', 'center', PALETTE.navyPrimary),
+      thCell('Name of Partner / Owner', 'left', PALETTE.navyPrimary),
+      thCell('Profit Sharing Ratio (%)', 'center', PALETTE.navyPrimary),
+      thCell('Remuneration Share (%)', 'center', PALETTE.navyPrimary),
+      thCell(`Opening Balance\nas on 01.04.${fyCY.substring(0, 4)} (₹)`, 'right', PALETTE.navyPrimary),
+      thCell('Capital Introduced\nduring the year (₹)', 'right', PALETTE.navyPrimary),
+      thCell("Partners' Remuneration\n(Sec 40(b)) (₹)", 'right', PALETTE.navyPrimary),
+      thCell('Interest on Capital\nduring the year (₹)', 'right', PALETTE.navyPrimary),
+      thCell('Drawings /\nWithdrawals (₹)', 'right', PALETTE.navyPrimary),
+      thCell('Share of Profit /\n(Loss) for the year (₹)', 'right', PALETTE.navyPrimary),
+      thCell(`Closing Balance\nas on ${currentPeriod} (₹)`, 'right', PALETTE.navyPrimary),
+    ]);
+  }
   capRowHeights.push({ hpt: 34 });
 
   const sched3Data = noteSchedules[3];
@@ -1886,19 +1970,32 @@ export function buildAttractiveExcelWorkbook({
       totClose += p.closingBalance;
 
       const bg = idx % 2 === 1 ? PALETTE.zebraOdd : PALETTE.white;
-      capRows.push([
-        textCell(`${idx + 1}`, { align: 'center', sz: 9.5, bold: true, bg }),
-        textCell(p.isDesignatedPartner ? `${p.partnerName} (DP)` : p.partnerName, { bold: true, sz: 10, bg }),
-        textCell(psrText, { align: 'center', sz: 9.5, bg }),
-        textCell(rsrText, { align: 'center', sz: 9.5, bg }),
-        numCell(p.openingBalance, { bg }),
-        numCell(p.capitalIntroduced, { bg }),
-        numCell(remunVal, { bg }),
-        numCell(p.interestOnCapital, { bg }),
-        numCell(drawVal, { bg }),
-        numCell(profitVal, { bg }),
-        numCell(p.closingBalance, { bg, bold: true }),
-      ]);
+      if (isProprietor) {
+        capRows.push([
+          textCell(`${idx + 1}`, { align: 'center', sz: 9.5, bold: true, bg }),
+          textCell(p.partnerName, { bold: true, sz: 10, bg }),
+          numCell(p.openingBalance, { bg }),
+          numCell(p.capitalIntroduced, { bg }),
+          numCell(p.interestOnCapital, { bg }),
+          numCell(drawVal, { bg }),
+          numCell(profitVal, { bg }),
+          numCell(p.closingBalance, { bg, bold: true }),
+        ]);
+      } else {
+        capRows.push([
+          textCell(`${idx + 1}`, { align: 'center', sz: 9.5, bold: true, bg }),
+          textCell(p.isDesignatedPartner ? `${p.partnerName} (DP)` : p.partnerName, { bold: true, sz: 10, bg }),
+          textCell(psrText, { align: 'center', sz: 9.5, bg }),
+          textCell(rsrText, { align: 'center', sz: 9.5, bg }),
+          numCell(p.openingBalance, { bg }),
+          numCell(p.capitalIntroduced, { bg }),
+          numCell(remunVal, { bg }),
+          numCell(p.interestOnCapital, { bg }),
+          numCell(drawVal, { bg }),
+          numCell(profitVal, { bg }),
+          numCell(p.closingBalance, { bg, bold: true }),
+        ]);
+      }
       capRowHeights.push({ hpt: 22 });
     });
   } else {
@@ -1906,22 +2003,35 @@ export function buildAttractiveExcelWorkbook({
     const singleOpen = sched3Data?.previousYearAmount || 0;
     const singleClose = sched3Data?.totalAmount || balanceSheet.ownersCapital || 0;
     const singleProf = profitAndLoss.profitAfterTax || 0;
-    const singleRemun = profitAndLoss.partnersRemuneration || 0;
+    const singleRemun = isProprietor ? 0 : (profitAndLoss.partnersRemuneration || 0);
     const netDiff = singleClose - singleOpen - singleProf - singleRemun;
 
-    capRows.push([
-      textCell('1', { align: 'center', sz: 9.5, bold: true }),
-      textCell(entityName, { bold: true, sz: 10 }),
-      textCell('100.0%', { align: 'center', sz: 9.5 }),
-      textCell('100.0%', { align: 'center', sz: 9.5 }),
-      numCell(singleOpen),
-      numCell(netDiff > 0 ? netDiff : 0),
-      numCell(singleRemun),
-      numCell(0),
-      numCell(netDiff < 0 ? Math.abs(netDiff) : 0),
-      numCell(singleProf),
-      numCell(singleClose, { bold: true }),
-    ]);
+    if (isProprietor) {
+      capRows.push([
+        textCell('1', { align: 'center', sz: 9.5, bold: true }),
+        textCell(entityName, { bold: true, sz: 10 }),
+        numCell(singleOpen),
+        numCell(netDiff > 0 ? netDiff : 0),
+        numCell(0),
+        numCell(netDiff < 0 ? Math.abs(netDiff) : 0),
+        numCell(singleProf),
+        numCell(singleClose, { bold: true }),
+      ]);
+    } else {
+      capRows.push([
+        textCell('1', { align: 'center', sz: 9.5, bold: true }),
+        textCell(entityName, { bold: true, sz: 10 }),
+        textCell('100.0%', { align: 'center', sz: 9.5 }),
+        textCell('100.0%', { align: 'center', sz: 9.5 }),
+        numCell(singleOpen),
+        numCell(netDiff > 0 ? netDiff : 0),
+        numCell(singleRemun),
+        numCell(0),
+        numCell(netDiff < 0 ? Math.abs(netDiff) : 0),
+        numCell(singleProf),
+        numCell(singleClose, { bold: true }),
+      ]);
+    }
     capRowHeights.push({ hpt: 22 });
 
     totOpen = singleOpen;
@@ -1934,19 +2044,32 @@ export function buildAttractiveExcelWorkbook({
   }
 
   // Total Row
-  capRows.push([
-    textCell('', { bg: PALETTE.grandTotalBg }),
-    textCell("TOTAL OWNERS' / PARTNERS' CAPITAL", { bold: true, sz: 10.5, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
-    textCell('100.0%', { align: 'center', bold: true, sz: 9.5, bg: PALETTE.grandTotalBg }),
-    textCell('100.0%', { align: 'center', bold: true, sz: 9.5, bg: PALETTE.grandTotalBg }),
-    numCell(totOpen, { isGrandTotal: true }),
-    numCell(totIntro, { isGrandTotal: true }),
-    numCell(totRemun, { isGrandTotal: true }),
-    numCell(totInt, { isGrandTotal: true }),
-    numCell(totDraw, { isGrandTotal: true }),
-    numCell(totProf, { isGrandTotal: true }),
-    numCell(totClose, { isGrandTotal: true }),
-  ]);
+  if (isProprietor) {
+    capRows.push([
+      textCell('', { bg: PALETTE.grandTotalBg }),
+      textCell("TOTAL PROPRIETOR'S CAPITAL", { bold: true, sz: 10.5, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
+      numCell(totOpen, { isGrandTotal: true }),
+      numCell(totIntro, { isGrandTotal: true }),
+      numCell(totInt, { isGrandTotal: true }),
+      numCell(totDraw, { isGrandTotal: true }),
+      numCell(totProf, { isGrandTotal: true }),
+      numCell(totClose, { isGrandTotal: true }),
+    ]);
+  } else {
+    capRows.push([
+      textCell('', { bg: PALETTE.grandTotalBg }),
+      textCell("TOTAL OWNERS' / PARTNERS' CAPITAL", { bold: true, sz: 10.5, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
+      textCell('100.0%', { align: 'center', bold: true, sz: 9.5, bg: PALETTE.grandTotalBg }),
+      textCell('100.0%', { align: 'center', bold: true, sz: 9.5, bg: PALETTE.grandTotalBg }),
+      numCell(totOpen, { isGrandTotal: true }),
+      numCell(totIntro, { isGrandTotal: true }),
+      numCell(totRemun, { isGrandTotal: true }),
+      numCell(totInt, { isGrandTotal: true }),
+      numCell(totDraw, { isGrandTotal: true }),
+      numCell(totProf, { isGrandTotal: true }),
+      numCell(totClose, { isGrandTotal: true }),
+    ]);
+  }
   capRowHeights.push({ hpt: 26 });
 
   // Verification Row comparing to Balance Sheet Note 3
@@ -1987,30 +2110,43 @@ export function buildAttractiveExcelWorkbook({
   appendSignOffBlock(capRows, entityConfig, currentPeriod, capColCount, capRowHeights);
 
   const wsCap = XLSX.utils.aoa_to_sheet(capRows);
-  wsCap['!cols'] = [
-    { wch: 8 },
-    { wch: 28 },
-    { wch: 14 },
-    { wch: 14 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 18 },
-    { wch: 20 },
-  ];
+  if (isProprietor) {
+    wsCap['!cols'] = [
+      { wch: 8 },
+      { wch: 32 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 22 },
+      { wch: 22 },
+    ];
+  } else {
+    wsCap['!cols'] = [
+      { wch: 8 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 20 },
+    ];
+  }
   wsCap['!rows'] = capRowHeights;
   wsCap['!merges'] = capMerges;
   applyPrintSetup(wsCap, {
-    orientation: 'landscape',
+    orientation: isProprietor ? 'portrait' : 'landscape',
     entityName,
-    reportTitle: "PARTNERS' CAPITAL ACCOUNT",
+    reportTitle: capitalReportTitle,
     financialYear: fyCY,
     headerRowsToFreeze: 6,
     tabColor: '059669',
   });
-  XLSX.utils.book_append_sheet(wb, wsCap, 'Partner Capital (Note 3)');
+  XLSX.utils.book_append_sheet(wb, wsCap, capitalSheetName);
 
   // ==========================================
   // SHEET 5: MASTER TRIAL BALANCE & MAPPINGS
@@ -2265,7 +2401,7 @@ export function buildAttractiveExcelWorkbook({
     { Name: '_xlnm.Print_Titles', Ref: "'Balance Sheet'!$1:$6", Sheet: 1 },
     { Name: '_xlnm.Print_Titles', Ref: "'Profit and Loss'!$1:$6", Sheet: 2 },
     { Name: '_xlnm.Print_Titles', Ref: "'Notes 1 to 25'!$1:$6", Sheet: 3 },
-    { Name: '_xlnm.Print_Titles', Ref: "'Partner Capital (Note 3)'!$1:$6", Sheet: 4 },
+    { Name: '_xlnm.Print_Titles', Ref: `'${capitalSheetName}'!$1:$6`, Sheet: 4 },
     { Name: '_xlnm.Print_Titles', Ref: "'Trial Balance Master'!$1:$6", Sheet: 5 },
     { Name: '_xlnm.Print_Titles', Ref: "'Audit Exceptions'!$1:$6", Sheet: 6 },
   ];
@@ -2275,7 +2411,7 @@ export function buildAttractiveExcelWorkbook({
     { sheetName: 'Balance Sheet', orientation: 'portrait', reportTitle: 'BALANCE SHEET', entityName, financialYear: fyCY },
     { sheetName: 'Profit and Loss', orientation: 'portrait', reportTitle: 'STATEMENT OF PROFIT AND LOSS', entityName, financialYear: fyCY },
     { sheetName: 'Notes 1 to 25', orientation: 'landscape', reportTitle: 'NOTES FORMING PART OF ACCOUNTS', entityName, financialYear: fyCY },
-    { sheetName: 'Partner Capital (Note 3)', orientation: 'landscape', reportTitle: "PARTNERS' CAPITAL ACCOUNT", entityName, financialYear: fyCY },
+    { sheetName: capitalSheetName, orientation: isProprietor ? 'portrait' : 'landscape', reportTitle: capitalReportTitle, entityName, financialYear: fyCY },
     { sheetName: 'Trial Balance Master', orientation: 'landscape', reportTitle: 'MASTER TRIAL BALANCE REGISTER', entityName, financialYear: fyCY },
     { sheetName: 'Audit Exceptions', orientation: 'landscape', reportTitle: 'STATUTORY AUDIT VALIDATION REPORT', entityName, financialYear: fyCY },
   ];
