@@ -93,6 +93,10 @@ export interface PartnerCapitalRecord {
   partnerName: string;
   profitSharePercent: number;
   profitShareRatio?: string;
+  remunerationSharePercent?: number;
+  remunerationShareRatio?: string;
+  isWorkingPartner?: boolean;
+  isDesignatedPartner?: boolean;
   openingBalance: number;
   capitalIntroduced: number;
   remuneration: number;
@@ -321,6 +325,9 @@ export interface EntityConfig {
   partners?: Array<{
     name: string;
     profitSharePercent?: number;
+    remunerationSharePercent?: number;
+    isWorkingPartner?: boolean;
+    isDesignatedPartner?: boolean;
     openingBalance?: number;
     capitalIntroduced?: number;
     remuneration?: number;

@@ -421,12 +421,13 @@ export const NotesView: React.FC<NotesViewProps> = ({
                             return null;
                           })()}
                           <div className="overflow-x-auto border border-emerald-300/80 rounded-xl shadow-xs">
-                            <table className="w-full text-left text-[11px] border-collapse min-w-[880px]">
+                            <table className="w-full text-left text-[11px] border-collapse min-w-[920px]">
                               <thead>
                                 <tr className="bg-emerald-900 text-white font-semibold">
                                   <th className="py-2.5 px-2 text-center w-12">Sr. No.</th>
-                                  <th className="py-2.5 px-3">Name of Partner/ Proprietor/ Owner</th>
-                                  <th className="py-2.5 px-2 text-center w-16">Share (%)</th>
+                                  <th className="py-2.5 px-3">Name of Partner / Designated Partner / Owner</th>
+                                  <th className="py-2.5 px-2 text-center w-16" title="Profit Sharing Ratio">Profit (%)</th>
+                                  <th className="py-2.5 px-2 text-center w-16" title="Remuneration Sharing Ratio u/s 40(b)">Remun (%)</th>
                                   <th className="py-2.5 px-3 text-right">As at 1st April (Opening)</th>
                                   <th className="py-2.5 px-3 text-right">Capital Introduced</th>
                                   <th className="py-2.5 px-3 text-right">Remuneration</th>
@@ -437,26 +438,36 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-emerald-100 bg-emerald-50/20 text-slate-800">
-                                {(schedule.partnerCapitalTable || []).map((row) => (
-                                  <tr key={row.srNo} className="hover:bg-white transition font-medium">
-                                    <td className="py-2 px-2 text-center font-mono text-slate-500">{row.srNo}</td>
-                                    <td className="py-2 px-3 font-semibold text-slate-900">{row.partnerName}</td>
-                                    <td className="py-2 px-2 text-center font-mono">{row.profitSharePercent}%</td>
-                                    <td className="py-2 px-3 text-right font-mono">{formatINR(row.openingBalance)}</td>
-                                    <td className="py-2 px-3 text-right font-mono">{row.capitalIntroduced ? formatINR(row.capitalIntroduced) : '-'}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-emerald-900 font-semibold">{row.remuneration ? formatINR(row.remuneration) : '-'}</td>
-                                    <td className="py-2 px-3 text-right font-mono">{row.interestOnCapital ? formatINR(row.interestOnCapital) : '-'}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-rose-700">{row.withdrawals ? `(${formatINR(row.withdrawals)})` : '-'}</td>
-                                    <td className={`py-2 px-3 text-right font-mono font-semibold ${row.shareOfProfit >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
-                                      {formatINR(row.shareOfProfit)}
-                                    </td>
-                                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-950 bg-emerald-100/60">{formatINR(row.closingBalance)}</td>
-                                  </tr>
-                                ))}
+                                {(schedule.partnerCapitalTable || []).map((row) => {
+                                  const remunPct = row.remunerationSharePercent !== undefined ? row.remunerationSharePercent : row.profitSharePercent;
+                                  return (
+                                    <tr key={row.srNo} className="hover:bg-white transition font-medium">
+                                      <td className="py-2 px-2 text-center font-mono text-slate-500">{row.srNo}</td>
+                                      <td className="py-2 px-3 font-semibold text-slate-900 flex items-center gap-1.5">
+                                        <span>{row.partnerName}</span>
+                                        {row.isDesignatedPartner && config.entityType === 'LLP' && (
+                                          <span className="text-[9px] bg-teal-100 text-teal-800 px-1.5 py-0.2 rounded font-medium">DP</span>
+                                        )}
+                                      </td>
+                                      <td className="py-2 px-2 text-center font-mono text-slate-700">{row.profitSharePercent}%</td>
+                                      <td className="py-2 px-2 text-center font-mono text-teal-800 font-semibold">{remunPct}%</td>
+                                      <td className="py-2 px-3 text-right font-mono">{formatINR(row.openingBalance)}</td>
+                                      <td className="py-2 px-3 text-right font-mono">{row.capitalIntroduced ? formatINR(row.capitalIntroduced) : '-'}</td>
+                                      <td className="py-2 px-3 text-right font-mono text-emerald-900 font-semibold">{row.remuneration ? formatINR(row.remuneration) : '-'}</td>
+                                      <td className="py-2 px-3 text-right font-mono">{row.interestOnCapital ? formatINR(row.interestOnCapital) : '-'}</td>
+                                      <td className="py-2 px-3 text-right font-mono text-rose-700">{row.withdrawals ? `(${formatINR(row.withdrawals)})` : '-'}</td>
+                                      <td className={`py-2 px-3 text-right font-mono font-semibold ${row.shareOfProfit >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
+                                        {formatINR(row.shareOfProfit)}
+                                      </td>
+                                      <td className="py-2 px-3 text-right font-mono font-bold text-slate-950 bg-emerald-100/60">{formatINR(row.closingBalance)}</td>
+                                    </tr>
+                                  );
+                                })}
                                 {/* Current Year Total Row */}
                                 <tr className="bg-emerald-100/90 font-bold text-emerald-950 border-t-2 border-emerald-300 text-xs">
                                   <td colSpan={2} className="py-2 px-3 text-right uppercase tracking-wider">Total (CY)</td>
                                   <td className="py-2 px-2 text-center font-mono">100%</td>
+                                  <td className="py-2 px-2 text-center font-mono text-teal-800">100%</td>
                                   <td className="py-2 px-3 text-right font-mono">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.openingBalance, 0))}</td>
                                   <td className="py-2 px-3 text-right font-mono">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.capitalIntroduced, 0))}</td>
                                   <td className="py-2 px-3 text-right font-mono">{formatINR((schedule.partnerCapitalTable || []).reduce((s, r) => s + r.remuneration, 0))}</td>
@@ -469,6 +480,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                 <tr className="bg-slate-100 font-semibold text-slate-700 border-t border-slate-300 text-[10px]">
                                   <td colSpan={2} className="py-1.5 px-3 uppercase text-slate-600">Previous Year (PY)</td>
                                   <td className="py-1.5 px-2 text-center font-mono">100%</td>
+                                  <td className="py-1.5 px-2 text-center font-mono text-teal-800">100%</td>
                                   <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.openingBalance, 0))}</td>
                                   <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.capitalIntroduced, 0))}</td>
                                   <td className="py-1.5 px-3 text-right font-mono">{formatINR((schedule.pyPartnerCapitalTable || []).reduce((s, r) => s + r.remuneration, 0))}</td>

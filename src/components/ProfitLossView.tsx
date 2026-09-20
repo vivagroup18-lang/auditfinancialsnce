@@ -680,6 +680,97 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
             })()}
           </div>
         )}
+        {/* Partner-Wise Allocation Schedule (Remuneration & Profit Distribution) */}
+        {config.partners && config.partners.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-emerald-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-teal-600"></span>
+                <span className="font-bold text-xs text-slate-800 uppercase tracking-wide">
+                  {config.entityType === 'LLP'
+                    ? "Partners' / Designated Partners' Remuneration & Profit Distribution (LLP Agreement)"
+                    : "Partners' Remuneration & Profit Distribution (Partnership Deed & Sec 40(b))"}
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {config.partners.length} {config.partners.length === 1 ? 'Partner' : 'Partners'} Configured
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-teal-200 shadow-2xs">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-teal-900 text-white text-[11px] font-semibold">
+                    <th className="py-2 px-3 text-center w-10">Sr.</th>
+                    <th className="py-2 px-3">Partner / Designated Partner Name</th>
+                    <th className="py-2 px-2 text-center w-24">Remun Share (%)</th>
+                    <th className="py-2 px-3 text-right w-36">Allocated Remun (Line X)</th>
+                    <th className="py-2 px-2 text-center w-24">Profit Share (%)</th>
+                    <th className="py-2 px-3 text-right w-36">Allocated PAT (Line XVII)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-teal-100 bg-teal-50/20 text-slate-800 text-[11px]">
+                  {(() => {
+                    const count = config.partners.length;
+                    const totalRemun = profitAndLoss.partnersRemuneration || 0;
+                    const totalPat = profitAndLoss.profitAfterTax || 0;
+                    let remunAllocated = 0;
+                    let patAllocated = 0;
+
+                    return config.partners.map((p, idx) => {
+                      const isLast = idx === count - 1;
+                      const rsr = p.remunerationSharePercent !== undefined ? p.remunerationSharePercent : (p.profitSharePercent !== undefined ? p.profitSharePercent : Math.round(100 / count));
+                      const psr = p.profitSharePercent !== undefined ? p.profitSharePercent : Math.round(100 / count);
+
+                      const remunShare = isLast
+                        ? Math.round((totalRemun - remunAllocated) * 100) / 100
+                        : Math.round(totalRemun * (rsr / 100) * 100) / 100;
+                      remunAllocated += remunShare;
+
+                      const patShare = isLast
+                        ? Math.round((totalPat - patAllocated) * 100) / 100
+                        : Math.round(totalPat * (psr / 100) * 100) / 100;
+                      patAllocated += patShare;
+
+                      return (
+                        <tr key={idx} className="hover:bg-white transition">
+                          <td className="py-1.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                          <td className="py-1.5 px-3 font-semibold text-slate-900 flex items-center gap-1.5">
+                            <span>{p.name}</span>
+                            {p.isDesignatedPartner && (
+                              <span className="text-[9px] bg-teal-100 text-teal-800 px-1.5 py-0.2 rounded font-medium">Designated</span>
+                            )}
+                            {p.isWorkingPartner && !p.isDesignatedPartner && (
+                              <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-medium">Working</span>
+                            )}
+                          </td>
+                          <td className="py-1.5 px-2 text-center font-mono text-teal-800 font-semibold">{rsr}%</td>
+                          <td className="py-1.5 px-3 text-right font-mono font-bold text-emerald-950">
+                            {formatINR(remunShare)}
+                          </td>
+                          <td className="py-1.5 px-2 text-center font-mono text-slate-700">{psr}%</td>
+                          <td className={`py-1.5 px-3 text-right font-mono font-bold ${patShare >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
+                            {formatINR(patShare)}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                  {/* Totals */}
+                  <tr className="bg-teal-100/90 font-bold text-teal-950 border-t-2 border-teal-300 text-[11px]">
+                    <td colSpan={2} className="py-2 px-3 text-right uppercase tracking-wider">Total Allocation</td>
+                    <td className="py-2 px-2 text-center font-mono">100%</td>
+                    <td className="py-2 px-3 text-right font-mono font-black text-emerald-950">{formatINR(profitAndLoss.partnersRemuneration || 0)}</td>
+                    <td className="py-2 px-2 text-center font-mono">100%</td>
+                    <td className={`py-2 px-3 text-right font-mono font-black ${(profitAndLoss.profitAfterTax || 0) >= 0 ? 'text-emerald-950' : 'text-rose-900'}`}>
+                      {formatINR(profitAndLoss.profitAfterTax || 0)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footnote */}

@@ -82,29 +82,37 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
       setCyRows(noteSchedule.partnerCapitalTable.map((r, i) => ({ ...r, srNo: i + 1 })));
     } else if (config.partners && config.partners.length > 0) {
       setCyRows(
-        config.partners.map((p, i) => ({
-          srNo: i + 1,
-          partnerName: p.name,
-          profitSharePercent: p.profitSharePercent || Math.round(100 / config.partners!.length),
-          profitShareRatio: `${p.profitSharePercent || Math.round(100 / config.partners!.length)}%`,
-          openingBalance: p.openingBalance || 0,
-          capitalIntroduced: p.capitalIntroduced || 0,
-          remuneration: p.remuneration || 0,
-          interestOnCapital: p.interestOnCapital || 0,
-          withdrawals: p.withdrawals || 0,
-          shareOfProfit: p.shareOfProfit || 0,
-          closingBalance:
-            p.closingBalance ||
-            Math.round(
-              ((p.openingBalance || 0) +
-                (p.capitalIntroduced || 0) +
-                (p.remuneration || 0) +
-                (p.interestOnCapital || 0) -
-                (p.withdrawals || 0) +
-                (p.shareOfProfit || 0)) *
-                100
-            ) / 100,
-        }))
+        config.partners.map((p, i) => {
+          const psr = p.profitSharePercent || Math.round(100 / config.partners!.length);
+          const rsr = p.remunerationSharePercent !== undefined ? p.remunerationSharePercent : psr;
+          return {
+            srNo: i + 1,
+            partnerName: p.name,
+            profitSharePercent: psr,
+            profitShareRatio: `${psr}%`,
+            remunerationSharePercent: rsr,
+            remunerationShareRatio: `${rsr}%`,
+            isWorkingPartner: p.isWorkingPartner ?? true,
+            isDesignatedPartner: p.isDesignatedPartner ?? true,
+            openingBalance: p.openingBalance || 0,
+            capitalIntroduced: p.capitalIntroduced || 0,
+            remuneration: p.remuneration || 0,
+            interestOnCapital: p.interestOnCapital || 0,
+            withdrawals: p.withdrawals || 0,
+            shareOfProfit: p.shareOfProfit || 0,
+            closingBalance:
+              p.closingBalance ||
+              Math.round(
+                ((p.openingBalance || 0) +
+                  (p.capitalIntroduced || 0) +
+                  (p.remuneration || 0) +
+                  (p.interestOnCapital || 0) -
+                  (p.withdrawals || 0) +
+                  (p.shareOfProfit || 0)) *
+                  100
+              ) / 100,
+          };
+        })
       );
     } else {
       // Default 2 partners
@@ -114,6 +122,10 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
           partnerName: 'Partner 1',
           profitSharePercent: 50,
           profitShareRatio: '50%',
+          remunerationSharePercent: 50,
+          remunerationShareRatio: '50%',
+          isWorkingPartner: true,
+          isDesignatedPartner: true,
           openingBalance: 0,
           capitalIntroduced: 0,
           remuneration: 0,
@@ -127,6 +139,10 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
           partnerName: 'Partner 2',
           profitSharePercent: 50,
           profitShareRatio: '50%',
+          remunerationSharePercent: 50,
+          remunerationShareRatio: '50%',
+          isWorkingPartner: true,
+          isDesignatedPartner: true,
           openingBalance: 0,
           capitalIntroduced: 0,
           remuneration: 0,
@@ -193,6 +209,18 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
     () => activeRows.reduce((sum, r) => sum + (r.profitSharePercent || 0), 0),
     [activeRows]
   );
+  const totalRsr = useMemo(
+    () =>
+      activeRows.reduce(
+        (sum, r) =>
+          sum +
+          (r.remunerationSharePercent !== undefined
+            ? r.remunerationSharePercent
+            : r.profitSharePercent || 0),
+        0
+      ),
+    [activeRows]
+  );
 
   const variance = Math.round((targetNote3Total - totalScheduleClosing) * 100) / 100;
   const isReconciled = Math.abs(variance) < 0.05;
@@ -219,6 +247,10 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
         const num = parseFloat(String(value)) || 0;
         row.profitSharePercent = num;
         row.profitShareRatio = `${num}%`;
+      } else if (field === 'remunerationSharePercent') {
+        const num = parseFloat(String(value)) || 0;
+        row.remunerationSharePercent = num;
+        row.remunerationShareRatio = `${num}%`;
       } else {
         const num = parseFloat(String(value)) || 0;
         (row as any)[field] = num;
@@ -246,6 +278,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
   const handleAddPartner = () => {
     const newIdx = activeRows.length + 1;
     const remainingPsr = Math.max(0, Math.round((100 - totalPsr) * 100) / 100);
+    const remainingRsr = Math.max(0, Math.round((100 - totalRsr) * 100) / 100);
     setActiveRows((prev) => [
       ...prev,
       {
@@ -253,6 +286,10 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
         partnerName: `Partner ${newIdx}`,
         profitSharePercent: remainingPsr,
         profitShareRatio: `${remainingPsr}%`,
+        remunerationSharePercent: remainingRsr > 0 ? remainingRsr : remainingPsr,
+        remunerationShareRatio: `${remainingRsr > 0 ? remainingRsr : remainingPsr}%`,
+        isWorkingPartner: true,
+        isDesignatedPartner: true,
         openingBalance: 0,
         capitalIntroduced: 0,
         remuneration: 0,
@@ -323,7 +360,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
     });
   };
 
-  // 1-Click: Distribute Partners' Remuneration by PSR %
+  // 1-Click: Distribute Partners' Remuneration by RSR %
   const handleDistributeRemuneration = () => {
     const remun = profitAndLoss?.partnersRemuneration || 0;
     if (remun === 0) {
@@ -339,7 +376,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
       let allocated = 0;
 
       return prev.map((row, idx) => {
-        const ratio = (row.profitSharePercent || (100 / count)) / 100;
+        const ratio = (row.remunerationSharePercent !== undefined ? row.remunerationSharePercent : (row.profitSharePercent || (100 / count))) / 100;
         const share =
           idx === count - 1
             ? Math.round((remun - allocated) * 100) / 100
@@ -367,7 +404,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
 
     setStatusMsg({
       type: 'success',
-      text: `Distributed Line X Remuneration (₹${formatINR(remun)}) across partners.`,
+      text: `Distributed Line X Remuneration (₹${formatINR(remun)}) across partners based on Remuneration Sharing Ratio (RSR).`,
     });
   };
 
@@ -657,6 +694,10 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
       partners: cyRows.map((r) => ({
         name: r.partnerName,
         profitSharePercent: r.profitSharePercent,
+        remunerationSharePercent: r.remunerationSharePercent,
+        remunerationShareRatio: r.remunerationShareRatio,
+        isWorkingPartner: r.isWorkingPartner,
+        isDesignatedPartner: r.isDesignatedPartner,
         openingBalance: r.openingBalance,
         capitalIntroduced: r.capitalIntroduced,
         remuneration: r.remuneration,
@@ -807,6 +848,13 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                 {totalPsr}%
               </span>
             </div>
+            <div className="w-px h-3.5 bg-slate-300"></div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500">Remun Share (RSR%):</span>
+              <span className={`font-mono font-bold ${Math.abs(totalRsr - 100) < 0.1 ? 'text-teal-700' : 'text-amber-700'}`}>
+                {totalRsr}%
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -923,15 +971,16 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                   <thead>
                     <tr className="bg-emerald-900 text-white font-semibold">
                       <th className="py-2.5 px-2 text-center w-10">Sr.</th>
-                      <th className="py-2.5 px-3 min-w-[170px]">Name of Partner/ Proprietor</th>
-                      <th className="py-2.5 px-2 text-center w-20">Share (%)</th>
-                      <th className="py-2.5 px-2 text-right w-28">As at 1st April (Opening)</th>
-                      <th className="py-2.5 px-2 text-right w-26">Capital Introduced</th>
-                      <th className="py-2.5 px-2 text-right w-26">Remuneration</th>
-                      <th className="py-2.5 px-2 text-right w-24">Interest</th>
-                      <th className="py-2.5 px-2 text-right w-26">Withdrawals</th>
-                      <th className="py-2.5 px-2 text-right w-28">Share of Profit/Loss</th>
-                      <th className="py-2.5 px-2 text-right w-30 font-bold text-emerald-200 bg-emerald-950">
+                      <th className="py-2.5 px-3 min-w-[160px]">Name of Partner/ Proprietor</th>
+                      <th className="py-2.5 px-2 text-center w-18" title="Profit Sharing Ratio">Profit (%)</th>
+                      <th className="py-2.5 px-2 text-center w-18" title="Remuneration Sharing Ratio u/s 40(b)">Remun (%)</th>
+                      <th className="py-2.5 px-2 text-right w-26">As at 1st April (Opening)</th>
+                      <th className="py-2.5 px-2 text-right w-24">Capital Introduced</th>
+                      <th className="py-2.5 px-2 text-right w-24">Remuneration</th>
+                      <th className="py-2.5 px-2 text-right w-22">Interest</th>
+                      <th className="py-2.5 px-2 text-right w-24">Withdrawals</th>
+                      <th className="py-2.5 px-2 text-right w-26">Share of Profit/Loss</th>
+                      <th className="py-2.5 px-2 text-right w-28 font-bold text-emerald-200 bg-emerald-950">
                         As at 31st March (Closing)
                       </th>
                       <th className="py-2.5 px-2 text-center w-10"></th>
@@ -959,9 +1008,23 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                               step="0.01"
                               value={row.profitSharePercent}
                               onChange={(e) => handleCellChange(idx, 'profitSharePercent', e.target.value)}
-                              className="w-16 px-1 py-1 text-center bg-white border border-slate-200 rounded font-mono text-xs focus:ring-1 focus:ring-emerald-500"
+                              className="w-14 px-1 py-1 text-center bg-white border border-slate-200 rounded font-mono text-xs focus:ring-1 focus:ring-emerald-500"
                             />
-                            <span className="text-[10px] text-slate-400 ml-1">%</span>
+                            <span className="text-[10px] text-slate-400 ml-0.5">%</span>
+                          </div>
+                        </td>
+                        <td className="py-1.5 px-1 text-center">
+                          <div className="relative inline-flex items-center">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={row.remunerationSharePercent !== undefined ? row.remunerationSharePercent : ''}
+                              placeholder={`${row.profitSharePercent || 0}`}
+                              onChange={(e) => handleCellChange(idx, 'remunerationSharePercent', e.target.value)}
+                              className="w-14 px-1 py-1 text-center bg-white border border-teal-200 rounded font-mono text-xs text-teal-900 focus:ring-1 focus:ring-teal-500"
+                              title="Remuneration Sharing % (defaults to Profit Share if blank)"
+                            />
+                            <span className="text-[10px] text-teal-600 ml-0.5">%</span>
                           </div>
                         </td>
                         <td className="py-1.5 px-1 text-right">
@@ -1047,6 +1110,9 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                       </td>
                       <td className="py-2.5 px-2 text-center font-mono font-bold">
                         {totalPsr}%
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-mono font-bold text-teal-800">
+                        {totalRsr}%
                       </td>
                       <td className="py-2.5 px-2 text-right font-mono font-bold">
                         {formatINR(totalOpening)}

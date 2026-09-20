@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, AlertTriangle, ExternalLink, Printer, ShieldCheck, Mail } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ExternalLink, Printer, ShieldCheck, Mail, Users } from 'lucide-react';
 import { BalanceSheetData, EntityConfig } from '../types';
 
 interface BalanceSheetViewProps {
@@ -135,7 +135,19 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
             </tr>
             <tr className="hover:bg-slate-50 transition-colors">
               <td className="py-2 px-10 text-slate-700">
-                (a) Owners' Capital Account
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>
+                    {config.entityType === 'Partnership Firm' || config.entityType === 'LLP'
+                      ? "(a) Partners' Capital Accounts"
+                      : "(a) Owners' Capital Account"}
+                  </span>
+                  {config.partners && config.partners.length > 0 && (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                      <Users className="w-2.5 h-2.5 text-emerald-600" />
+                      <span>{config.partners.length} {config.partners.length === 1 ? 'Partner' : 'Partners'}</span>
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="py-2 px-2 text-center">
                 <button

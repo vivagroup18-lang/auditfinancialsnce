@@ -184,8 +184,15 @@ export function computeOwnersCapitalTable(
 
   // 2. Priority 2: Configured partners with individual balances
   if (partnerConfigs.length > 0) {
+    let remunAllocated = 0;
+    let patAllocated = 0;
+    const count = partnerConfigs.length;
+
     const records: PartnerCapitalRecord[] = partnerConfigs.map((p, idx) => {
-      const ratio = (p.profitSharePercent || (100 / partnerConfigs.length)) / 100;
+      const isLast = idx === count - 1;
+      const profitRatio = (p.profitSharePercent !== undefined ? p.profitSharePercent : (100 / count)) / 100;
+      const remunRatio = (p.remunerationSharePercent !== undefined ? p.remunerationSharePercent : (p.profitSharePercent !== undefined ? p.profitSharePercent : (100 / count))) / 100;
+
       const pOpening = isPY ? (p.pyOpeningBalance ?? p.openingBalance) : p.openingBalance;
       const pIntroduced = isPY ? (p.pyCapitalIntroduced ?? p.capitalIntroduced) : p.capitalIntroduced;
       const pRemun = isPY ? (p.pyRemuneration ?? p.remuneration) : p.remuneration;
@@ -196,10 +203,31 @@ export function computeOwnersCapitalTable(
 
       const effectiveOpening = pOpening !== undefined ? pOpening : 0;
       const effectiveIntroduced = pIntroduced !== undefined ? pIntroduced : 0;
-      const effectiveRemun = pRemun !== undefined ? pRemun : Math.round(remuneration * ratio * 100) / 100;
-      const effectiveInterest = pInterest !== undefined ? pInterest : Math.round(interestOnCapital * ratio * 100) / 100;
+
+      // Allocate remuneration using remunerationSharePercent (reconcile on last partner)
+      let effectiveRemun = 0;
+      if (pRemun !== undefined) {
+        effectiveRemun = pRemun;
+      } else if (remuneration > 0) {
+        effectiveRemun = isLast
+          ? Math.round((remuneration - remunAllocated) * 100) / 100
+          : Math.round(remuneration * remunRatio * 100) / 100;
+      }
+      remunAllocated += effectiveRemun;
+
+      const effectiveInterest = pInterest !== undefined ? pInterest : Math.round(interestOnCapital * profitRatio * 100) / 100;
       const effectiveDrawings = pDrawings !== undefined ? pDrawings : 0;
-      const effectiveProfitShare = pProfitShare !== undefined ? pProfitShare : Math.round(pat * ratio * 100) / 100;
+
+      // Allocate PAT using profitSharePercent (reconcile on last partner)
+      let effectiveProfitShare = 0;
+      if (pProfitShare !== undefined) {
+        effectiveProfitShare = pProfitShare;
+      } else if (pat !== 0) {
+        effectiveProfitShare = isLast
+          ? Math.round((pat - patAllocated) * 100) / 100
+          : Math.round(pat * profitRatio * 100) / 100;
+      }
+      patAllocated += effectiveProfitShare;
 
       const computedClosing = Math.round(
         (effectiveOpening + effectiveIntroduced + effectiveRemun + effectiveInterest - effectiveDrawings + effectiveProfitShare) * 100
@@ -207,11 +235,18 @@ export function computeOwnersCapitalTable(
 
       const finalClosing = pExplicitClosing !== undefined ? pExplicitClosing : computedClosing;
 
+      const psrVal = p.profitSharePercent !== undefined ? p.profitSharePercent : Math.round(100 / count);
+      const rsrVal = p.remunerationSharePercent !== undefined ? p.remunerationSharePercent : psrVal;
+
       return {
         srNo: idx + 1,
         partnerName: p.name,
-        profitSharePercent: p.profitSharePercent || Math.round(100 / partnerConfigs.length),
-        profitShareRatio: `${p.profitSharePercent || Math.round(100 / partnerConfigs.length)}%`,
+        profitSharePercent: psrVal,
+        profitShareRatio: `${psrVal}%`,
+        remunerationSharePercent: rsrVal,
+        remunerationShareRatio: `${rsrVal}%`,
+        isWorkingPartner: p.isWorkingPartner ?? true,
+        isDesignatedPartner: p.isDesignatedPartner ?? true,
         openingBalance: effectiveOpening,
         capitalIntroduced: effectiveIntroduced,
         remuneration: effectiveRemun,
@@ -302,6 +337,10 @@ export function computeOwnersCapitalTable(
         partnerName: dp.name,
         profitSharePercent: psr,
         profitShareRatio: `${psr}%`,
+        remunerationSharePercent: psr,
+        remunerationShareRatio: `${psr}%`,
+        isWorkingPartner: true,
+        isDesignatedPartner: true,
         openingBalance: pOpening >= 0 ? pOpening : pClosing,
         capitalIntroduced: dp.introducedBal,
         remuneration: pRemun,
@@ -334,6 +373,10 @@ export function computeOwnersCapitalTable(
         partnerName: propName,
         profitSharePercent: 100,
         profitShareRatio: '100%',
+        remunerationSharePercent: 100,
+        remunerationShareRatio: '100%',
+        isWorkingPartner: true,
+        isDesignatedPartner: false,
         openingBalance: pOpening,
         capitalIntroduced: 0,
         remuneration: remuneration,
@@ -360,6 +403,10 @@ export function computeOwnersCapitalTable(
       partnerName: 'Partner 1',
       profitSharePercent: halfShare,
       profitShareRatio: '50%',
+      remunerationSharePercent: halfShare,
+      remunerationShareRatio: '50%',
+      isWorkingPartner: true,
+      isDesignatedPartner: true,
       openingBalance: halfOpening,
       capitalIntroduced: 0,
       remuneration: halfRemun,
@@ -373,6 +420,10 @@ export function computeOwnersCapitalTable(
       partnerName: 'Partner 2',
       profitSharePercent: halfShare,
       profitShareRatio: '50%',
+      remunerationSharePercent: halfShare,
+      remunerationShareRatio: '50%',
+      isWorkingPartner: true,
+      isDesignatedPartner: true,
       openingBalance: totalClosing - halfClosing - halfRemun - halfInterest - (pat - halfProfit),
       capitalIntroduced: 0,
       remuneration: remuneration - halfRemun,

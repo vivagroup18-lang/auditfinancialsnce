@@ -20,10 +20,14 @@ import {
   X,
   FileText,
   Database,
+  Users,
+  Percent,
+  AlertTriangle,
 } from 'lucide-react';
 import { Company, EntityConfig } from '../types';
 import { POPULAR_INDIAN_FY_PRESETS } from '../utils/financialYearUtils';
 import { SAMPLE_DATASETS } from '../data/sampleTrialBalances';
+import { PartnerConfigForm, PartnerConfigItem } from './PartnerConfigForm';
 
 interface CompaniesWindowProps {
   companies: Company[];
@@ -72,6 +76,12 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   const [newFirmRegNo, setNewFirmRegNo] = useState('');
   const [newUdin, setNewUdin] = useState('');
 
+  // Partners configured during Companies Stage
+  const [newPartners, setNewPartners] = useState<PartnerConfigItem[]>([
+    { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+    { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+  ]);
+
   // Edit Modal/Inline State
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [editConfig, setEditConfig] = useState<EntityConfig | null>(null);
@@ -106,6 +116,8 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
     if (!finalName) return;
 
     const preset = POPULAR_INDIAN_FY_PRESETS.find((p) => p.cyYear === newFY);
+    const isFirmOrLLP = newEntityType === 'Partnership Firm' || newEntityType === 'LLP';
+
     const createdConfig: EntityConfig = {
       entityName: finalName,
       entityType: newEntityType,
@@ -115,13 +127,14 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       previousReportingPeriod: preset?.pyPeriod || 'March 31, 2024',
       currencyUnit: 'INR',
       taxRatePercent: 30,
-      transferProfitTo: newEntityType === 'Partnership Firm' ? 'partners_capital' : 'proprietor_capital',
+      transferProfitTo: newEntityType === 'LLP' ? 'reserves' : 'partners_capital',
       pan: newPan.trim().toUpperCase() || undefined,
       gstin: newGstin.trim().toUpperCase() || undefined,
       auditorName: newAuditorName.trim() || undefined,
       auditorMembershipNo: newMembershipNo.trim() || undefined,
       firmRegistrationNo: newFirmRegNo.trim() || undefined,
       udin: newUdin.trim() || undefined,
+      partners: isFirmOrLLP && newPartners.length > 0 ? newPartners : undefined,
     };
 
     onCreateCompany(createdConfig, newStarterType, newCloneSourceId);
@@ -135,6 +148,10 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
     setNewFirmRegNo('');
     setNewUdin('');
     setShowAdditionalDetails(false);
+    setNewPartners([
+      { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+      { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+    ]);
 
     // Immediately open working windows for newly created entity
     onOpenWorkingWindows();
@@ -154,6 +171,10 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
           previousReportingPeriod: 'March 31, 2024',
           taxRatePercent: 30,
           transferProfitTo: 'partners_capital',
+          partners: [
+            { name: 'Partner A', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 500000 },
+            { name: 'Partner B', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 500000 },
+          ],
         },
         'sample_partnership'
       );
@@ -179,7 +200,30 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   // Start Editing
   const handleStartEdit = (company: Company) => {
     setEditingCompany(company);
-    setEditConfig({ ...company.config });
+    const existingPartners =
+      company.config.partners && company.config.partners.length > 0
+        ? company.config.partners.map((p) => ({
+            name: p.name,
+            profitSharePercent: p.profitSharePercent ?? 50,
+            remunerationSharePercent:
+              p.remunerationSharePercent !== undefined
+                ? p.remunerationSharePercent
+                : p.profitSharePercent ?? 50,
+            isWorkingPartner: p.isWorkingPartner !== false,
+            isDesignatedPartner: p.isDesignatedPartner !== false,
+            openingBalance: p.openingBalance || 0,
+          }))
+        : company.config.entityType === 'Partnership Firm' || company.config.entityType === 'LLP'
+        ? [
+            { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+            { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+          ]
+        : [];
+
+    setEditConfig({
+      ...company.config,
+      partners: existingPartners,
+    });
   };
 
   // Save Edit
@@ -382,6 +426,28 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                               </span>
                             )}
                           </div>
+
+                          {/* Partners Summary Chip for Partnership Firms & LLPs */}
+                          {company.config.partners && company.config.partners.length > 0 && (
+                            <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1">
+                              <Users className="w-3 h-3 text-emerald-700 shrink-0" />
+                              <span className="font-semibold text-slate-700">
+                                {company.config.entityType === 'LLP' ? 'Designated Partners:' : 'Partners:'}
+                              </span>
+                              {company.config.partners.map((p, pIdx) => (
+                                <span
+                                  key={pIdx}
+                                  className="inline-flex items-center gap-1 font-mono text-[10px] bg-white px-1.5 py-0.5 rounded border border-slate-200"
+                                >
+                                  <span className="font-sans font-medium text-slate-800">{p.name}</span>
+                                  <span className="text-emerald-700 font-bold">({p.profitSharePercent || 0}% PSR)</span>
+                                  {p.remunerationSharePercent !== undefined && p.remunerationSharePercent !== p.profitSharePercent && (
+                                    <span className="text-indigo-700 font-semibold">({p.remunerationSharePercent}% Remun)</span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          )}
 
                           {/* Audit Status Indicators */}
                           <div className="mt-3 flex items-center gap-2.5 flex-wrap text-[11px]">
@@ -677,11 +743,20 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                 )}
               </div>
 
+              {/* Partners and Sharing Ratios for Partnership Firm and LLP */}
+              {(newEntityType === 'Partnership Firm' || newEntityType === 'LLP') && (
+                <PartnerConfigForm
+                  entityType={newEntityType}
+                  partners={newPartners}
+                  onChange={setNewPartners}
+                />
+              )}
+
               {/* Submit Button */}
               <button
                 type="submit"
                 disabled={!newEntityName.trim()}
-                className="w-full py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm"
+                className="w-full py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
               >
                 <span>Save &amp; Open Working Windows</span>
                 <ArrowRight className="w-4 h-4" />
@@ -694,7 +769,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       {/* Edit Company Modal */}
       {editingCompany && editConfig && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-2xl max-w-2xl max-h-[90vh] overflow-y-auto w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-emerald-700" />
@@ -705,7 +780,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
               <button
                 type="button"
                 onClick={() => setEditingCompany(null)}
-                className="p-1 rounded text-slate-400 hover:text-slate-600"
+                className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -728,7 +803,13 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                   <label className="font-semibold text-slate-700 block">Entity Type</label>
                   <select
                     value={editConfig.entityType}
-                    onChange={(e) => setEditConfig({ ...editConfig, entityType: e.target.value as any })}
+                    onChange={(e) =>
+                      setEditConfig({
+                        ...editConfig,
+                        entityType: e.target.value as any,
+                        transferProfitTo: e.target.value === 'LLP' ? 'reserves' : 'partners_capital',
+                      })
+                    }
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900"
                   >
                     <option value="Partnership Firm">Partnership Firm</option>
@@ -776,6 +857,15 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Partners and Sharing Ratios for Partnership Firm and LLP */}
+              {(editConfig.entityType === 'Partnership Firm' || editConfig.entityType === 'LLP') && (
+                <PartnerConfigForm
+                  entityType={editConfig.entityType}
+                  partners={editConfig.partners || []}
+                  onChange={(updated) => setEditConfig({ ...editConfig, partners: updated })}
+                />
+              )}
 
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                 <button

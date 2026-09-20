@@ -1580,15 +1580,17 @@ export function buildAttractiveExcelWorkbook({
 
       sched.partnerCapitalTable.forEach((p, pIdx) => {
         const psrText = p.profitSharePercent ? `${p.profitSharePercent}%` : (p.profitShareRatio || 'Equal');
+        const rsrText = p.remunerationSharePercent !== undefined ? `${p.remunerationSharePercent}%` : psrText;
         const remunVal = p.remuneration ?? p.partnersRemuneration ?? 0;
         const drawVal = p.withdrawals ?? p.drawings ?? 0;
         const profitVal = p.shareOfProfit ?? p.shareOfProfitOrLoss ?? 0;
+        const dpBadge = p.isDesignatedPartner ? ' [Designated Partner]' : '';
 
         const pBannerIdx = notesRows.length;
         const pBanner: any[] = [];
         for (let c = 0; c < notesColCount; c++) {
           pBanner.push(
-            textCell(c === 0 ? `Partner ${pIdx + 1}: ${p.partnerName} [Profit Sharing Ratio: ${psrText}]` : '', {
+            textCell(c === 0 ? `Partner ${pIdx + 1}: ${p.partnerName}${dpBadge} [PSR: ${psrText} | Remuneration Share: ${rsrText}]` : '', {
               bold: true,
               sz: 9.5,
               color: '1E3A8A',
@@ -1830,7 +1832,7 @@ export function buildAttractiveExcelWorkbook({
   // ==========================================
   const capRows: any[][] = [];
   const capRowHeights: Array<{ hpt?: number; hidden?: boolean }> = [];
-  const capColCount = 10;
+  const capColCount = 11;
   appendExecutiveHeaderBanner(
     capRows,
     entityName,
@@ -1845,6 +1847,7 @@ export function buildAttractiveExcelWorkbook({
     thCell('Sr. No.', 'center', PALETTE.navyPrimary),
     thCell('Name of Partner / Owner', 'left', PALETTE.navyPrimary),
     thCell('Profit Sharing Ratio (%)', 'center', PALETTE.navyPrimary),
+    thCell('Remuneration Share (%)', 'center', PALETTE.navyPrimary),
     thCell(`Opening Balance\nas on 01.04.${fyCY.substring(0, 4)} (₹)`, 'right', PALETTE.navyPrimary),
     thCell('Capital Introduced\nduring the year (₹)', 'right', PALETTE.navyPrimary),
     thCell("Partners' Remuneration\n(Sec 40(b)) (₹)", 'right', PALETTE.navyPrimary),
@@ -1869,6 +1872,7 @@ export function buildAttractiveExcelWorkbook({
   if (pList.length > 0) {
     pList.forEach((p, idx) => {
       const psrText = p.profitSharePercent ? `${p.profitSharePercent}%` : (p.profitShareRatio || 'Equal');
+      const rsrText = p.remunerationSharePercent !== undefined ? `${p.remunerationSharePercent}%` : psrText;
       const remunVal = p.remuneration ?? p.partnersRemuneration ?? 0;
       const drawVal = p.withdrawals ?? p.drawings ?? 0;
       const profitVal = p.shareOfProfit ?? p.shareOfProfitOrLoss ?? 0;
@@ -1884,8 +1888,9 @@ export function buildAttractiveExcelWorkbook({
       const bg = idx % 2 === 1 ? PALETTE.zebraOdd : PALETTE.white;
       capRows.push([
         textCell(`${idx + 1}`, { align: 'center', sz: 9.5, bold: true, bg }),
-        textCell(p.partnerName, { bold: true, sz: 10, bg }),
+        textCell(p.isDesignatedPartner ? `${p.partnerName} (DP)` : p.partnerName, { bold: true, sz: 10, bg }),
         textCell(psrText, { align: 'center', sz: 9.5, bg }),
+        textCell(rsrText, { align: 'center', sz: 9.5, bg }),
         numCell(p.openingBalance, { bg }),
         numCell(p.capitalIntroduced, { bg }),
         numCell(remunVal, { bg }),
@@ -1907,6 +1912,7 @@ export function buildAttractiveExcelWorkbook({
     capRows.push([
       textCell('1', { align: 'center', sz: 9.5, bold: true }),
       textCell(entityName, { bold: true, sz: 10 }),
+      textCell('100.0%', { align: 'center', sz: 9.5 }),
       textCell('100.0%', { align: 'center', sz: 9.5 }),
       numCell(singleOpen),
       numCell(netDiff > 0 ? netDiff : 0),
@@ -1931,6 +1937,7 @@ export function buildAttractiveExcelWorkbook({
   capRows.push([
     textCell('', { bg: PALETTE.grandTotalBg }),
     textCell("TOTAL OWNERS' / PARTNERS' CAPITAL", { bold: true, sz: 10.5, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
+    textCell('100.0%', { align: 'center', bold: true, sz: 9.5, bg: PALETTE.grandTotalBg }),
     textCell('100.0%', { align: 'center', bold: true, sz: 9.5, bg: PALETTE.grandTotalBg }),
     numCell(totOpen, { isGrandTotal: true }),
     numCell(totIntro, { isGrandTotal: true }),
@@ -1983,6 +1990,7 @@ export function buildAttractiveExcelWorkbook({
   wsCap['!cols'] = [
     { wch: 8 },
     { wch: 28 },
+    { wch: 14 },
     { wch: 14 },
     { wch: 18 },
     { wch: 18 },

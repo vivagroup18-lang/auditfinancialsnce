@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, Save, Layers } from 'lucide-react';
 import { EntityConfig } from '../types';
+import { PartnerConfigForm } from './PartnerConfigForm';
 
 interface EntityConfigModalProps {
   isOpen: boolean;
@@ -180,6 +181,18 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
               </label>
             </div>
           </div>
+
+          {/* Partners & Sharing Ratios for Partnership Firm and LLP */}
+          {(formData.entityType === 'Partnership Firm' || formData.entityType === 'LLP') && (
+            <PartnerConfigForm
+              entityType={formData.entityType}
+              partners={formData.partners || [
+                { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+                { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+              ]}
+              onChange={(updated) => setFormData({ ...formData, partners: updated })}
+            />
+          )}
 
           <div className="border-t border-slate-200 pt-3">
             <h4 className="font-bold text-slate-800 mb-2">Auditor Details & Statutory Credentials</h4>

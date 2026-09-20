@@ -17,6 +17,7 @@ import {
   Save,
 } from 'lucide-react';
 import { Company, EntityConfig } from '../types';
+import { PartnerConfigForm } from './PartnerConfigForm';
 
 interface CompanyManagerModalProps {
   isOpen: boolean;
@@ -687,6 +688,18 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                 </div>
               </div>
 
+              {/* Partners & Sharing Ratios for Partnership Firm and LLP */}
+              {(newConfig.entityType === 'Partnership Firm' || newConfig.entityType === 'LLP') && (
+                <PartnerConfigForm
+                  entityType={newConfig.entityType}
+                  partners={newConfig.partners || [
+                    { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+                    { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+                  ]}
+                  onChange={(updated) => setNewConfig({ ...newConfig, partners: updated })}
+                />
+              )}
+
               {/* Form Actions */}
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
                 <button
@@ -927,6 +940,18 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Partners & Sharing Ratios for Partnership Firm and LLP */}
+              {(editFormData.entityType === 'Partnership Firm' || editFormData.entityType === 'LLP') && (
+                <PartnerConfigForm
+                  entityType={editFormData.entityType}
+                  partners={editFormData.partners || [
+                    { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+                    { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+                  ]}
+                  onChange={(updated) => setEditFormData({ ...editFormData, partners: updated })}
+                />
+              )}
 
               {/* Form Buttons */}
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
