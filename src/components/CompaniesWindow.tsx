@@ -182,36 +182,56 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   // 1-Click Sample Handlers
   const handleCreateSample = (type: 'sample_partnership' | 'sample_proprietorship') => {
     if (type === 'sample_partnership') {
-      const sample = SAMPLE_DATASETS[0];
+      const sample = SAMPLE_DATASETS[1]; // RRK & CO. (Partnership Firm)
       onCreateCompany(
         {
           entityName: sample.name,
           entityType: sample.entityType,
           financialYear: sample.financialYear,
-          reportingPeriod: 'March 31, 2025',
-          previousFinancialYear: '2023-24',
-          previousReportingPeriod: 'March 31, 2024',
+          reportingPeriod: sample.reportingPeriod || 'March 31, 2025',
+          previousFinancialYear: sample.previousFinancialYear || '2023-24',
+          previousReportingPeriod: sample.previousReportingPeriod || 'March 31, 2024',
           taxRatePercent: 30,
           transferProfitTo: 'partners_capital',
+          address: 'Plot No. 12, Industrial Area, Phase II, Pune - 411018, Maharashtra',
+          registeredAddress: 'Plot No. 12, Industrial Area, Phase II, Pune - 411018, Maharashtra',
+          placeOfSigning: 'Pune',
+          dateOfSigning: 'March 31, 2025',
+          signingPartnerName: 'Partner R. R. Kulkarni',
+          auditorFirmName: 'Kulkarni & Associates',
+          auditorName: 'CA Rajesh Kulkarni',
+          auditorRole: 'Partner',
+          auditorMembershipNo: '123456',
+          firmRegistrationNo: '112233W',
           partners: [
-            { name: 'Partner A', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 500000 },
-            { name: 'Partner B', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 500000 },
+            { name: 'Partner R. R. Kulkarni', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, isSigningPartner: true, openingBalance: 5000000, openingNature: 'Cr' },
+            { name: 'Partner R. K. Kulkarni', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, isSigningPartner: false, openingBalance: 5000000, openingNature: 'Cr' },
           ],
         },
         'sample_partnership'
       );
     } else {
-      const sample = SAMPLE_DATASETS[1];
+      const sample = SAMPLE_DATASETS[0]; // Durga Steel (Proprietorship Firm)
       onCreateCompany(
         {
           entityName: sample.name,
           entityType: sample.entityType,
           financialYear: sample.financialYear,
-          reportingPeriod: 'March 31, 2025',
+          reportingPeriod: sample.reportingPeriod || 'March 31, 2025',
           previousFinancialYear: '2023-24',
           previousReportingPeriod: 'March 31, 2024',
           taxRatePercent: 30,
           transferProfitTo: 'proprietor_capital',
+          proprietorName: 'Parasharam Patil',
+          address: 'Shop No. 4, Steel Market Yard, Kalamboli, Navi Mumbai - 410218, Maharashtra',
+          registeredAddress: 'Shop No. 4, Steel Market Yard, Kalamboli, Navi Mumbai - 410218, Maharashtra',
+          placeOfSigning: 'Navi Mumbai',
+          dateOfSigning: 'March 31, 2025',
+          auditorFirmName: 'S. P. Joshi & Co.',
+          auditorName: 'CA Snehal Joshi',
+          auditorRole: 'Proprietor',
+          auditorMembershipNo: '654321',
+          firmRegistrationNo: '223344W',
         },
         'sample_proprietorship'
       );
