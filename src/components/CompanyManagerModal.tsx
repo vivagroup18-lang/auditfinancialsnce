@@ -73,6 +73,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
     placeOfSigning: '',
     dateOfSigning: '',
     proprietorName: '',
+    signingPartnerName: '',
     auditorFirmName: '',
     auditorName: '',
     auditorRole: 'Partner',
@@ -100,7 +101,10 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
     setEditingCompanyId(companyId);
     const comp = companies.find((c) => c.id === companyId);
     if (comp) {
-      setEditFormData({ ...comp.config });
+      setEditFormData({
+        ...comp.config,
+        signingPartnerName: comp.config.signingPartnerName || comp.config.partners?.[0]?.name || '',
+      });
     }
     setActiveTab('edit');
   };
@@ -128,6 +132,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
       placeOfSigning: '',
       dateOfSigning: '',
       proprietorName: '',
+      signingPartnerName: '',
       auditorFirmName: '',
       auditorName: '',
       auditorRole: 'Partner',
@@ -795,6 +800,8 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                     { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0, openingNature: 'Cr' },
                   ]}
                   onChange={(updated) => setNewConfig({ ...newConfig, partners: updated })}
+                  signingPartnerName={newConfig.signingPartnerName}
+                  onSigningPartnerChange={(name) => setNewConfig({ ...newConfig, signingPartnerName: name })}
                 />
               )}
 
@@ -1131,6 +1138,8 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                     { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0, openingNature: 'Cr' },
                   ]}
                   onChange={(updated) => setEditFormData({ ...editFormData, partners: updated })}
+                  signingPartnerName={editFormData.signingPartnerName}
+                  onSigningPartnerChange={(name) => setEditFormData({ ...editFormData, signingPartnerName: name })}
                 />
               )}
 

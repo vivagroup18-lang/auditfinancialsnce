@@ -491,11 +491,16 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
               <p className="text-[11px] text-slate-400 font-sans mt-0.5">
                 {config.entityType === 'Sole Proprietorship'
                   ? `To the Proprietor of ${config.entityName}${config.proprietorName ? ` (${config.proprietorName})` : ''}`
-                  : `To the Partners of ${config.entityName}`}
+                  : `To the Partners of ${config.entityName}${config.signingPartnerName ? ` (Signing Partner: ${config.signingPartnerName})` : (config.partners?.[0]?.name ? ` (Signing Partner: ${config.partners[0].name})` : '')}`}
               </p>
+              {(config.registeredAddress || config.address) && (
+                <p className="text-[10px] text-slate-400 font-sans mt-0.5">
+                  {config.registeredAddress || config.address}
+                </p>
+              )}
             </div>
             <p>
-              We have audited the accompanying financial statements of <strong>{config.entityName}</strong> ("the Entity"), which comprise the Balance Sheet as at {config.reportingPeriod}, and the Statement of Profit and Loss for the year then ended, and Notes to the financial statements, including significant accounting policies and other explanatory notes.
+              We have audited the accompanying financial statements of <strong>{config.entityName}</strong> ("the Entity"{(config.registeredAddress || config.address) ? `, having its principal place of business at ${config.registeredAddress || config.address}` : ''}), which comprise the Balance Sheet as at {config.reportingPeriod}, and the Statement of Profit and Loss for the year then ended, and Notes to the financial statements, including significant accounting policies and other explanatory notes.
             </p>
             <p>
               In our opinion and to the best of our information and according to the explanations given to us, the aforesaid financial statements give a true and fair view in conformity with the Guidance Note on Financial Statements of Non-Corporate Entities issued by the Institute of Chartered Accountants of India (ICAI).

@@ -377,7 +377,7 @@ function applyPrintSetup(
 }
 
 /**
- * Generates an executive header banner row (Company Name, Title, Subtitle, Currency notice).
+ * Generates an executive header banner row (Company Name, Address, Title, Subtitle, Currency notice).
  */
 function appendExecutiveHeaderBanner(
   rows: any[][],
@@ -386,7 +386,8 @@ function appendExecutiveHeaderBanner(
   currentPeriod: string,
   previousPeriod: string,
   colCount: number,
-  rowHeights?: Array<{ hpt?: number; hidden?: boolean }>
+  rowHeights?: Array<{ hpt?: number; hidden?: boolean }>,
+  address?: string
 ) {
   // Row 0: Entity Legal Name Banner
   const titleRow: any[] = [];
@@ -408,9 +409,35 @@ function appendExecutiveHeaderBanner(
     );
   }
   rows.push(titleRow);
-  if (rowHeights) rowHeights.push({ hpt: 34 });
+  if (rowHeights) rowHeights.push({ hpt: 32 });
 
-  // Row 1: Report Title Sub-banner
+  // Row 1: Registered Office / Principal Place of Business Address Banner
+  const cleanAddress = (address || '').trim();
+  const addressText = cleanAddress
+    ? `Principal Place of Business / Registered Office: ${cleanAddress}`
+    : 'Principal Place of Business / Registered Office: India';
+
+  const addressRow: any[] = [];
+  for (let c = 0; c < colCount; c++) {
+    addressRow.push(
+      textCell(c === 0 ? addressText : '', {
+        bold: false,
+        sz: 9.5,
+        color: PALETTE.navyDark,
+        bg: PALETTE.navyLight,
+        align: 'center',
+        border: {
+          bottom: { style: 'thin', color: { rgb: PALETTE.borderLight } },
+          left: { style: 'thin', color: { rgb: PALETTE.navyLight } },
+          right: { style: 'thin', color: { rgb: PALETTE.navyLight } },
+        },
+      })
+    );
+  }
+  rows.push(addressRow);
+  if (rowHeights) rowHeights.push({ hpt: 20 });
+
+  // Row 2: Report Title Sub-banner
   const subTitleRow: any[] = [];
   for (let c = 0; c < colCount; c++) {
     subTitleRow.push(
@@ -431,7 +458,7 @@ function appendExecutiveHeaderBanner(
   rows.push(subTitleRow);
   if (rowHeights) rowHeights.push({ hpt: 24 });
 
-  // Row 2: ICAI Guidance Note Subtitle
+  // Row 3: ICAI Guidance Note Subtitle
   const noteRow: any[] = [];
   for (let c = 0; c < colCount; c++) {
     noteRow.push(
@@ -452,7 +479,7 @@ function appendExecutiveHeaderBanner(
   rows.push(noteRow);
   if (rowHeights) rowHeights.push({ hpt: 18 });
 
-  // Row 3: Meta & Currency Bar
+  // Row 4: Meta & Currency Bar
   const metaRow: any[] = [];
   for (let c = 0; c < colCount; c++) {
     let content = '';
@@ -471,7 +498,7 @@ function appendExecutiveHeaderBanner(
   rows.push(metaRow);
   if (rowHeights) rowHeights.push({ hpt: 20 });
 
-  // Row 4: Empty spacer
+  // Row 5: Empty spacer
   rows.push(new Array(colCount).fill(textCell('', { border: {} })));
   if (rowHeights) rowHeights.push({ hpt: 10 });
 }
@@ -522,8 +549,15 @@ function appendSignOffBlock(
   const effectiveDate = entityConfig.dateOfSigning || defaultDateStr;
   const effectivePlace = entityConfig.placeOfSigning || 'India';
 
+  const activeSigningPartner =
+    entityConfig.signingPartnerName ||
+    entityConfig.partners?.find((p) => p.isSigningPartner)?.name ||
+    entityConfig.partners?.[0]?.name;
+
   const managementSigner = isProprietor
     ? `Proprietor${entityConfig.proprietorName ? `: ${entityConfig.proprietorName}` : ''}`
+    : activeSigningPartner
+    ? `Partner: ${activeSigningPartner} (Authorized Signatory)`
     : 'Partner / Designated Partner / Authorized Signatory';
 
   const blockLines = [
@@ -546,7 +580,11 @@ function appendSignOffBlock(
       hpt: 20,
     },
     {
-      left: isProprietor && entityConfig.proprietorName ? `Proprietor Legal Name: ${entityConfig.proprietorName}` : '',
+      left: isProprietor && entityConfig.proprietorName
+        ? `Proprietor Legal Name: ${entityConfig.proprietorName}`
+        : activeSigningPartner
+        ? `Signing Partner: ${activeSigningPartner}`
+        : '',
       right: `Firm Registration No. (FRN): ${entityConfig.firmRegistrationNo || 'N/A'}`,
       bold: false,
       hpt: 20,
@@ -621,6 +659,12 @@ export function buildAttractiveExcelWorkbook({
   const fyCY = entityConfig.financialYear || '2024-25';
   const fyPY = entityConfig.previousFinancialYear || '2023-24';
 
+  const effectiveAddress = (entityConfig.registeredAddress || entityConfig.address || '').trim();
+  const activeSigningPartner =
+    entityConfig.signingPartnerName ||
+    entityConfig.partners?.find((p) => p.isSigningPartner)?.name ||
+    entityConfig.partners?.[0]?.name;
+
   // ==========================================
   // SHEET 1: EXECUTIVE SUMMARY & AUDIT DASHBOARD
   // ==========================================
@@ -633,7 +677,8 @@ export function buildAttractiveExcelWorkbook({
     currentPeriod,
     previousPeriod,
     4,
-    summaryRowHeights
+    summaryRowHeights,
+    effectiveAddress
   );
 
   // Section 1: Entity & Auditor Profile Card
@@ -653,10 +698,18 @@ export function buildAttractiveExcelWorkbook({
       entityConfig.auditorFirmName || entityConfig.auditorName || 'Chartered Accountants',
     ],
     [
-      'Constitution / Form of Business:',
-      entityType,
+      'Registered Office / Address:',
+      effectiveAddress || 'India (Default)',
       'Statutory Auditor Name & Role:',
       `${entityConfig.auditorName || 'Chartered Accountant'}${entityConfig.auditorRole ? ` (${entityConfig.auditorRole})` : ''}`,
+    ],
+    [
+      'Constitution / Form of Business:',
+      entityType,
+      'Designated Signing Partner / Signatory:',
+      isProprietor
+        ? (entityConfig.proprietorName ? `Proprietor: ${entityConfig.proprietorName}` : 'Sole Proprietor')
+        : (activeSigningPartner ? `Partner: ${activeSigningPartner} (Authorized)` : 'Partners / Designated Partner'),
     ],
     [
       'Current Financial Year:',
@@ -821,10 +874,11 @@ export function buildAttractiveExcelWorkbook({
   wsSummary['!rows'] = summaryRowHeights;
   wsSummary['!merges'] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, // Title
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, // Subtitle
-    { s: { r: 2, c: 0 }, e: { r: 2, c: 3 } }, // ICAI note
-    { s: { r: 5, c: 0 }, e: { r: 5, c: 1 } }, // Section 1 header
-    { s: { r: 5, c: 2 }, e: { r: 5, c: 3 } }, // Section 2 header
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, // Address
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 3 } }, // Subtitle
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 3 } }, // ICAI note
+    { s: { r: 6, c: 0 }, e: { r: 6, c: 1 } }, // Section 1 header
+    { s: { r: 6, c: 2 }, e: { r: 6, c: 3 } }, // Section 2 header
     { s: { r: summaryTallyIdx, c: 0 }, e: { r: summaryTallyIdx, c: 3 } }, // Tally banner
   ];
   applyPrintSetup(wsSummary, {
@@ -832,7 +886,7 @@ export function buildAttractiveExcelWorkbook({
     entityName,
     reportTitle: 'EXECUTIVE SUMMARY',
     financialYear: fyCY,
-    headerRowsToFreeze: 5,
+    headerRowsToFreeze: 6,
     tabColor: '1E3A8A',
   });
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Executive Summary');
@@ -847,6 +901,7 @@ export function buildAttractiveExcelWorkbook({
     { s: { r: 0, c: 0 }, e: { r: 0, c: bsColCount - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: bsColCount - 1 } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: bsColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: bsColCount - 1 } },
   ];
 
   appendExecutiveHeaderBanner(
@@ -856,7 +911,8 @@ export function buildAttractiveExcelWorkbook({
     currentPeriod,
     previousPeriod,
     bsColCount,
-    bsRowHeights
+    bsRowHeights,
+    effectiveAddress
   );
 
   // Column Headers - Pure Statutory 4-Column Presentation with balanced print widths
@@ -1065,7 +1121,7 @@ export function buildAttractiveExcelWorkbook({
     entityName,
     reportTitle: 'BALANCE SHEET',
     financialYear: fyCY,
-    headerRowsToFreeze: 6,
+    headerRowsToFreeze: 7,
     tabColor: '047857',
   });
   XLSX.utils.book_append_sheet(wb, wsBS, 'Balance Sheet');
@@ -1080,6 +1136,7 @@ export function buildAttractiveExcelWorkbook({
     { s: { r: 0, c: 0 }, e: { r: 0, c: plColCount - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: plColCount - 1 } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: plColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: plColCount - 1 } },
   ];
 
   appendExecutiveHeaderBanner(
@@ -1089,7 +1146,8 @@ export function buildAttractiveExcelWorkbook({
     currentPeriod,
     previousPeriod,
     plColCount,
-    plRowHeights
+    plRowHeights,
+    effectiveAddress
   );
 
   plRows.push([
@@ -1313,7 +1371,7 @@ export function buildAttractiveExcelWorkbook({
     entityName,
     reportTitle: 'PROFIT & LOSS',
     financialYear: fyCY,
-    headerRowsToFreeze: 6,
+    headerRowsToFreeze: 7,
     tabColor: '4338CA',
   });
   XLSX.utils.book_append_sheet(wb, wsPL, 'Profit and Loss');
@@ -1340,15 +1398,18 @@ export function buildAttractiveExcelWorkbook({
     'NOTES FORMING PART OF THE FINANCIAL STATEMENTS (NOTES 1 TO 25)',
     currentPeriod,
     previousPeriod,
-    notesColCount
+    notesColCount,
+    undefined,
+    effectiveAddress
   );
 
-  // Explicit row heights for executive header banner rows (rows 0 to 4)
+  // Explicit row heights for executive header banner rows (rows 0 to 5)
   notesRowHeights[0] = { hpt: 30 };
-  notesRowHeights[1] = { hpt: 24 };
-  notesRowHeights[2] = { hpt: 18 };
-  notesRowHeights[3] = { hpt: 20 };
-  notesRowHeights[4] = { hpt: 12 };
+  notesRowHeights[1] = { hpt: 20 };
+  notesRowHeights[2] = { hpt: 24 };
+  notesRowHeights[3] = { hpt: 18 };
+  notesRowHeights[4] = { hpt: 20 };
+  notesRowHeights[5] = { hpt: 12 };
 
   addNotesRow([
     thCell('Note No.', 'center', PALETTE.navyMedium),
@@ -1363,8 +1424,9 @@ export function buildAttractiveExcelWorkbook({
     { s: { r: 0, c: 0 }, e: { r: 0, c: notesColCount - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: notesColCount - 1 } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: notesColCount - 1 } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: notesColCount - 2 } },
-    { s: { r: 3, c: notesColCount - 1 }, e: { r: 3, c: notesColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: notesColCount - 1 } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: notesColCount - 2 } },
+    { s: { r: 4, c: notesColCount - 1 }, e: { r: 4, c: notesColCount - 1 } },
   ];
 
   for (let i = 1; i <= 25; i++) {
@@ -1525,6 +1587,26 @@ export function buildAttractiveExcelWorkbook({
 
       if (isProprietor && entityConfig.proprietorName) {
         entityInfoRows.push(['Name of Sole Proprietor', entityConfig.proprietorName]);
+      } else if (!isProprietor && activeSigningPartner) {
+        entityInfoRows.push(['Designated Signing Partner / Authorized Signatory', activeSigningPartner]);
+      }
+
+      if (entityConfig.auditorFirmName || entityConfig.auditorName) {
+        entityInfoRows.push([
+          'Statutory Auditor',
+          entityConfig.auditorName
+            ? `${entityConfig.auditorName}${entityConfig.auditorRole ? ` (${entityConfig.auditorRole})` : ''}`
+            : entityConfig.auditorFirmName || 'Chartered Accountants',
+        ]);
+        if (entityConfig.auditorFirmName && entityConfig.auditorName) {
+          entityInfoRows.push(['Audit Firm Name', entityConfig.auditorFirmName]);
+        }
+        if (entityConfig.firmRegistrationNo) {
+          entityInfoRows.push(['Firm Registration No. (FRN)', entityConfig.firmRegistrationNo]);
+        }
+        if (entityConfig.auditorMembershipNo) {
+          entityInfoRows.push(['Auditor Membership No.', entityConfig.auditorMembershipNo]);
+        }
       }
 
       entityInfoRows.push(
@@ -2099,7 +2181,7 @@ export function buildAttractiveExcelWorkbook({
     entityName,
     reportTitle: 'NOTES TO ACCOUNTS (1 TO 25)',
     financialYear: fyCY,
-    headerRowsToFreeze: 6,
+    headerRowsToFreeze: 7,
     tabColor: 'D97706',
   });
   XLSX.utils.book_append_sheet(wb, wsMasterNotes, 'Notes 1 to 25');
@@ -2122,7 +2204,8 @@ export function buildAttractiveExcelWorkbook({
     currentPeriod,
     previousPeriod,
     capColCount,
-    capRowHeights
+    capRowHeights,
+    effectiveAddress
   );
 
   if (isProprietor) {
@@ -2380,6 +2463,7 @@ export function buildAttractiveExcelWorkbook({
     { s: { r: 0, c: 0 }, e: { r: 0, c: capColCount - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: capColCount - 1 } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: capColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: capColCount - 1 } },
     { s: { r: capVerifIdx, c: 0 }, e: { r: capVerifIdx, c: capColCount - 1 } },
   ];
 
@@ -2418,7 +2502,7 @@ export function buildAttractiveExcelWorkbook({
     entityName,
     reportTitle: capitalReportTitle,
     financialYear: fyCY,
-    headerRowsToFreeze: 6,
+    headerRowsToFreeze: 7,
     tabColor: '059669',
   });
   XLSX.utils.book_append_sheet(wb, wsCap, capitalSheetName);
@@ -2436,7 +2520,8 @@ export function buildAttractiveExcelWorkbook({
     currentPeriod,
     previousPeriod,
     tbColCount,
-    tbRowHeights
+    tbRowHeights,
+    effectiveAddress
   );
 
   tbRows.push([
@@ -2554,13 +2639,14 @@ export function buildAttractiveExcelWorkbook({
     { s: { r: 0, c: 0 }, e: { r: 0, c: tbColCount - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: tbColCount - 1 } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: tbColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: tbColCount - 1 } },
   ];
   applyPrintSetup(wsTB, {
     orientation: 'landscape',
     entityName,
     reportTitle: 'TRIAL BALANCE MASTER',
     financialYear: fyCY,
-    headerRowsToFreeze: 6,
+    headerRowsToFreeze: 7,
     tabColor: '0284C7',
   });
   XLSX.utils.book_append_sheet(wb, wsTB, 'Trial Balance Master');
@@ -2578,7 +2664,8 @@ export function buildAttractiveExcelWorkbook({
     currentPeriod,
     previousPeriod,
     excColCount,
-    excRowHeights
+    excRowHeights,
+    effectiveAddress
   );
 
   excRows.push([
@@ -2658,27 +2745,28 @@ export function buildAttractiveExcelWorkbook({
     { s: { r: 0, c: 0 }, e: { r: 0, c: excColCount - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: excColCount - 1 } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: excColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: excColCount - 1 } },
   ];
   applyPrintSetup(wsExc, {
     orientation: 'landscape',
     entityName,
     reportTitle: 'AUDIT EXCEPTIONS REPORT',
     financialYear: fyCY,
-    headerRowsToFreeze: 6,
+    headerRowsToFreeze: 7,
     tabColor: 'DC2626',
   });
   XLSX.utils.book_append_sheet(wb, wsExc, 'Audit Exceptions');
 
-  // Setup print titles (repeating header rows 1 to 6 on every printed page)
+  // Setup print titles (repeating header rows 1 to 7 on every printed page)
   wb.Workbook = wb.Workbook || {};
   wb.Workbook.Names = [
-    { Name: '_xlnm.Print_Titles', Ref: "'Executive Summary'!$1:$6", Sheet: 0 },
-    { Name: '_xlnm.Print_Titles', Ref: "'Balance Sheet'!$1:$6", Sheet: 1 },
-    { Name: '_xlnm.Print_Titles', Ref: "'Profit and Loss'!$1:$6", Sheet: 2 },
-    { Name: '_xlnm.Print_Titles', Ref: "'Notes 1 to 25'!$1:$6", Sheet: 3 },
-    { Name: '_xlnm.Print_Titles', Ref: `'${capitalSheetName}'!$1:$6`, Sheet: 4 },
-    { Name: '_xlnm.Print_Titles', Ref: "'Trial Balance Master'!$1:$6", Sheet: 5 },
-    { Name: '_xlnm.Print_Titles', Ref: "'Audit Exceptions'!$1:$6", Sheet: 6 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Executive Summary'!$1:$7", Sheet: 0 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Balance Sheet'!$1:$7", Sheet: 1 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Profit and Loss'!$1:$7", Sheet: 2 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Notes 1 to 25'!$1:$7", Sheet: 3 },
+    { Name: '_xlnm.Print_Titles', Ref: `'${capitalSheetName}'!$1:$7`, Sheet: 4 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Trial Balance Master'!$1:$7", Sheet: 5 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Audit Exceptions'!$1:$7", Sheet: 6 },
   ];
 
   const sheetConfigs: SheetPrintConfig[] = [

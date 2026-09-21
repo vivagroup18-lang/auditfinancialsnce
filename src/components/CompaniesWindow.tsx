@@ -81,6 +81,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   const [newPlaceOfSigning, setNewPlaceOfSigning] = useState('');
   const [newDateOfSigning, setNewDateOfSigning] = useState('');
   const [newProprietorName, setNewProprietorName] = useState('');
+  const [newSigningPartnerName, setNewSigningPartnerName] = useState('');
 
   // Partners configured during Companies Stage
   const [newPartners, setNewPartners] = useState<PartnerConfigItem[]>([
@@ -141,6 +142,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       placeOfSigning: newPlaceOfSigning.trim() || undefined,
       dateOfSigning: newDateOfSigning.trim() || undefined,
       proprietorName: newEntityType === 'Sole Proprietorship' ? (newProprietorName.trim() || undefined) : undefined,
+      signingPartnerName: isFirmOrLLP ? (newSigningPartnerName.trim() || newPartners[0]?.name || undefined) : undefined,
       auditorFirmName: newAuditorFirmName.trim() || undefined,
       auditorName: newAuditorName.trim() || undefined,
       auditorRole: newAuditorRole || undefined,
@@ -160,6 +162,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
     setNewPlaceOfSigning('');
     setNewDateOfSigning('');
     setNewProprietorName('');
+    setNewSigningPartnerName('');
     setNewAuditorFirmName('');
     setNewAuditorName('');
     setNewAuditorRole('Partner');
@@ -242,6 +245,10 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
 
     setEditConfig({
       ...company.config,
+      signingPartnerName:
+        company.config.signingPartnerName ||
+        company.config.partners?.find((p) => p.isSigningPartner)?.name ||
+        existingPartners[0]?.name,
       partners: existingPartners,
     });
   };
@@ -875,6 +882,8 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                   entityType={newEntityType}
                   partners={newPartners}
                   onChange={setNewPartners}
+                  signingPartnerName={newSigningPartnerName}
+                  onSigningPartnerChange={setNewSigningPartnerName}
                 />
               )}
 
@@ -1124,6 +1133,8 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                   entityType={editConfig.entityType}
                   partners={editConfig.partners || []}
                   onChange={(updated) => setEditConfig({ ...editConfig, partners: updated })}
+                  signingPartnerName={editConfig.signingPartnerName}
+                  onSigningPartnerChange={(name) => setEditConfig({ ...editConfig, signingPartnerName: name })}
                 />
               )}
 

@@ -8,6 +8,7 @@ export interface PartnerConfigItem {
   remunerationSharePercent?: number;
   isWorkingPartner?: boolean;
   isDesignatedPartner?: boolean;
+  isSigningPartner?: boolean;
   openingBalance?: number;
   openingNature?: 'Cr' | 'Dr';
 }
@@ -17,6 +18,8 @@ interface PartnerConfigFormProps {
   partners: PartnerConfigItem[];
   onChange: (updatedPartners: PartnerConfigItem[]) => void;
   compact?: boolean;
+  signingPartnerName?: string;
+  onSigningPartnerChange?: (signingPartnerName: string) => void;
 }
 
 export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
@@ -24,9 +27,29 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
   partners,
   onChange,
   compact = false,
+  signingPartnerName,
+  onSigningPartnerChange,
 }) => {
   const isLLP = entityType === 'LLP';
   const partnerTitle = isLLP ? 'Designated Partners' : 'Partners';
+
+  // Calculate effective signing partner
+  const effectiveSigningPartner =
+    signingPartnerName ||
+    partners.find((p) => p.isSigningPartner)?.name ||
+    partners[0]?.name ||
+    '';
+
+  const handleSigningPartnerSelect = (selectedName: string) => {
+    if (onSigningPartnerChange) {
+      onSigningPartnerChange(selectedName);
+    }
+    const updated = partners.map((p) => ({
+      ...p,
+      isSigningPartner: p.name === selectedName,
+    }));
+    onChange(updated);
+  };
 
   // Calculate totals
   const totalPsr = Math.round(
@@ -57,11 +80,16 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
     field: keyof PartnerConfigItem,
     val: any
   ) => {
+    const oldName = partners[index]?.name;
     const updated = [...partners];
     updated[index] = {
       ...updated[index],
       [field]: val,
     };
+    if (field === 'name' && (effectiveSigningPartner === oldName || partners[index]?.isSigningPartner)) {
+      if (onSigningPartnerChange) onSigningPartnerChange(val);
+      updated[index].isSigningPartner = true;
+    }
     onChange(updated);
   };
 
@@ -77,6 +105,7 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
       remunerationSharePercent: remainingRsr > 0 ? remainingRsr : remainingPsr,
       isWorkingPartner: true,
       isDesignatedPartner: true,
+      isSigningPartner: false,
       openingBalance: 0,
       openingNature: 'Cr',
     };
@@ -86,7 +115,13 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
   // Remove partner
   const handleRemovePartner = (index: number) => {
     if (partners.length <= 1) return;
+    const removedName = partners[index]?.name;
     const filtered = partners.filter((_, i) => i !== index);
+    if (effectiveSigningPartner === removedName) {
+      const newSigning = filtered[0]?.name || '';
+      if (onSigningPartnerChange) onSigningPartnerChange(newSigning);
+      if (filtered[0]) filtered[0].isSigningPartner = true;
+    }
     onChange(filtered);
   };
 
@@ -149,6 +184,40 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
         </div>
       </div>
 
+      {/* Signing Partner Dropdown Selector */}
+      <div className="p-3 bg-emerald-50/70 border border-emerald-200/90 rounded-xl space-y-1.5 shadow-2xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 font-bold text-emerald-950 text-xs">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Designated Signing Partner (Statutory Report Sign-off)</span>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+            Authorized Signatory
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            value={effectiveSigningPartner}
+            onChange={(e) => handleSigningPartnerSelect(e.target.value)}
+            className="flex-1 px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+          >
+            {partners.map((p, i) => {
+              const pName = p.name.trim() || `Partner ${i + 1}`;
+              return (
+                <option key={i} value={pName}>
+                  {pName} {p.isWorkingPartner !== false ? '(Working Partner)' : ''} — Signing Partner
+                </option>
+              );
+            })}
+          </select>
+        </div>
+
+        <p className="text-[11px] text-emerald-800 leading-snug">
+          Selected partner will be displayed as the authorized signatory on the Balance Sheet, Profit &amp; Loss, and ICAI Statutory Reports.
+        </p>
+      </div>
+
       {/* Partners List */}
       <div className="space-y-2.5">
         {partners.map((partner, idx) => (
@@ -187,6 +256,23 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
               >
                 {partner.isWorkingPartner !== false ? 'Working Partner' : 'Non-Working'}
               </button>
+
+              {/* Signing Partner Badge / Button */}
+              {partner.name && (partner.name === effectiveSigningPartner || partner.isSigningPartner) ? (
+                <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-400 flex items-center gap-1 shrink-0">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                  <span>Signing Partner</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSigningPartnerSelect(partner.name)}
+                  className="px-2 py-1 rounded-lg text-[10px] font-semibold text-slate-500 hover:text-emerald-800 hover:bg-emerald-50 border border-dashed border-slate-300 hover:border-emerald-300 transition shrink-0 cursor-pointer"
+                  title="Designate this partner as the authorized signatory"
+                >
+                  Set as Signatory
+                </button>
+              )}
 
               {partners.length > 1 && (
                 <button

@@ -381,6 +381,7 @@ export interface EntityConfig {
   placeOfSigning?: string;
   dateOfSigning?: string;
   proprietorName?: string;
+  signingPartnerName?: string;
   currencyUnit?: 'INR' | 'Lakhs' | 'Crores';
   auditorFirmName?: string;
   auditorName?: string;
@@ -400,6 +401,7 @@ export interface EntityConfig {
     remunerationSharePercent?: number;
     isWorkingPartner?: boolean;
     isDesignatedPartner?: boolean;
+    isSigningPartner?: boolean;
     openingBalance?: number;
     openingNature?: 'Cr' | 'Dr';
     capitalIntroduced?: number;

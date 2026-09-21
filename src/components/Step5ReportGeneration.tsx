@@ -190,12 +190,29 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
               <Building2 className="w-5 h-5 text-emerald-400" />
               <span>{config.entityName}</span>
             </h3>
+            {(config.registeredAddress || config.address) && (
+              <div className="text-xs text-slate-300">
+                {config.registeredAddress || config.address}
+              </div>
+            )}
             <div className="text-xs text-slate-400 flex items-center gap-2 flex-wrap pt-0.5">
               <span>{config.entityType}</span>
               <span>•</span>
               <span>Financial Year: <strong className="text-emerald-400">FY {config.financialYear}</strong></span>
               <span>•</span>
               <span>Reporting Date: {config.reportingPeriod || 'March 31, 2025'}</span>
+              {config.entityType === 'Sole Proprietorship' && config.proprietorName && (
+                <>
+                  <span>•</span>
+                  <span>Proprietor: <strong className="text-slate-200">{config.proprietorName}</strong></span>
+                </>
+              )}
+              {config.entityType !== 'Sole Proprietorship' && (
+                <>
+                  <span>•</span>
+                  <span>Signing Partner: <strong className="text-emerald-300">{config.signingPartnerName || config.partners?.find(p => p.isSigningPartner)?.name || config.partners?.[0]?.name || 'Authorized Partner'}</strong></span>
+                </>
+              )}
               {(config.auditorFirmName || config.auditorName) && (
                 <>
                   <span>•</span>

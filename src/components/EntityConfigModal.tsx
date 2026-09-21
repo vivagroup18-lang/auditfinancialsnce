@@ -244,6 +244,8 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
                 { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
               ]}
               onChange={(updated) => setFormData({ ...formData, partners: updated })}
+              signingPartnerName={formData.signingPartnerName}
+              onSigningPartnerChange={(name) => setFormData({ ...formData, signingPartnerName: name })}
             />
           )}
 

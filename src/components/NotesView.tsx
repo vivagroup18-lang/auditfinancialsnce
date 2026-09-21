@@ -303,24 +303,36 @@ export const NotesView: React.FC<NotesViewProps> = ({
                       <p>
                         <strong>1.1 General Information:</strong> {config.entityName} is a {config.entityType} domiciled in India. The entity is engaged in commercial business operations. The financial statements for the reporting period ended {config.reportingPeriod} (Comparative period ended {config.previousReportingPeriod || 'March 31, 2024'}) have been prepared in accordance with the Guidance Note on Financial Statements of Non-Corporate Entities issued by the Institute of Chartered Accountants of India (ICAI).
                       </p>
-                      {config.registeredAddress && (
+                      {(config.registeredAddress || config.address) && (
                         <p>
-                          <strong>1.2 Registered Principal Place of Business:</strong> {config.registeredAddress}
+                          <strong>1.2 Registered Principal Place of Business:</strong> {config.registeredAddress || config.address}
                         </p>
                       )}
-                      {config.entityType === 'Sole Proprietorship' && config.proprietorName && (
+                      {config.entityType === 'Sole Proprietorship' && config.proprietorName ? (
                         <p>
                           <strong>1.3 Sole Proprietor:</strong> The entity is owned and managed by <strong>{config.proprietorName}</strong> as Sole Proprietor.
+                        </p>
+                      ) : config.entityType !== 'Sole Proprietorship' ? (
+                        <p>
+                          <strong>1.3 Designated Signing Partner:</strong> The financial statements and statutory reports are signed and authorized by <strong>{config.signingPartnerName || config.partners?.find(p => p.isSigningPartner)?.name || config.partners?.[0]?.name || 'Authorized Signatory'}</strong> (Authorized Signatory) on behalf of all partners.
+                        </p>
+                      ) : null}
+                      {(config.auditorFirmName || config.auditorName) && (
+                        <p>
+                          <strong>1.4 Statutory Auditor:</strong> Audited by <strong>{config.auditorFirmName || config.auditorName}</strong>
+                          {config.firmRegistrationNo ? ` (FRN: ${config.firmRegistrationNo})` : ''}
+                          {config.auditorName ? `, Engagement Partner/Proprietor: ${config.auditorName}` : ''}
+                          {config.auditorMembershipNo ? ` (Membership No: ${config.auditorMembershipNo})` : ''}.
                         </p>
                       )}
                       {config.placeOfSigning && (
                         <p>
-                          <strong>1.4 Place of Signing:</strong> {config.placeOfSigning}
+                          <strong>1.5 Place of Signing:</strong> {config.placeOfSigning}
                         </p>
                       )}
                       {config.dateOfSigning && (
                         <p>
-                          <strong>1.5 Date of Signing / Adoption:</strong> {config.dateOfSigning}
+                          <strong>1.6 Date of Signing / Adoption:</strong> {config.dateOfSigning}
                         </p>
                       )}
                       <p>

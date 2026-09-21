@@ -34,15 +34,19 @@ export const CA_EMAIL_TEMPLATES: EmailTemplateOption[] = [
         ? `₹${pl.totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
         : 'As computed';
 
+      const addressee = config.entityType === 'Sole Proprietorship'
+        ? (config.proprietorName ? `Dear ${config.proprietorName},` : 'Dear Sir / Madam,')
+        : (config.signingPartnerName ? `Dear ${config.signingPartnerName} & Partners,` : 'Dear Partners / Management,');
+
       return `
 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 680px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
   <div style="background-color: #064e3b; color: #ffffff; padding: 20px 24px;">
     <h2 style="margin: 0 0 6px 0; font-size: 20px; font-weight: bold;">Statutory Financial Statements — FY ${config.financialYear}</h2>
-    <p style="margin: 0; font-size: 13px; opacity: 0.9;">Entity: <strong>${config.entityName}</strong> (${config.entityType})</p>
+    <p style="margin: 0; font-size: 13px; opacity: 0.9;">Entity: <strong>${config.entityName}</strong> (${config.entityType})${(config.registeredAddress || config.address) ? ` • ${config.registeredAddress || config.address}` : ''}</p>
   </div>
 
   <div style="padding: 24px;">
-    <p>Dear Sir / Madam,</p>
+    <p>${addressee}</p>
 
     <p>We have compiled the Financial Statements for <strong>${config.entityName}</strong> for the reporting period ending <strong>${config.reportingPeriod}</strong> (Financial Year ${config.financialYear}) in accordance with the Technical Guide on Financial Statements of Non-Corporate Entities issued by the Institute of Chartered Accountants of India (ICAI).</p>
 

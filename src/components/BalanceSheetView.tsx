@@ -67,6 +67,11 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
         <h2 className="text-lg sm:text-xl font-bold text-slate-950 uppercase tracking-tight">
           {config.entityName || 'NON-CORPORATE ENTITY'}
         </h2>
+        {(config.registeredAddress || config.address) && (
+          <div className="text-xs text-slate-600 font-medium mt-0.5 max-w-xl mx-auto">
+            {config.registeredAddress || config.address}
+          </div>
+        )}
         <div className="text-xs text-slate-500 font-medium mt-1">
           {config.entityType} • Statutory Balance Sheet
         </div>
@@ -775,6 +780,59 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
           The accompanying Notes 1 through 25 are an integral part of these Non-Corporate Entity financial statements.
           Schedule references strictly map to the ICAI Guidance Note on Non-Corporate Entities taxonomy. Signed in terms of our statutory audit report of even date attached for Form 3CB/3CD.
         </p>
+      </div>
+
+      {/* Statutory CA & Management Sign-off Block */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs print:break-inside-avoid">
+        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4 pb-2.5 border-b border-slate-100 flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-slate-800">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            Statutory Audit &amp; Management Sign-Off Block
+          </span>
+          <span className="text-[11px] text-slate-400 font-normal">
+            In terms of our Statutory Audit Report of even date attached
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs text-slate-700">
+          <div className="space-y-2">
+            <div className="font-bold text-slate-900">For and on behalf of the Entity:</div>
+            <div className="font-bold text-slate-800 uppercase text-sm">{config.entityName}</div>
+            <div className="text-slate-500 text-[11px]">Constitution: {config.entityType}</div>
+            <div className="pt-8 pb-1 border-b border-slate-300 w-56">
+              <span className="text-[10px] text-slate-400 italic">Signature &amp; Seal</span>
+            </div>
+            <div className="font-bold text-slate-900 text-xs pt-1">
+              {config.entityType === 'Sole Proprietorship'
+                ? `Proprietor: ${config.proprietorName || 'Proprietor'}`
+                : `Partner: ${config.signingPartnerName || config.partners?.find(p => p.isSigningPartner)?.name || config.partners?.[0]?.name || 'Authorized Signatory'} (Authorized Signatory)`}
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Place: {config.placeOfSigning || 'India'} • Date: {config.dateOfSigning || new Date().toLocaleDateString('en-IN')}
+            </div>
+          </div>
+
+          <div className="space-y-2 md:text-right">
+            <div className="font-bold text-slate-900">For Statutory Auditors:</div>
+            <div className="font-bold text-slate-800 text-sm">
+              {config.auditorFirmName || config.auditorName || 'Chartered Accountants'}
+            </div>
+            <div className="text-slate-500 text-[11px]">
+              Chartered Accountants • FRN: {config.firmRegistrationNo || 'N/A'}
+            </div>
+            <div className="pt-8 pb-1 border-b border-slate-300 w-56 md:ml-auto">
+              <span className="text-[10px] text-slate-400 italic">Chartered Accountant Seal &amp; Signature</span>
+            </div>
+            <div className="font-bold text-slate-900 text-xs pt-1">
+              {config.auditorName || 'Chartered Accountant'}
+            </div>
+            <div className="text-[11px] text-slate-500">
+              {config.auditorRole || 'Partner'} • M. No: {config.auditorMembershipNo || 'N/A'}
+            </div>
+            <div className="text-[11px] text-emerald-800 font-mono font-medium pt-0.5">
+              UDIN: {config.udin || 'Applicable at signing'}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
