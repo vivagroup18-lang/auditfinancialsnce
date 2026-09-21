@@ -237,6 +237,22 @@ export const NotesView: React.FC<NotesViewProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
+                  {/* Dedicated Edit Button on Header for Note 3 */}
+                  {def.noteNumber === 3 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsPartnerModalOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 font-semibold text-xs rounded-lg shadow-2xs transition cursor-pointer"
+                      title="Edit Note 3: Capital Account Reconciliation & PSR"
+                    >
+                      <Sliders className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>{config.entityType === 'Sole Proprietorship' ? 'Edit Capital Account' : 'Edit Schedule & PSR'}</span>
+                    </button>
+                  )}
+
                   {/* Dedicated Edit Button on Header for Note 9 */}
                   {def.noteNumber === 9 && (
                     <button
@@ -245,10 +261,10 @@ export const NotesView: React.FC<NotesViewProps> = ({
                         e.stopPropagation();
                         handleOpenTradePayables();
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-2xs transition cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 font-semibold text-xs rounded-lg shadow-2xs transition cursor-pointer"
                       title="Edit Note 9: MSME dues, Section 22 disclosures & aging schedule"
                     >
-                      <Sliders className="w-3.5 h-3.5" />
+                      <Sliders className="w-3.5 h-3.5 text-emerald-700" />
                       <span>Edit Creditors MSME Data</span>
                     </button>
                   )}
@@ -404,60 +420,289 @@ export const NotesView: React.FC<NotesViewProps> = ({
                         </div>
                       )}
 
-                      {/* Note 9: Statutory MSME & Aging Disclosures Banner at TOP */}
+                      {/* Note 9: Statutory MSME & Aging Schedule (Formatted identical to Note 3) */}
                       {def.noteNumber === 9 && (() => {
                         const tpConfig = config.tradePayablesConfig;
+                        const msmeCreditors = schedule?.items.filter((it) => {
+                          const sub = (it.subCategory || '').toLowerCase();
+                          const name = (it.accountName || '').toLowerCase();
+                          const isOther = sub.includes('other than micro') || name.includes('other than micro') || name.includes('other creditors');
+                          return !isOther && (sub.includes('msme') || name.includes('msme') || sub.includes('micro') || name.includes('micro') || sub.includes('(a)'));
+                        }) || [];
+
+                        const rawMsmeCY = msmeCreditors.reduce(
+                          (acc, it) => acc + (it.displayBalance !== undefined ? it.displayBalance : it.netBalance),
+                          0
+                        );
+                        const rawMsmePY = msmeCreditors.reduce(
+                          (acc, it) => acc + (it.previousYearBalance || 0),
+                          0
+                        );
                         const totalCY = schedule?.totalAmount || 0;
-                        const msmeCY = tpConfig?.msmeAmountCY !== undefined ? tpConfig.msmeAmountCY : 0;
-                        const othersCY = tpConfig?.othersAmountCY !== undefined ? tpConfig.othersAmountCY : totalCY;
-                        const classifiedSum = msmeCY + othersCY;
+                        const totalPY = schedule?.previousYearAmount || 0;
+
+                        const msmeTotalCY = tpConfig?.msmeAmountCY !== undefined ? tpConfig.msmeAmountCY : rawMsmeCY;
+                        const msmeTotalPY = tpConfig?.msmeAmountPY !== undefined ? tpConfig.msmeAmountPY : rawMsmePY;
+                        const otherTotalCY = tpConfig?.othersAmountCY !== undefined ? tpConfig.othersAmountCY : Math.max(0, totalCY - msmeTotalCY);
+                        const otherTotalPY = tpConfig?.othersAmountPY !== undefined ? tpConfig.othersAmountPY : Math.max(0, totalPY - msmeTotalPY);
+
+                        // Reconciliation check
+                        const classifiedSum = msmeTotalCY + otherTotalCY;
                         const diffCY = Math.round((classifiedSum - totalCY) * 100) / 100;
                         const isReconciled = Math.abs(diffCY) < 0.05;
 
+                        // Aging items from tpConfig
+                        const agMsme_lt1 = tpConfig?.agingMsmeLess1Yr !== undefined ? tpConfig.agingMsmeLess1Yr : msmeTotalCY;
+                        const agMsme_12 = tpConfig?.agingMsme1To2Yrs || 0;
+                        const agMsme_23 = tpConfig?.agingMsme2To3Yrs || 0;
+                        const agMsme_m3 = tpConfig?.agingMsmeMore3Yrs || 0;
+                        const agMsme_tot = agMsme_lt1 + agMsme_12 + agMsme_23 + agMsme_m3;
+
+                        const agOth_lt1 = tpConfig?.agingOthersLess1Yr !== undefined ? tpConfig.agingOthersLess1Yr : otherTotalCY;
+                        const agOth_12 = tpConfig?.agingOthers1To2Yrs || 0;
+                        const agOth_23 = tpConfig?.agingOthers2To3Yrs || 0;
+                        const agOth_m3 = tpConfig?.agingOthersMore3Yrs || 0;
+                        const agOth_tot = agOth_lt1 + agOth_12 + agOth_23 + agOth_m3;
+
+                        const agDispMsme_lt1 = tpConfig?.agingDisputedMsmeLess1Yr || 0;
+                        const agDispMsme_12 = tpConfig?.agingDisputedMsme1To2Yrs || 0;
+                        const agDispMsme_23 = tpConfig?.agingDisputedMsme2To3Yrs || 0;
+                        const agDispMsme_m3 = tpConfig?.agingDisputedMsmeMore3Yrs || 0;
+                        const agDispMsme_tot = agDispMsme_lt1 + agDispMsme_12 + agDispMsme_23 + agDispMsme_m3;
+
+                        const agDispOth_lt1 = tpConfig?.agingDisputedOthersLess1Yr || 0;
+                        const agDispOth_12 = tpConfig?.agingDisputedOthers1To2Yrs || 0;
+                        const agDispOth_23 = tpConfig?.agingDisputedOthers2To3Yrs || 0;
+                        const agDispOth_m3 = tpConfig?.agingDisputedOthersMore3Yrs || 0;
+                        const agDispOth_tot = agDispOth_lt1 + agDispOth_12 + agDispOth_23 + agDispOth_m3;
+
+                        const grandAgingCY = agMsme_tot + agOth_tot + agDispMsme_tot + agDispOth_tot;
+                        const agingDiff = Math.round((grandAgingCY - totalCY) * 100) / 100;
+                        const isAgingReconciled = Math.abs(agingDiff) < 0.05;
+
+                        // Sec 22 items
+                        const s22PrincipalCY = tpConfig?.msmeSec22PrincipalCY !== undefined ? tpConfig.msmeSec22PrincipalCY : msmeTotalCY;
+                        const s22InterestCY = tpConfig?.msmeSec22InterestCY || 0;
+                        const s22PrincipalPY = tpConfig?.msmeSec22PrincipalPY !== undefined ? tpConfig.msmeSec22PrincipalPY : msmeTotalPY;
+                        const s22InterestPY = tpConfig?.msmeSec22InterestPY || 0;
+
+                        const s22DelayedCY = tpConfig?.msmeSec22DelayedPaymentsCY || 0;
+                        const s22DelayedPY = tpConfig?.msmeSec22DelayedPaymentsPY || 0;
+                        const s22IntPaidCY = tpConfig?.msmeSec22InterestPaidCY || 0;
+                        const s22IntPaidPY = tpConfig?.msmeSec22InterestPaidPY || 0;
+
+                        const s22IntDueCY = tpConfig?.msmeSec22InterestDueDelayCY || 0;
+                        const s22IntDuePY = tpConfig?.msmeSec22InterestDueDelayPY || 0;
+
+                        const s22IntAccruedCY = tpConfig?.msmeSec22InterestAccruedCY || 0;
+                        const s22IntAccruedPY = tpConfig?.msmeSec22InterestAccruedPY || 0;
+
+                        const s22FurtherIntCY = tpConfig?.msmeSec22FurtherInterestCY || 0;
+                        const s22FurtherIntPY = tpConfig?.msmeSec22FurtherInterestPY || 0;
+
                         return (
-                          <div className="mb-4 p-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-xl shadow-xs border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-start sm:items-center gap-3">
-                              <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0">
-                                <Sliders className="w-5 h-5" />
+                          <div className="mb-5 space-y-3">
+                            {/* Statutory Header Bar matching Note 3 */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-emerald-100">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                                  Note 9 Statutory Schedule: Trade Payables MSME &amp; Aging Schedule (Page 8)
+                                </h4>
                               </div>
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="text-sm font-bold text-white tracking-tight">
-                                    Trade Payables &amp; MSME Statutory Disclosures (Note 9)
-                                  </h4>
-                                  {isReconciled ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/40">
-                                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                      <span>Tally Reconciled</span>
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/40">
-                                      <AlertTriangle className="w-3 h-3 text-amber-400" />
-                                      <span>Variance: ₹{formatINR(Math.abs(diffCY))}</span>
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-slate-300 mt-1">
-                                  Statutory sub-classification (MSME vs Others), MSMED Act Section 22 interest disclosures, and aging schedule (&lt; 1 yr, 1-2 yrs, 2-3 yrs, &gt; 3 yrs).
-                                </p>
-                                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400 flex-wrap">
-                                  <span>Trial Balance Total: <strong className="text-white font-mono">₹{formatINR(totalCY)}</strong></span>
-                                  <span>•</span>
-                                  <span>(a) MSME Dues: <strong className="text-emerald-400 font-mono">₹{formatINR(msmeCY)}</strong></span>
-                                  <span>•</span>
-                                  <span>(b) Other Creditors: <strong className="text-teal-300 font-mono">₹{formatINR(othersCY)}</strong></span>
-                                </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleOpenTradePayables}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-2xs transition cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Reconcile Trade Payables</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleOpenTradePayables}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 font-semibold text-xs rounded-lg shadow-2xs transition cursor-pointer"
+                                >
+                                  <Sliders className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>Edit Creditors MSME &amp; Aging</span>
+                                </button>
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={handleOpenTradePayables}
-                              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer shrink-0"
-                            >
-                              <Sliders className="w-4 h-4" />
-                              <span>Edit Creditors MSME Data</span>
-                            </button>
+                            {/* Variance Alert Banner matching Note 3 */}
+                            {(!isReconciled || !isAgingReconciled) && (
+                              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between text-xs text-amber-900 shadow-2xs">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                  <span>
+                                    Trade Payables Schedule Total (₹{formatINR(classifiedSum)}) {!isReconciled ? `differs from Balance Sheet Note 9 Total (₹${formatINR(totalCY)}) by ₹${formatINR(Math.abs(diffCY))}` : ''}
+                                    {!isAgingReconciled ? ` and Aging Total (₹${formatINR(grandAgingCY)}) differs by ₹${formatINR(Math.abs(agingDiff))}` : ''}.
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleOpenTradePayables}
+                                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[11px] rounded-md transition shadow-2xs cursor-pointer"
+                                >
+                                  Reconcile Schedule
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Table 1: Statutory Sub-Classification (ICAI NCE Format - Page 8) */}
+                            <div className="overflow-x-auto border border-emerald-300/80 rounded-xl shadow-xs">
+                              <table className="w-full text-left text-[11px] border-collapse min-w-[720px]">
+                                <thead>
+                                  <tr className="bg-emerald-900 text-white font-semibold">
+                                    <th className="py-2.5 px-3">Statutory Schedule Head (ICAI Guidance Note - Page 8)</th>
+                                    <th className="py-2.5 px-3 text-right w-44">Current Period ({config.reportingPeriod || 'CY'})</th>
+                                    <th className="py-2.5 px-3 text-right w-44">Previous Period ({config.previousReportingPeriod || 'PY'})</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-100 bg-emerald-50/20 text-slate-800">
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 text-slate-900">
+                                      (a) Total outstanding dues of micro, small and medium enterprises (MSME)
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-emerald-900">{formatINR(msmeTotalCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-600">{formatINR(msmeTotalPY)}</td>
+                                  </tr>
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 text-slate-900">
+                                      (b) Total outstanding dues of creditors other than micro, small and medium enterprises
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{formatINR(otherTotalCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-600">{formatINR(otherTotalPY)}</td>
+                                  </tr>
+                                  <tr className="bg-emerald-100/90 font-bold text-emerald-950 border-t-2 border-emerald-300 text-xs">
+                                    <td className="py-2 px-3 uppercase tracking-wider">Total Trade Payables</td>
+                                    <td className="py-2 px-3 text-right font-mono font-black text-emerald-950 bg-emerald-200">{formatINR(classifiedSum)}</td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 bg-slate-200/70">{formatINR(totalPY)}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Table 2: Trade Payables Aging Schedule as at reporting date */}
+                            <div className="overflow-x-auto border border-emerald-300/80 rounded-xl shadow-xs">
+                              <div className="bg-emerald-950 text-emerald-200 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider flex items-center justify-between border-b border-emerald-800">
+                                <span>Trade Payables Aging Schedule as at {config.reportingPeriod}</span>
+                                <span className="text-[10px] font-normal text-emerald-300">(Amount in ₹)</span>
+                              </div>
+                              <table className="w-full text-left text-[11px] border-collapse min-w-[720px]">
+                                <thead>
+                                  <tr className="bg-emerald-900 text-white font-semibold">
+                                    <th className="py-2.5 px-3">Particulars</th>
+                                    <th className="py-2.5 px-2 text-right w-24">&lt; 1 Year</th>
+                                    <th className="py-2.5 px-2 text-right w-24">1 - 2 Years</th>
+                                    <th className="py-2.5 px-2 text-right w-24">2 - 3 Years</th>
+                                    <th className="py-2.5 px-2 text-right w-24">&gt; 3 Years</th>
+                                    <th className="py-2.5 px-3 text-right w-32 font-bold text-emerald-200 bg-emerald-950">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-100 bg-emerald-50/20 text-slate-800">
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 font-semibold text-slate-900">(i) MSME</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_lt1)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_12)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_23)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_m3)}</td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-950 bg-emerald-100/60">{formatINR(agMsme_tot)}</td>
+                                  </tr>
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 font-semibold text-slate-900">(ii) Others</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agOth_lt1)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agOth_12)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agOth_23)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agOth_m3)}</td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-950 bg-emerald-100/60">{formatINR(agOth_tot)}</td>
+                                  </tr>
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 text-slate-700">(iii) Disputed dues - MSME</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_lt1)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_12)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_23)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_m3)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500">{formatINR(agDispMsme_tot)}</td>
+                                  </tr>
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 text-slate-700">(iv) Disputed dues - Others</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_lt1)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_12)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_23)}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_m3)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500">{formatINR(agDispOth_tot)}</td>
+                                  </tr>
+                                  <tr className="bg-emerald-100/90 font-bold text-emerald-950 border-t-2 border-emerald-300 text-xs">
+                                    <td className="py-2 px-3 uppercase tracking-wider">Total Trade Payables</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_lt1 + agOth_lt1 + agDispMsme_lt1 + agDispOth_lt1)}</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_12 + agOth_12 + agDispMsme_12 + agDispOth_12)}</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_23 + agOth_23 + agDispMsme_23 + agDispOth_23)}</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_m3 + agOth_m3 + agDispMsme_m3 + agDispOth_m3)}</td>
+                                    <td className="py-2 px-3 text-right font-mono font-black text-emerald-950 bg-emerald-200">{formatINR(grandAgingCY)}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Table 3: Disclosure relating to suppliers registered under MSMED Act (Section 22) */}
+                            <div className="overflow-x-auto border border-emerald-300/80 rounded-xl shadow-xs">
+                              <div className="bg-emerald-950 text-emerald-200 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider flex items-center justify-between border-b border-emerald-800">
+                                <span>Disclosure relating to suppliers registered under MSMED Act (Section 22)</span>
+                                <span className="text-[10px] font-normal text-emerald-300">(Amount in ₹)</span>
+                              </div>
+                              <table className="w-full text-left text-[11px] border-collapse min-w-[720px]">
+                                <thead>
+                                  <tr className="bg-emerald-900 text-white font-semibold">
+                                    <th className="py-2.5 px-3">Statutory Disclosure Item</th>
+                                    <th className="py-2.5 px-3 text-right w-40">CY ({config.reportingPeriod || 'CY'})</th>
+                                    <th className="py-2.5 px-3 text-right w-40">PY ({config.previousReportingPeriod || 'PY'})</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-100 bg-emerald-50/20 text-slate-800">
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3">
+                                      <span className="font-semibold text-slate-900 block">(a) Principal amount and interest due thereon remaining unpaid to any supplier as at the end of each accounting year:</span>
+                                      <div className="pl-4 text-slate-600 text-[10px] space-y-0.5 mt-1">
+                                        <div>• Principal amount: <span className="font-mono font-semibold text-slate-800">₹{formatINR(s22PrincipalCY)}</span></div>
+                                        <div>• Interest due thereon: <span className="font-mono font-semibold text-slate-800">₹{formatINR(s22InterestCY)}</span></div>
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-emerald-950 align-top pt-2.5">{formatINR(s22PrincipalCY + s22InterestCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-600 align-top pt-2.5">{formatINR(s22PrincipalPY + s22InterestPY)}</td>
+                                  </tr>
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 text-slate-900">
+                                      (b) The amount of interest paid by the buyer in terms of section 16 of the MSMED Act, along with the amount of the payment made to the supplier beyond the appointed day during each accounting year.
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntPaidCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-600 align-top pt-2.5">{formatINR(s22IntPaidPY)}</td>
+                                  </tr>
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 text-slate-900">
+                                      (c) The amount of interest due and payable for the period of delay in making payment (which have been paid but beyond the appointed day during the year) but without adding the interest specified under the MSMED Act.
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntDueCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-600 align-top pt-2.5">{formatINR(s22IntDuePY)}</td>
+                                  </tr>
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 text-slate-900">
+                                      (d) The amount of interest accrued and remaining unpaid at the end of each accounting year.
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntAccruedCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-600 align-top pt-2.5">{formatINR(s22IntAccruedPY)}</td>
+                                  </tr>
+                                  <tr className="hover:bg-white transition font-medium">
+                                    <td className="py-2 px-3 text-slate-900">
+                                      (e) The amount of further interest remaining due and payable even in the succeeding years, until such date when the interest dues above are actually paid to the small enterprise.
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22FurtherIntCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-600 align-top pt-2.5">{formatINR(s22FurtherIntPY)}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         );
                       })()}
@@ -746,295 +991,6 @@ export const NotesView: React.FC<NotesViewProps> = ({
                         </div>
                       )}
 
-                      {/* Note 9: Statutory MSMED Act Interest & Delayed Payments Disclosure & Aging Schedule */}
-                      {def.noteNumber === 9 && (() => {
-                        const tpConfig = config.tradePayablesConfig;
-                        const msmeCreditors = schedule?.items.filter((it) => {
-                          const sub = (it.subCategory || '').toLowerCase();
-                          const name = (it.accountName || '').toLowerCase();
-                          const isOther = sub.includes('other than micro') || name.includes('other than micro') || name.includes('other creditors');
-                          return !isOther && (sub.includes('msme') || name.includes('msme') || sub.includes('micro') || name.includes('micro') || sub.includes('(a)'));
-                        }) || [];
-
-                        const rawMsmeCY = msmeCreditors.reduce(
-                          (acc, it) => acc + (it.displayBalance !== undefined ? it.displayBalance : it.netBalance),
-                          0
-                        );
-                        const rawMsmePY = msmeCreditors.reduce(
-                          (acc, it) => acc + (it.previousYearBalance || 0),
-                          0
-                        );
-                        const totalCY = schedule?.totalAmount || 0;
-                        const totalPY = schedule?.previousYearAmount || 0;
-
-                        const msmeTotalCY = tpConfig?.msmeAmountCY !== undefined ? tpConfig.msmeAmountCY : rawMsmeCY;
-                        const msmeTotalPY = tpConfig?.msmeAmountPY !== undefined ? tpConfig.msmeAmountPY : rawMsmePY;
-                        const otherTotalCY = tpConfig?.othersAmountCY !== undefined ? tpConfig.othersAmountCY : Math.max(0, totalCY - msmeTotalCY);
-                        const otherTotalPY = tpConfig?.othersAmountPY !== undefined ? tpConfig.othersAmountPY : Math.max(0, totalPY - msmeTotalPY);
-
-                        // Reconciliation check
-                        const classifiedSum = msmeTotalCY + otherTotalCY;
-                        const diffCY = Math.round((classifiedSum - totalCY) * 100) / 100;
-                        const isReconciled = Math.abs(diffCY) < 0.05;
-
-                        // Aging items from tpConfig
-                        const agMsme_lt1 = tpConfig?.agingMsmeLess1Yr !== undefined ? tpConfig.agingMsmeLess1Yr : msmeTotalCY;
-                        const agMsme_12 = tpConfig?.agingMsme1To2Yrs || 0;
-                        const agMsme_23 = tpConfig?.agingMsme2To3Yrs || 0;
-                        const agMsme_m3 = tpConfig?.agingMsmeMore3Yrs || 0;
-                        const agMsme_tot = agMsme_lt1 + agMsme_12 + agMsme_23 + agMsme_m3;
-
-                        const agOth_lt1 = tpConfig?.agingOthersLess1Yr !== undefined ? tpConfig.agingOthersLess1Yr : otherTotalCY;
-                        const agOth_12 = tpConfig?.agingOthers1To2Yrs || 0;
-                        const agOth_23 = tpConfig?.agingOthers2To3Yrs || 0;
-                        const agOth_m3 = tpConfig?.agingOthersMore3Yrs || 0;
-                        const agOth_tot = agOth_lt1 + agOth_12 + agOth_23 + agOth_m3;
-
-                        const agDispMsme_lt1 = tpConfig?.agingDisputedMsmeLess1Yr || 0;
-                        const agDispMsme_12 = tpConfig?.agingDisputedMsme1To2Yrs || 0;
-                        const agDispMsme_23 = tpConfig?.agingDisputedMsme2To3Yrs || 0;
-                        const agDispMsme_m3 = tpConfig?.agingDisputedMsmeMore3Yrs || 0;
-                        const agDispMsme_tot = agDispMsme_lt1 + agDispMsme_12 + agDispMsme_23 + agDispMsme_m3;
-
-                        const agDispOth_lt1 = tpConfig?.agingDisputedOthersLess1Yr || 0;
-                        const agDispOth_12 = tpConfig?.agingDisputedOthers1To2Yrs || 0;
-                        const agDispOth_23 = tpConfig?.agingDisputedOthers2To3Yrs || 0;
-                        const agDispOth_m3 = tpConfig?.agingDisputedOthersMore3Yrs || 0;
-                        const agDispOth_tot = agDispOth_lt1 + agDispOth_12 + agDispOth_23 + agDispOth_m3;
-
-                        const grandAgingCY = agMsme_tot + agOth_tot + agDispMsme_tot + agDispOth_tot;
-                        const agingDiff = Math.round((grandAgingCY - totalCY) * 100) / 100;
-                        const isAgingReconciled = Math.abs(agingDiff) < 0.05;
-
-                        // Sec 22 items
-                        const s22PrincipalCY = tpConfig?.msmeSec22PrincipalCY !== undefined ? tpConfig.msmeSec22PrincipalCY : msmeTotalCY;
-                        const s22InterestCY = tpConfig?.msmeSec22InterestCY || 0;
-                        const s22PrincipalPY = tpConfig?.msmeSec22PrincipalPY !== undefined ? tpConfig.msmeSec22PrincipalPY : msmeTotalPY;
-                        const s22InterestPY = tpConfig?.msmeSec22InterestPY || 0;
-
-                        const s22DelayedCY = tpConfig?.msmeSec22DelayedPaymentsCY || 0;
-                        const s22DelayedPY = tpConfig?.msmeSec22DelayedPaymentsPY || 0;
-                        const s22IntPaidCY = tpConfig?.msmeSec22InterestPaidCY || 0;
-                        const s22IntPaidPY = tpConfig?.msmeSec22InterestPaidPY || 0;
-
-                        const s22IntDueCY = tpConfig?.msmeSec22InterestDueDelayCY || 0;
-                        const s22IntDuePY = tpConfig?.msmeSec22InterestDueDelayPY || 0;
-
-                        const s22IntAccruedCY = tpConfig?.msmeSec22InterestAccruedCY || 0;
-                        const s22IntAccruedPY = tpConfig?.msmeSec22InterestAccruedPY || 0;
-
-                        const s22FurtherIntCY = tpConfig?.msmeSec22FurtherInterestCY || 0;
-                        const s22FurtherIntPY = tpConfig?.msmeSec22FurtherInterestPY || 0;
-
-                        return (
-                          <div className="mt-4 space-y-4">
-                            {/* Action & Reconciliation Header */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-xl shadow-xs">
-                              <div className="flex items-center gap-2.5">
-                                <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30">
-                                  <Sliders className="w-4 h-4" />
-                                </div>
-                                <div>
-                                  <span className="text-xs font-bold block">Trade Payables Statutory Disclosures Manager</span>
-                                  <span className="text-[10px] text-slate-300">
-                                    Trial Balance Total: {formatINR(totalCY)} | Classified: {formatINR(classifiedSum)}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                {isReconciled && isAgingReconciled ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/40">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                    <span>Tally Reconciled</span>
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/40">
-                                    <AlertTriangle className="w-3 h-3 text-amber-400" />
-                                    <span>Diff: ₹{formatINR(Math.abs(diffCY || agingDiff))}</span>
-                                  </span>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={handleOpenTradePayables}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition cursor-pointer"
-                                >
-                                  <Sliders className="w-3.5 h-3.5" />
-                                  <span>Edit Creditors MSME &amp; Aging Data</span>
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Sub-classification */}
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
-                              <div className="flex items-center justify-between pb-1 border-b border-slate-200">
-                                <h4 className="font-bold text-slate-900 uppercase tracking-wide">
-                                  Trade Payables Statutory Sub-Classification (ICAI NCE Format)
-                                </h4>
-                                <button
-                                  type="button"
-                                  onClick={handleOpenTradePayables}
-                                  className="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Sliders className="w-3 h-3" />
-                                  <span>Edit Creditors MSME Data</span>
-                                </button>
-                              </div>
-                              <div className="space-y-1.5 text-[11px]">
-                                <div className="flex justify-between py-1 border-b border-slate-100">
-                                  <span className="text-slate-700">
-                                    (a) Total outstanding dues of micro, small and medium enterprises (MSME)
-                                  </span>
-                                  <span className="font-mono font-bold text-slate-900">{formatINR(msmeTotalCY)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-slate-100">
-                                  <span className="text-slate-700">
-                                    (b) Total outstanding dues of creditors other than micro, small and medium enterprises
-                                  </span>
-                                  <span className="font-mono font-bold text-slate-900">{formatINR(otherTotalCY)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 font-bold bg-emerald-50/70 px-2 rounded">
-                                  <span className="text-emerald-950">Total Trade Payables</span>
-                                  <span className="font-mono text-emerald-900">{formatINR(classifiedSum)}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* MSMED Act Section 22 Disclosures */}
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5">
-                              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                                <h4 className="font-bold text-slate-900 uppercase tracking-wide">
-                                  Disclosure relating to suppliers registered under MSMED Act (Section 22)
-                                </h4>
-                                <span className="text-[10px] text-slate-500 font-mono">(Amount in Rs.)</span>
-                              </div>
-                              <table className="w-full text-left text-[11px] border-collapse">
-                                <thead>
-                                  <tr className="bg-slate-200/80 text-slate-800 font-bold">
-                                    <th className="py-2 px-3">Particulars</th>
-                                    <th className="py-2 px-3 w-36 text-right">CY ({config.reportingPeriod || '31 March 2026'})</th>
-                                    <th className="py-2 px-3 w-36 text-right">PY ({config.previousReportingPeriod || '31 March 2025'})</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200 text-slate-700">
-                                  <tr>
-                                    <td className="py-2 px-3 font-medium">
-                                      (a) Principal amount and interest due thereon remaining unpaid to any supplier as at the end of each accounting year:
-                                      <div className="pl-4 text-slate-500 text-[10px] space-y-0.5 mt-0.5">
-                                        <div>- Principal amount: {formatINR(s22PrincipalCY)}</div>
-                                        <div>- Interest due thereon: {formatINR(s22InterestCY)}</div>
-                                        <div className="font-semibold text-slate-700">- Total: {formatINR(s22PrincipalCY + s22InterestCY)}</div>
-                                      </div>
-                                    </td>
-                                    <td className="py-2 px-3 text-right font-mono font-medium align-top pt-2.5">{formatINR(s22PrincipalCY + s22InterestCY)}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22PrincipalPY + s22InterestPY)}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 px-3 font-medium">
-                                      (b) The amount of interest paid by the buyer in terms of section 16 of the MSMED Act, along with the amount of the payment made to the supplier beyond the appointed day during each accounting year.
-                                    </td>
-                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntPaidCY)}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22IntPaidPY)}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 px-3 font-medium">
-                                      (c) The amount of interest due and payable for the period of delay in making payment (which have been paid but beyond the appointed day during the year) but without adding the interest specified under the MSMED Act.
-                                    </td>
-                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntDueCY)}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22IntDuePY)}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 px-3 font-medium">
-                                      (d) The amount of interest accrued and remaining unpaid at the end of each accounting year.
-                                    </td>
-                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntAccruedCY)}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22IntAccruedPY)}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-2 px-3 font-medium">
-                                      (e) The amount of further interest remaining due and payable even in the succeeding years, until such date when the interest dues above are actually paid to the small enterprise.
-                                    </td>
-                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22FurtherIntCY)}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22FurtherIntPY)}</td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-
-                            {/* Trade Payables Aging Schedule */}
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5 overflow-x-auto">
-                              <div className="flex items-center justify-between pb-1 border-b border-slate-200">
-                                <h4 className="font-bold text-slate-900 uppercase tracking-wide">
-                                  Trade Payables Aging Schedule as at {config.reportingPeriod}
-                                </h4>
-                                <button
-                                  type="button"
-                                  onClick={() => setIsTradePayablesModalOpen(true)}
-                                  className="text-[11px] text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Sliders className="w-3 h-3" />
-                                  <span>Edit Aging Buckets</span>
-                                </button>
-                              </div>
-                              <table className="w-full text-left text-[11px] border-collapse">
-                                <thead>
-                                  <tr className="bg-slate-200/80 text-slate-800 font-bold">
-                                    <th className="py-2 px-3">Particulars</th>
-                                    <th className="py-2 px-2 text-right">&lt; 1 Year</th>
-                                    <th className="py-2 px-2 text-right">1 - 2 Years</th>
-                                    <th className="py-2 px-2 text-right">2 - 3 Years</th>
-                                    <th className="py-2 px-2 text-right">&gt; 3 Years</th>
-                                    <th className="py-2 px-3 text-right">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200 text-slate-700">
-                                  <tr>
-                                    <td className="py-1.5 px-3 font-medium">(i) MSME</td>
-                                    <td className="py-1.5 px-2 text-right font-mono">{formatINR(agMsme_lt1)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_12)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_23)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_m3)}</td>
-                                    <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{formatINR(agMsme_tot)}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-1.5 px-3 font-medium">(ii) Others</td>
-                                    <td className="py-1.5 px-2 text-right font-mono">{formatINR(agOth_lt1)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agOth_12)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agOth_23)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agOth_m3)}</td>
-                                    <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{formatINR(agOth_tot)}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-1.5 px-3 font-medium">(iii) Disputed dues - MSME</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_lt1)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_12)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_23)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_m3)}</td>
-                                    <td className="py-1.5 px-3 text-right font-mono text-slate-400">{formatINR(agDispMsme_tot)}</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="py-1.5 px-3 font-medium">(iv) Disputed dues - Others</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_lt1)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_12)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_23)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_m3)}</td>
-                                    <td className="py-1.5 px-3 text-right font-mono text-slate-400">{formatINR(agDispOth_tot)}</td>
-                                  </tr>
-                                  <tr className="bg-slate-100 font-bold text-slate-900">
-                                    <td className="py-2 px-3">Total Trade Payables</td>
-                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_lt1 + agOth_lt1 + agDispMsme_lt1 + agDispOth_lt1)}</td>
-                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_12 + agOth_12 + agDispMsme_12 + agDispOth_12)}</td>
-                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_23 + agOth_23 + agDispMsme_23 + agDispOth_23)}</td>
-                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_m3 + agOth_m3 + agDispMsme_m3 + agDispOth_m3)}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-emerald-800">{formatINR(grandAgingCY)}</td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        );
-                      })()}
 
                       {/* Note 16: Trade Receivables Aging Schedule */}
                       {def.noteNumber === 16 && (() => {
