@@ -1731,6 +1731,7 @@ export default function App() {
             onUpdateConfig={handleUpdateConfig}
             onSwitchCompany={() => setDashboardView('companies')}
             initialStep={workspaceStep}
+            onStepChange={(step) => setWorkspaceStep(step)}
             currentUser={currentUser}
             onOpenSubscriptionModal={() => {
               setSubscriptionUpgradeReason(undefined);

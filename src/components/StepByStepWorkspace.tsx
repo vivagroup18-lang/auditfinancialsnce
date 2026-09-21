@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Building2,
   Calendar,
@@ -82,6 +82,7 @@ interface StepByStepWorkspaceProps {
   // Navigation
   onSwitchCompany: () => void;
   initialStep?: 1 | 2 | 3 | 4 | 5;
+  onStepChange?: (step: 1 | 2 | 3 | 4 | 5) => void;
 
   // Auth & Cloud
   currentUser?: UserProfile | null;
@@ -128,6 +129,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
   onUpdateConfig,
   onSwitchCompany,
   initialStep = 1,
+  onStepChange,
   currentUser,
   onOpenSubscriptionModal,
   user,
@@ -136,6 +138,21 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
   onSignOut,
 }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(initialStep);
+
+  // Keep internal step synchronized with parent/header selection
+  useEffect(() => {
+    if (initialStep !== undefined) {
+      setCurrentStep(initialStep);
+    }
+  }, [initialStep]);
+
+  const handleStepChange = (step: 1 | 2 | 3 | 4 | 5) => {
+    setCurrentStep(step);
+    if (onStepChange) {
+      onStepChange(step);
+    }
+  };
+
   const [selectedNoteNumber, setSelectedNoteNumber] = useState<number | undefined>(undefined);
   const [isTradePayablesModalOpen, setIsTradePayablesModalOpen] = useState(false);
 
@@ -191,7 +208,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
 
   const handleSelectNote = (noteNumber: number) => {
     setSelectedNoteNumber(noteNumber);
-    setCurrentStep(4);
+    handleStepChange(4);
   };
 
   return (
@@ -259,7 +276,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
         </div>
 
         {/* 5-Step Guided Stepper Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 pt-1">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 pt-1">
           {STEPS.map((s) => {
             const isCurrent = currentStep === s.step;
             const isCompleted = s.isCompleted && !isCurrent;
@@ -268,23 +285,23 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
               <button
                 key={s.step}
                 type="button"
-                onClick={() => setCurrentStep(s.step as any)}
-                className={`text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1.5 cursor-pointer ${
+                onClick={() => handleStepChange(s.step as any)}
+                className={`text-left p-3.5 rounded-xl border transition flex flex-col justify-between gap-2 cursor-pointer ${
                   isCurrent
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                    ? 'bg-slate-900 text-white border-emerald-500 shadow-md ring-2 ring-emerald-500/25 scale-[1.01]'
                     : isCompleted
-                    ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950 hover:bg-emerald-100/70'
-                    : 'bg-slate-50/80 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    ? 'bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100 shadow-2xs'
+                    : 'bg-white border-slate-200/90 text-slate-700 hover:border-slate-300 hover:bg-slate-50 shadow-2xs'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span
-                    className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center ${
+                    className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center transition shrink-0 ${
                       isCurrent
-                        ? 'bg-emerald-500 text-slate-950'
+                        ? 'bg-emerald-500 text-slate-950 shadow-xs'
                         : isCompleted
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-200 text-slate-600'
+                        : 'bg-slate-150 text-slate-600 border border-slate-200'
                     }`}
                   >
                     {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
@@ -304,9 +321,11 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
                 </div>
 
                 <div>
-                  <div className="text-xs font-bold truncate">{s.title}</div>
+                  <div className={`text-xs font-bold truncate ${isCurrent ? 'text-white' : 'text-slate-900'}`}>
+                    {s.title}
+                  </div>
                   <div
-                    className={`text-[10px] truncate ${
+                    className={`text-[10px] truncate mt-0.5 ${
                       isCurrent ? 'text-slate-300' : 'text-slate-500'
                     }`}
                   >
@@ -342,7 +361,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           isAIMapping={isAIMapping}
           onOpenYearEndAdjustments={onOpenYearEndAdjustments}
           computedFinancials={computedFinancials}
-          onProceedToStep2={() => setCurrentStep(2)}
+          onProceedToStep2={() => handleStepChange(2)}
           onSelectNote={handleSelectNote}
           onOpenTradePayables={handleOpenTradePayables}
           onUpdateConfig={onUpdateConfig}
@@ -367,8 +386,8 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onTriggerAIMap={onTriggerAIMap}
           isAIMapping={isAIMapping}
           pyComputedFinancials={pyComputedFinancials}
-          onBackToStep1={() => setCurrentStep(1)}
-          onProceedToStep3={() => setCurrentStep(3)}
+          onBackToStep1={() => handleStepChange(1)}
+          onProceedToStep3={() => handleStepChange(3)}
           onSelectNote={handleSelectNote}
           onUpdateConfig={onUpdateConfig}
         />
@@ -378,8 +397,8 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
         <Step3ComparativeStatements
           config={config}
           computedFinancials={computedFinancials}
-          onBackToStep2={() => setCurrentStep(2)}
-          onProceedToStep4={() => setCurrentStep(4)}
+          onBackToStep2={() => handleStepChange(2)}
+          onProceedToStep4={() => handleStepChange(4)}
           onSelectNote={handleSelectNote}
           onOpenTradePayables={handleOpenTradePayables}
         />
@@ -397,8 +416,8 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           selectedNoteNumber={selectedNoteNumber}
           onOpenYearEndAdjustments={onOpenYearEndAdjustments}
           onOpenTradePayables={handleOpenTradePayables}
-          onBackToStep3={() => setCurrentStep(3)}
-          onProceedToStep5={() => setCurrentStep(5)}
+          onBackToStep3={() => handleStepChange(3)}
+          onProceedToStep5={() => handleStepChange(5)}
         />
       )}
 
@@ -415,7 +434,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           accessToken={accessToken}
           onAuthSuccess={onAuthSuccess}
           onSignOut={onSignOut}
-          onBackToStep4={() => setCurrentStep(4)}
+          onBackToStep4={() => handleStepChange(4)}
           onSwitchCompany={onSwitchCompany}
         />
       )}
