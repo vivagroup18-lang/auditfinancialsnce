@@ -13,6 +13,7 @@ import {
   Printer,
   ChevronRight,
   Download,
+  Sliders,
 } from 'lucide-react';
 import {
   BalanceSheetData,
@@ -32,6 +33,7 @@ interface Step3ComparativeStatementsProps {
   onBackToStep2: () => void;
   onProceedToStep4: () => void;
   onSelectNote?: (noteNumber: number) => void;
+  onOpenTradePayables?: () => void;
 }
 
 export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProps> = ({
@@ -40,6 +42,7 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
   onBackToStep2,
   onProceedToStep4,
   onSelectNote = () => {},
+  onOpenTradePayables,
 }) => {
   const [statementType, setStatementType] = useState<'balance_sheet' | 'profit_loss' | 'notes_summary'>('balance_sheet');
 
@@ -414,13 +417,26 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                   })()}
                 </tr>
                 <tr>
-                  <td className="py-2 px-4 pl-10">
-                    <div>(b) Trade payables</div>
-                    <div className="text-[11px] text-slate-500 font-normal pl-3">
-                      (A) total outstanding dues of micro & small enterprises: {formatINR(bs.tradePayablesMsme || 0)}
+                  <td className="py-2.5 px-4 pl-10">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="font-semibold text-slate-900">(b) Trade payables</div>
+                      {onOpenTradePayables && (
+                        <button
+                          type="button"
+                          onClick={onOpenTradePayables}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded shadow-2xs transition cursor-pointer"
+                          title="Enter MSME dues, Section 22 disclosures & aging schedule"
+                        >
+                          <Sliders className="w-3 h-3" />
+                          <span>Edit Creditors MSME Data</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-normal pl-3 mt-0.5">
+                      (A) total outstanding dues of micro & small enterprises: <strong className="font-mono text-slate-700">{formatINR(bs.tradePayablesMsme || 0)}</strong>
                     </div>
                     <div className="text-[11px] text-slate-500 font-normal pl-3">
-                      (B) total outstanding dues of other creditors: {formatINR(bs.tradePayablesOther || bs.tradePayables)}
+                      (B) total outstanding dues of other creditors: <strong className="font-mono text-slate-700">{formatINR(bs.tradePayablesOther || bs.tradePayables)}</strong>
                     </div>
                   </td>
                   <td className="py-2 px-3 text-center align-top pt-2.5">

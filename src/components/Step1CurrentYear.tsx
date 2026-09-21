@@ -55,6 +55,7 @@ interface Step1CurrentYearProps {
   } | null;
   onProceedToStep2: () => void;
   onSelectNote?: (noteNumber: number) => void;
+  onOpenTradePayables?: () => void;
   onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
 }
 
@@ -80,6 +81,7 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
   computedFinancials,
   onProceedToStep2,
   onSelectNote = () => {},
+  onOpenTradePayables,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'upload' | 'mapping' | 'statements'>(() => {
     return mappedLedgers && mappedLedgers.length > 0 ? 'mapping' : 'upload';
@@ -456,6 +458,7 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
                 onSelectNote(note);
                 setStatementSubView('notes');
               }}
+              onOpenTradePayables={onOpenTradePayables}
             />
           )}
 
@@ -475,6 +478,7 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
               noteSchedules={computedFinancials.noteSchedules}
               config={config}
               onOpenYearEndAdjustments={onOpenYearEndAdjustments}
+              onOpenTradePayables={onOpenTradePayables}
               onUpdateConfig={onUpdateConfig}
               profitAndLoss={computedFinancials?.profitAndLoss}
             />

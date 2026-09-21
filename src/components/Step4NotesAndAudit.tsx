@@ -10,6 +10,7 @@ import {
   Box,
   Layers,
   FileCheck,
+  Sliders,
 } from 'lucide-react';
 import {
   NoteScheduleData,
@@ -31,6 +32,7 @@ interface Step4NotesAndAuditProps {
   onSelectNote: (noteNumber: number) => void;
   selectedNoteNumber?: number;
   onOpenYearEndAdjustments: () => void;
+  onOpenTradePayables?: () => void;
   onBackToStep3: () => void;
   onProceedToStep5: () => void;
 }
@@ -45,6 +47,7 @@ export const Step4NotesAndAudit: React.FC<Step4NotesAndAuditProps> = ({
   onSelectNote,
   selectedNoteNumber,
   onOpenYearEndAdjustments,
+  onOpenTradePayables,
   onBackToStep3,
   onProceedToStep5,
 }) => {
@@ -137,7 +140,22 @@ export const Step4NotesAndAudit: React.FC<Step4NotesAndAuditProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {onOpenTradePayables && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectNote(9);
+                  onOpenTradePayables();
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Edit Note 9: MSME dues, Section 22 disclosures & aging schedule"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Edit Creditors MSME Data</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onOpenYearEndAdjustments}
@@ -157,6 +175,7 @@ export const Step4NotesAndAudit: React.FC<Step4NotesAndAuditProps> = ({
           config={config}
           selectedNoteNumber={selectedNoteNumber}
           onOpenYearEndAdjustments={onOpenYearEndAdjustments}
+          onOpenTradePayables={onOpenTradePayables}
           onUpdateConfig={onUpdateConfig}
           profitAndLoss={profitAndLoss}
         />

@@ -28,6 +28,7 @@ interface NotesViewProps {
   config: EntityConfig;
   selectedNoteNumber?: number;
   onOpenYearEndAdjustments?: () => void;
+  onOpenTradePayables?: () => void;
   onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
   profitAndLoss?: Omit<ProfitAndLossData, 'previousYear'>;
 }
@@ -37,6 +38,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
   config,
   selectedNoteNumber,
   onOpenYearEndAdjustments,
+  onOpenTradePayables,
   onUpdateConfig,
   profitAndLoss,
 }) => {
@@ -45,6 +47,14 @@ export const NotesView: React.FC<NotesViewProps> = ({
   const [isTradePayablesModalOpen, setIsTradePayablesModalOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'WITH_BALANCE' | 'BALANCE_SHEET' | 'PROFIT_LOSS' | 'POLICIES'>('ALL');
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
+
+  const handleOpenTradePayables = () => {
+    if (onOpenTradePayables) {
+      onOpenTradePayables();
+    } else {
+      setIsTradePayablesModalOpen(true);
+    }
+  };
 
   // Auto-expand selected note if passed
   useEffect(() => {
@@ -199,9 +209,17 @@ export const NotesView: React.FC<NotesViewProps> = ({
               }`}
             >
               {/* Note Header Accordion Toggle */}
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => toggleNote(def.noteNumber)}
-                className="w-full text-left p-4 bg-slate-50/70 hover:bg-slate-50 transition flex items-center justify-between border-b border-slate-200"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleNote(def.noteNumber);
+                  }
+                }}
+                className="w-full text-left p-4 bg-slate-50/70 hover:bg-slate-50 transition flex items-center justify-between border-b border-slate-200 cursor-pointer"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
                   <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs shrink-0">
@@ -218,7 +236,23 @@ export const NotesView: React.FC<NotesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 shrink-0">
+                <div className="flex items-center gap-3 shrink-0">
+                  {/* Dedicated Edit Button on Header for Note 9 */}
+                  {def.noteNumber === 9 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenTradePayables();
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-2xs transition cursor-pointer"
+                      title="Edit Note 9: MSME dues, Section 22 disclosures & aging schedule"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Edit Creditors MSME Data</span>
+                    </button>
+                  )}
+
                   {def.noteNumber >= 3 && (
                     <div className="flex items-center gap-3 text-right bg-slate-100/90 px-3 py-1 rounded-lg border border-slate-200">
                       <div>
@@ -242,7 +276,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
                     <ChevronRight className="w-5 h-5 text-slate-400" />
                   )}
                 </div>
-              </button>
+              </div>
 
               {/* Note Expanded Body */}
               {isExpanded && (
@@ -369,6 +403,64 @@ export const NotesView: React.FC<NotesViewProps> = ({
                           </button>
                         </div>
                       )}
+
+                      {/* Note 9: Statutory MSME & Aging Disclosures Banner at TOP */}
+                      {def.noteNumber === 9 && (() => {
+                        const tpConfig = config.tradePayablesConfig;
+                        const totalCY = schedule?.totalAmount || 0;
+                        const msmeCY = tpConfig?.msmeAmountCY !== undefined ? tpConfig.msmeAmountCY : 0;
+                        const othersCY = tpConfig?.othersAmountCY !== undefined ? tpConfig.othersAmountCY : totalCY;
+                        const classifiedSum = msmeCY + othersCY;
+                        const diffCY = Math.round((classifiedSum - totalCY) * 100) / 100;
+                        const isReconciled = Math.abs(diffCY) < 0.05;
+
+                        return (
+                          <div className="mb-4 p-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-xl shadow-xs border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-start sm:items-center gap-3">
+                              <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0">
+                                <Sliders className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-sm font-bold text-white tracking-tight">
+                                    Trade Payables &amp; MSME Statutory Disclosures (Note 9)
+                                  </h4>
+                                  {isReconciled ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/40">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                      <span>Tally Reconciled</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/40">
+                                      <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                      <span>Variance: ₹{formatINR(Math.abs(diffCY))}</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-300 mt-1">
+                                  Statutory sub-classification (MSME vs Others), MSMED Act Section 22 interest disclosures, and aging schedule (&lt; 1 yr, 1-2 yrs, 2-3 yrs, &gt; 3 yrs).
+                                </p>
+                                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400 flex-wrap">
+                                  <span>Trial Balance Total: <strong className="text-white font-mono">₹{formatINR(totalCY)}</strong></span>
+                                  <span>•</span>
+                                  <span>(a) MSME Dues: <strong className="text-emerald-400 font-mono">₹{formatINR(msmeCY)}</strong></span>
+                                  <span>•</span>
+                                  <span>(b) Other Creditors: <strong className="text-teal-300 font-mono">₹{formatINR(othersCY)}</strong></span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleOpenTradePayables}
+                              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer shrink-0"
+                            >
+                              <Sliders className="w-4 h-4" />
+                              <span>Edit Creditors MSME Data</span>
+                            </button>
+                          </div>
+                        );
+                      })()}
 
                       {/* Note 3: Official ICAI Partner / Owner Capital Account Table */}
                       {def.noteNumber === 3 && (() => {
@@ -765,11 +857,11 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
                                 <button
                                   type="button"
-                                  onClick={() => setIsTradePayablesModalOpen(true)}
+                                  onClick={handleOpenTradePayables}
                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition cursor-pointer"
                                 >
                                   <Sliders className="w-3.5 h-3.5" />
-                                  <span>Edit MSME &amp; Aging Disclosures</span>
+                                  <span>Edit Creditors MSME &amp; Aging Data</span>
                                 </button>
                               </div>
                             </div>
@@ -782,11 +874,11 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                 </h4>
                                 <button
                                   type="button"
-                                  onClick={() => setIsTradePayablesModalOpen(true)}
+                                  onClick={handleOpenTradePayables}
                                   className="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
                                 >
                                   <Sliders className="w-3 h-3" />
-                                  <span>Edit / Reconcile</span>
+                                  <span>Edit Creditors MSME Data</span>
                                 </button>
                               </div>
                               <div className="space-y-1.5 text-[11px]">

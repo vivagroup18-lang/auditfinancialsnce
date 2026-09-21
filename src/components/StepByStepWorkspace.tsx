@@ -13,6 +13,7 @@ import {
   Download,
   Box,
   Settings,
+  Sliders,
 } from 'lucide-react';
 import {
   EntityConfig,
@@ -29,6 +30,7 @@ import { Step2PreviousYear } from './Step2PreviousYear';
 import { Step3ComparativeStatements } from './Step3ComparativeStatements';
 import { Step4NotesAndAudit } from './Step4NotesAndAudit';
 import { Step5ReportGeneration } from './Step5ReportGeneration';
+import { TradePayablesMsmeModal } from './TradePayablesMsmeModal';
 import type { User } from 'firebase/auth';
 
 interface StepByStepWorkspaceProps {
@@ -135,6 +137,11 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(initialStep);
   const [selectedNoteNumber, setSelectedNoteNumber] = useState<number | undefined>(undefined);
+  const [isTradePayablesModalOpen, setIsTradePayablesModalOpen] = useState(false);
+
+  const handleOpenTradePayables = () => {
+    setIsTradePayablesModalOpen(true);
+  };
 
   // Compute standalone Previous Year totals for Step 2 if PY ledgers exist
   const pyComputedFinancials = useMemo(() => {
@@ -229,6 +236,16 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
                 Change FY
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleOpenTradePayables}
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Edit Note 9 Creditors MSME & Aging Data"
+            >
+              <Sliders className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="hidden sm:inline">Creditors MSME Data</span>
+            </button>
 
             <button
               type="button"
@@ -327,6 +344,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           computedFinancials={computedFinancials}
           onProceedToStep2={() => setCurrentStep(2)}
           onSelectNote={handleSelectNote}
+          onOpenTradePayables={handleOpenTradePayables}
           onUpdateConfig={onUpdateConfig}
         />
       )}
@@ -363,6 +381,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onBackToStep2={() => setCurrentStep(2)}
           onProceedToStep4={() => setCurrentStep(4)}
           onSelectNote={handleSelectNote}
+          onOpenTradePayables={handleOpenTradePayables}
         />
       )}
 
@@ -377,6 +396,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onSelectNote={setSelectedNoteNumber}
           selectedNoteNumber={selectedNoteNumber}
           onOpenYearEndAdjustments={onOpenYearEndAdjustments}
+          onOpenTradePayables={handleOpenTradePayables}
           onBackToStep3={() => setCurrentStep(3)}
           onProceedToStep5={() => setCurrentStep(5)}
         />
@@ -399,6 +419,15 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onSwitchCompany={onSwitchCompany}
         />
       )}
+
+      {/* Global Trade Payables (Note 9) MSME & Aging Disclosures Modal */}
+      <TradePayablesMsmeModal
+        isOpen={isTradePayablesModalOpen}
+        onClose={() => setIsTradePayablesModalOpen(false)}
+        config={config}
+        onUpdateConfig={onUpdateConfig}
+        noteSchedule={computedFinancials.noteSchedules[9]}
+      />
     </div>
   );
 };

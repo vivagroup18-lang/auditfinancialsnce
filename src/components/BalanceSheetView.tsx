@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, AlertTriangle, ExternalLink, Printer, ShieldCheck, Mail, Users } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ExternalLink, Printer, ShieldCheck, Mail, Users, Sliders } from 'lucide-react';
 import { BalanceSheetData, EntityConfig } from '../types';
 
 interface BalanceSheetViewProps {
@@ -7,6 +7,7 @@ interface BalanceSheetViewProps {
   config: EntityConfig;
   onSelectNote: (noteNumber: number) => void;
   onEmailStatement?: () => void;
+  onOpenTradePayables?: () => void;
 }
 
 export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
@@ -14,6 +15,7 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
   config,
   onSelectNote,
   onEmailStatement,
+  onOpenTradePayables,
 }) => {
   const formatINR = (val?: number) => {
     if (val === undefined || val === null || isNaN(val)) return '-';
@@ -314,13 +316,26 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
               </td>
             </tr>
             <tr className="hover:bg-slate-50 transition-colors">
-              <td className="py-2 px-10 text-slate-700">
-                (b) Trade payables
-                <span className="block text-[11px] text-slate-500 font-normal pl-4">
-                  (A) total outstanding dues of micro and small enterprises (MSME): {formatINR(balanceSheet.tradePayablesMsme || 0)}
+              <td className="py-2.5 px-10 text-slate-700">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-semibold text-slate-900">(b) Trade payables</span>
+                  {onOpenTradePayables && (
+                    <button
+                      type="button"
+                      onClick={onOpenTradePayables}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg shadow-2xs transition cursor-pointer"
+                      title="Enter MSME dues, Section 22 disclosures & aging schedule"
+                    >
+                      <Sliders className="w-3 h-3" />
+                      <span>Edit Creditors MSME Data</span>
+                    </button>
+                  )}
+                </div>
+                <span className="block text-[11px] text-slate-500 font-normal pl-4 mt-0.5">
+                  (A) total outstanding dues of micro and small enterprises (MSME): <strong className="font-mono text-slate-700">{formatINR(balanceSheet.tradePayablesMsme || 0)}</strong>
                 </span>
                 <span className="block text-[11px] text-slate-500 font-normal pl-4">
-                  (B) total outstanding dues of creditors other than micro and small enterprises: {formatINR(balanceSheet.tradePayablesOther || balanceSheet.tradePayables)}
+                  (B) total outstanding dues of creditors other than micro and small enterprises: <strong className="font-mono text-slate-700">{formatINR(balanceSheet.tradePayablesOther || balanceSheet.tradePayables)}</strong>
                 </span>
               </td>
               <td className="py-2 px-2 text-center align-top pt-3">
