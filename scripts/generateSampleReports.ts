@@ -94,6 +94,51 @@ async function generateSample(datasetIndex: number, outputBaseName: string) {
             closingBalance: 5000000,
           },
         ],
+    tradePayablesConfig: isProprietor
+      ? {
+          msmeDuesCY: 420000.0,
+          othersDuesCY: 1401090.23,
+          msmedDisclosures: {
+            principalUnpaidEndOfYear: 420000.0,
+            interestDueOnPrincipal: 0,
+            interestPaidLatePayments: 0,
+            interestDueAndPayableBeyondDelay: 0,
+            interestAccruedAndRemainingUnpaid: 0,
+            furtherInterestRemainingDue: 0,
+          },
+          agingSchedule: {
+            msme: { lessThanOneYear: 420000.0, oneToTwoYears: 0, twoToThreeYears: 0, moreThanThreeYears: 0 },
+            others: { lessThanOneYear: 1350000.0, oneToTwoYears: 51090.23, twoToThreeYears: 0, moreThanThreeYears: 0 },
+            disputedMsme: { lessThanOneYear: 0, oneToTwoYears: 0, twoToThreeYears: 0, moreThanThreeYears: 0 },
+            disputedOthers: { lessThanOneYear: 0, oneToTwoYears: 0, twoToThreeYears: 0, moreThanThreeYears: 0 },
+          },
+        }
+      : {
+          msmeDuesCY: 950000,
+          msmeDuesPY: 800000,
+          othersDuesCY: 2460000,
+          othersDuesPY: 2100000,
+          msmedDisclosures: {
+            principalUnpaidEndOfYear: 950000,
+            principalUnpaidEndOfYearPY: 800000,
+            interestDueOnPrincipal: 0,
+            interestDueOnPrincipalPY: 0,
+            interestPaidLatePayments: 0,
+            interestPaidLatePaymentsPY: 0,
+            interestDueAndPayableBeyondDelay: 0,
+            interestDueAndPayableBeyondDelayPY: 0,
+            interestAccruedAndRemainingUnpaid: 0,
+            interestAccruedAndRemainingUnpaidPY: 0,
+            furtherInterestRemainingDue: 0,
+            furtherInterestRemainingDuePY: 0,
+          },
+          agingSchedule: {
+            msme: { lessThanOneYear: 950000, oneToTwoYears: 0, twoToThreeYears: 0, moreThanThreeYears: 0 },
+            others: { lessThanOneYear: 2310000, oneToTwoYears: 150000, twoToThreeYears: 0, moreThanThreeYears: 0 },
+            disputedMsme: { lessThanOneYear: 0, oneToTwoYears: 0, twoToThreeYears: 0, moreThanThreeYears: 0 },
+            disputedOthers: { lessThanOneYear: 0, oneToTwoYears: 0, twoToThreeYears: 0, moreThanThreeYears: 0 },
+          },
+        },
   };
 
   // 4. Calculate Financial Statements

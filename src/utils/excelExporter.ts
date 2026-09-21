@@ -1758,10 +1758,11 @@ export function buildAttractiveExcelWorkbook({
 
     // Note 9: Statutory MSMED Act, 2006 Delayed Payment Disclosures & Aging Schedule
     if (i === 9) {
-      const msmeCY = (balanceSheet as any).tradePayablesMsme || 0;
-      const msmePY = (balanceSheet.previousYear as any)?.tradePayablesMsme || 0;
-      const otherCY = (balanceSheet as any).tradePayablesOther ?? sched.totalAmount;
-      const otherPY = (balanceSheet.previousYear as any)?.tradePayablesOther ?? (sched.previousYearAmount || 0);
+      const tpCfg = entityConfig.tradePayablesConfig;
+      const msmeCY = tpCfg?.msmeAmountCY !== undefined ? tpCfg.msmeAmountCY : ((balanceSheet as any).tradePayablesMsme || 0);
+      const msmePY = tpCfg?.msmeAmountPY !== undefined ? tpCfg.msmeAmountPY : ((balanceSheet.previousYear as any)?.tradePayablesMsme || 0);
+      const otherCY = tpCfg?.othersAmountCY !== undefined ? tpCfg.othersAmountCY : ((balanceSheet as any).tradePayablesOther ?? sched.totalAmount);
+      const otherPY = tpCfg?.othersAmountPY !== undefined ? tpCfg.othersAmountPY : ((balanceSheet.previousYear as any)?.tradePayablesOther ?? (sched.previousYearAmount || 0));
 
       // 1. Statutory Sub-classification
       const subClassHdrIdx = notesRows.length;
@@ -1812,12 +1813,23 @@ export function buildAttractiveExcelWorkbook({
       addNotesRow(msmeHdr, 22);
       notesMerges.push({ s: { r: msmeHeaderIdx, c: 0 }, e: { r: msmeHeaderIdx, c: notesColCount - 1 } });
 
+      const s22a_CY = tpCfg?.msmeSec22PrincipalCY !== undefined ? ((tpCfg.msmeSec22PrincipalCY || 0) + (tpCfg.msmeSec22InterestCY || 0)) : msmeCY;
+      const s22a_PY = tpCfg?.msmeSec22PrincipalPY !== undefined ? ((tpCfg.msmeSec22PrincipalPY || 0) + (tpCfg.msmeSec22InterestPY || 0)) : msmePY;
+      const s22b_CY = tpCfg?.msmeSec22InterestPaidCY || 0;
+      const s22b_PY = tpCfg?.msmeSec22InterestPaidPY || 0;
+      const s22c_CY = tpCfg?.msmeSec22InterestDueDelayCY || 0;
+      const s22c_PY = tpCfg?.msmeSec22InterestDueDelayPY || 0;
+      const s22d_CY = tpCfg?.msmeSec22InterestAccruedCY || 0;
+      const s22d_PY = tpCfg?.msmeSec22InterestAccruedPY || 0;
+      const s22e_CY = tpCfg?.msmeSec22FurtherInterestCY || 0;
+      const s22e_PY = tpCfg?.msmeSec22FurtherInterestPY || 0;
+
       const msmeClauses = [
-        ['(a)', 'Principal amount and interest due thereon remaining unpaid to any supplier as at the end of each accounting year:', msmeCY, msmePY],
-        ['(b)', 'Interest paid by the buyer under MSMED Act along with delayed payments made beyond the appointed day during the year:', 0, 0],
-        ['(c)', 'Interest due and payable for the period of delay in making payment beyond the appointed day without adding interest under MSMED Act:', 0, 0],
-        ['(d)', 'Interest accrued and remaining unpaid at the end of each accounting year:', 0, 0],
-        ['(e)', 'Further interest remaining due and payable in the succeeding years until such date when the interest dues are actually paid:', 0, 0],
+        ['(a)', 'Principal amount and interest due thereon remaining unpaid to any supplier as at the end of each accounting year:', s22a_CY, s22a_PY],
+        ['(b)', 'Interest paid by the buyer under MSMED Act along with delayed payments made beyond the appointed day during the year:', s22b_CY, s22b_PY],
+        ['(c)', 'Interest due and payable for the period of delay in making payment beyond the appointed day without adding interest under MSMED Act:', s22c_CY, s22c_PY],
+        ['(d)', 'Interest accrued and remaining unpaid at the end of each accounting year:', s22d_CY, s22d_PY],
+        ['(e)', 'Further interest remaining due and payable in the succeeding years until such date when the interest dues are actually paid:', s22e_CY, s22e_PY],
       ];
 
       msmeClauses.forEach(([clause, desc, amtCY, amtPY], cIdx) => {
@@ -1857,11 +1869,31 @@ export function buildAttractiveExcelWorkbook({
         thCell('Total (₹)', 'right', PALETTE.navyPrimary),
       ], 24);
 
+      const agMsme_lt1 = tpCfg?.agingMsmeLess1Yr !== undefined ? tpCfg.agingMsmeLess1Yr : msmeCY;
+      const agMsme_12 = tpCfg?.agingMsme1To2Yrs || 0;
+      const agMsme_23 = (tpCfg?.agingMsme2To3Yrs || 0) + (tpCfg?.agingMsmeMore3Yrs || 0);
+      const agMsme_tot = agMsme_lt1 + agMsme_12 + agMsme_23;
+
+      const agOth_lt1 = tpCfg?.agingOthersLess1Yr !== undefined ? tpCfg.agingOthersLess1Yr : otherCY;
+      const agOth_12 = tpCfg?.agingOthers1To2Yrs || 0;
+      const agOth_23 = (tpCfg?.agingOthers2To3Yrs || 0) + (tpCfg?.agingOthersMore3Yrs || 0);
+      const agOth_tot = agOth_lt1 + agOth_12 + agOth_23;
+
+      const agDispMsme_lt1 = tpCfg?.agingDisputedMsmeLess1Yr || 0;
+      const agDispMsme_12 = tpCfg?.agingDisputedMsme1To2Yrs || 0;
+      const agDispMsme_23 = (tpCfg?.agingDisputedMsme2To3Yrs || 0) + (tpCfg?.agingDisputedMsmeMore3Yrs || 0);
+      const agDispMsme_tot = agDispMsme_lt1 + agDispMsme_12 + agDispMsme_23;
+
+      const agDispOth_lt1 = tpCfg?.agingDisputedOthersLess1Yr || 0;
+      const agDispOth_12 = tpCfg?.agingDisputedOthers1To2Yrs || 0;
+      const agDispOth_23 = (tpCfg?.agingDisputedOthers2To3Yrs || 0) + (tpCfg?.agingDisputedOthersMore3Yrs || 0);
+      const agDispOth_tot = agDispOth_lt1 + agDispOth_12 + agDispOth_23;
+
       const agingRows = [
-        ['(i) MSME', msmeCY, 0, 0, msmeCY],
-        ['(ii) Others', otherCY, 0, 0, otherCY],
-        ['(iii) Disputed dues - MSME', 0, 0, 0, 0],
-        ['(iv) Disputed dues - Others', 0, 0, 0, 0],
+        ['(i) MSME', agMsme_lt1, agMsme_12, agMsme_23, agMsme_tot],
+        ['(ii) Others', agOth_lt1, agOth_12, agOth_23, agOth_tot],
+        ['(iii) Disputed dues - MSME', agDispMsme_lt1, agDispMsme_12, agDispMsme_23, agDispMsme_tot],
+        ['(iv) Disputed dues - Others', agDispOth_lt1, agDispOth_12, agDispOth_23, agDispOth_tot],
       ];
 
       agingRows.forEach(([title, lt1, y12, y23, tot], aIdx) => {
@@ -1876,13 +1908,15 @@ export function buildAttractiveExcelWorkbook({
         ], 20);
       });
 
+      const totalAgingAll = agMsme_tot + agOth_tot + agDispMsme_tot + agDispOth_tot;
+
       addNotesRow([
         textCell('', { bg: PALETTE.grandTotalBg }),
         textCell('Total Trade Payables Aging', { bold: true, sz: 10, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
-        numCell(sched.totalAmount, { isGrandTotal: true }),
-        numCell(0, { isGrandTotal: true }),
-        numCell(0, { isGrandTotal: true }),
-        numCell(sched.totalAmount, { isGrandTotal: true }),
+        numCell(agMsme_lt1 + agOth_lt1 + agDispMsme_lt1 + agDispOth_lt1, { isGrandTotal: true }),
+        numCell(agMsme_12 + agOth_12 + agDispMsme_12 + agDispOth_12, { isGrandTotal: true }),
+        numCell(agMsme_23 + agOth_23 + agDispMsme_23 + agDispOth_23, { isGrandTotal: true }),
+        numCell(totalAgingAll, { isGrandTotal: true }),
       ], 22);
     }
 

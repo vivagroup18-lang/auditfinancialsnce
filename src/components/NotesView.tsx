@@ -20,6 +20,7 @@ import { NoteScheduleData, EntityConfig, ProfitAndLossData } from '../types';
 import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
 import { isPartnersRemunerationItem, formatINR } from '../utils/financialCalculations';
 import { PartnerCapitalModal } from './PartnerCapitalModal';
+import { TradePayablesMsmeModal } from './TradePayablesMsmeModal';
 import { downloadPartnerCapitalTemplate } from '../utils/fileParsers';
 
 interface NotesViewProps {
@@ -41,6 +42,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
+  const [isTradePayablesModalOpen, setIsTradePayablesModalOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'WITH_BALANCE' | 'BALANCE_SHEET' | 'PROFIT_LOSS' | 'POLICIES'>('ALL');
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
 
@@ -654,30 +656,139 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
                       {/* Note 9: Statutory MSMED Act Interest & Delayed Payments Disclosure & Aging Schedule */}
                       {def.noteNumber === 9 && (() => {
-                        const msmeCreditors = schedule?.items.filter((it) =>
-                          (it.subCategory && it.subCategory.toLowerCase().includes('msme')) ||
-                          it.accountName.toLowerCase().includes('msme')
-                        ) || [];
-                        const msmeTotalCY = msmeCreditors.reduce(
+                        const tpConfig = config.tradePayablesConfig;
+                        const msmeCreditors = schedule?.items.filter((it) => {
+                          const sub = (it.subCategory || '').toLowerCase();
+                          const name = (it.accountName || '').toLowerCase();
+                          const isOther = sub.includes('other than micro') || name.includes('other than micro') || name.includes('other creditors');
+                          return !isOther && (sub.includes('msme') || name.includes('msme') || sub.includes('micro') || name.includes('micro') || sub.includes('(a)'));
+                        }) || [];
+
+                        const rawMsmeCY = msmeCreditors.reduce(
                           (acc, it) => acc + (it.displayBalance !== undefined ? it.displayBalance : it.netBalance),
                           0
                         );
-                        const msmeTotalPY = msmeCreditors.reduce(
+                        const rawMsmePY = msmeCreditors.reduce(
                           (acc, it) => acc + (it.previousYearBalance || 0),
                           0
                         );
                         const totalCY = schedule?.totalAmount || 0;
                         const totalPY = schedule?.previousYearAmount || 0;
-                        const otherTotalCY = Math.max(0, totalCY - msmeTotalCY);
-                        const otherTotalPY = Math.max(0, totalPY - msmeTotalPY);
+
+                        const msmeTotalCY = tpConfig?.msmeAmountCY !== undefined ? tpConfig.msmeAmountCY : rawMsmeCY;
+                        const msmeTotalPY = tpConfig?.msmeAmountPY !== undefined ? tpConfig.msmeAmountPY : rawMsmePY;
+                        const otherTotalCY = tpConfig?.othersAmountCY !== undefined ? tpConfig.othersAmountCY : Math.max(0, totalCY - msmeTotalCY);
+                        const otherTotalPY = tpConfig?.othersAmountPY !== undefined ? tpConfig.othersAmountPY : Math.max(0, totalPY - msmeTotalPY);
+
+                        // Reconciliation check
+                        const classifiedSum = msmeTotalCY + otherTotalCY;
+                        const diffCY = Math.round((classifiedSum - totalCY) * 100) / 100;
+                        const isReconciled = Math.abs(diffCY) < 0.05;
+
+                        // Aging items from tpConfig
+                        const agMsme_lt1 = tpConfig?.agingMsmeLess1Yr !== undefined ? tpConfig.agingMsmeLess1Yr : msmeTotalCY;
+                        const agMsme_12 = tpConfig?.agingMsme1To2Yrs || 0;
+                        const agMsme_23 = tpConfig?.agingMsme2To3Yrs || 0;
+                        const agMsme_m3 = tpConfig?.agingMsmeMore3Yrs || 0;
+                        const agMsme_tot = agMsme_lt1 + agMsme_12 + agMsme_23 + agMsme_m3;
+
+                        const agOth_lt1 = tpConfig?.agingOthersLess1Yr !== undefined ? tpConfig.agingOthersLess1Yr : otherTotalCY;
+                        const agOth_12 = tpConfig?.agingOthers1To2Yrs || 0;
+                        const agOth_23 = tpConfig?.agingOthers2To3Yrs || 0;
+                        const agOth_m3 = tpConfig?.agingOthersMore3Yrs || 0;
+                        const agOth_tot = agOth_lt1 + agOth_12 + agOth_23 + agOth_m3;
+
+                        const agDispMsme_lt1 = tpConfig?.agingDisputedMsmeLess1Yr || 0;
+                        const agDispMsme_12 = tpConfig?.agingDisputedMsme1To2Yrs || 0;
+                        const agDispMsme_23 = tpConfig?.agingDisputedMsme2To3Yrs || 0;
+                        const agDispMsme_m3 = tpConfig?.agingDisputedMsmeMore3Yrs || 0;
+                        const agDispMsme_tot = agDispMsme_lt1 + agDispMsme_12 + agDispMsme_23 + agDispMsme_m3;
+
+                        const agDispOth_lt1 = tpConfig?.agingDisputedOthersLess1Yr || 0;
+                        const agDispOth_12 = tpConfig?.agingDisputedOthers1To2Yrs || 0;
+                        const agDispOth_23 = tpConfig?.agingDisputedOthers2To3Yrs || 0;
+                        const agDispOth_m3 = tpConfig?.agingDisputedOthersMore3Yrs || 0;
+                        const agDispOth_tot = agDispOth_lt1 + agDispOth_12 + agDispOth_23 + agDispOth_m3;
+
+                        const grandAgingCY = agMsme_tot + agOth_tot + agDispMsme_tot + agDispOth_tot;
+                        const agingDiff = Math.round((grandAgingCY - totalCY) * 100) / 100;
+                        const isAgingReconciled = Math.abs(agingDiff) < 0.05;
+
+                        // Sec 22 items
+                        const s22PrincipalCY = tpConfig?.msmeSec22PrincipalCY !== undefined ? tpConfig.msmeSec22PrincipalCY : msmeTotalCY;
+                        const s22InterestCY = tpConfig?.msmeSec22InterestCY || 0;
+                        const s22PrincipalPY = tpConfig?.msmeSec22PrincipalPY !== undefined ? tpConfig.msmeSec22PrincipalPY : msmeTotalPY;
+                        const s22InterestPY = tpConfig?.msmeSec22InterestPY || 0;
+
+                        const s22DelayedCY = tpConfig?.msmeSec22DelayedPaymentsCY || 0;
+                        const s22DelayedPY = tpConfig?.msmeSec22DelayedPaymentsPY || 0;
+                        const s22IntPaidCY = tpConfig?.msmeSec22InterestPaidCY || 0;
+                        const s22IntPaidPY = tpConfig?.msmeSec22InterestPaidPY || 0;
+
+                        const s22IntDueCY = tpConfig?.msmeSec22InterestDueDelayCY || 0;
+                        const s22IntDuePY = tpConfig?.msmeSec22InterestDueDelayPY || 0;
+
+                        const s22IntAccruedCY = tpConfig?.msmeSec22InterestAccruedCY || 0;
+                        const s22IntAccruedPY = tpConfig?.msmeSec22InterestAccruedPY || 0;
+
+                        const s22FurtherIntCY = tpConfig?.msmeSec22FurtherInterestCY || 0;
+                        const s22FurtherIntPY = tpConfig?.msmeSec22FurtherInterestPY || 0;
 
                         return (
                           <div className="mt-4 space-y-4">
+                            {/* Action & Reconciliation Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-xl shadow-xs">
+                              <div className="flex items-center gap-2.5">
+                                <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30">
+                                  <Sliders className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold block">Trade Payables Statutory Disclosures Manager</span>
+                                  <span className="text-[10px] text-slate-300">
+                                    Trial Balance Total: {formatINR(totalCY)} | Classified: {formatINR(classifiedSum)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {isReconciled && isAgingReconciled ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/40">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                    <span>Tally Reconciled</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/40">
+                                    <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                    <span>Diff: ₹{formatINR(Math.abs(diffCY || agingDiff))}</span>
+                                  </span>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => setIsTradePayablesModalOpen(true)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition cursor-pointer"
+                                >
+                                  <Sliders className="w-3.5 h-3.5" />
+                                  <span>Edit MSME &amp; Aging Disclosures</span>
+                                </button>
+                              </div>
+                            </div>
+
                             {/* Sub-classification */}
                             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
-                              <h4 className="font-bold text-slate-900 uppercase tracking-wide pb-1 border-b border-slate-200">
-                                Trade Payables Statutory Sub-Classification (ICAI NCE Format)
-                              </h4>
+                              <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+                                <h4 className="font-bold text-slate-900 uppercase tracking-wide">
+                                  Trade Payables Statutory Sub-Classification (ICAI NCE Format)
+                                </h4>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsTradePayablesModalOpen(true)}
+                                  className="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Sliders className="w-3 h-3" />
+                                  <span>Edit / Reconcile</span>
+                                </button>
+                              </div>
                               <div className="space-y-1.5 text-[11px]">
                                 <div className="flex justify-between py-1 border-b border-slate-100">
                                   <span className="text-slate-700">
@@ -693,7 +804,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                 </div>
                                 <div className="flex justify-between py-1 font-bold bg-emerald-50/70 px-2 rounded">
                                   <span className="text-emerald-950">Total Trade Payables</span>
-                                  <span className="font-mono text-emerald-900">{formatINR(totalCY)}</span>
+                                  <span className="font-mono text-emerald-900">{formatINR(classifiedSum)}</span>
                                 </div>
                               </div>
                             </div>
@@ -719,41 +830,41 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                     <td className="py-2 px-3 font-medium">
                                       (a) Principal amount and interest due thereon remaining unpaid to any supplier as at the end of each accounting year:
                                       <div className="pl-4 text-slate-500 text-[10px] space-y-0.5 mt-0.5">
-                                        <div>- Principal amount: {formatINR(msmeTotalCY)}</div>
-                                        <div>- Interest due thereon: ₹0.00</div>
-                                        <div className="font-semibold text-slate-700">- Total: {formatINR(msmeTotalCY)}</div>
+                                        <div>- Principal amount: {formatINR(s22PrincipalCY)}</div>
+                                        <div>- Interest due thereon: {formatINR(s22InterestCY)}</div>
+                                        <div className="font-semibold text-slate-700">- Total: {formatINR(s22PrincipalCY + s22InterestCY)}</div>
                                       </div>
                                     </td>
-                                    <td className="py-2 px-3 text-right font-mono font-medium align-top pt-2.5">{formatINR(msmeTotalCY)}</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(msmeTotalPY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono font-medium align-top pt-2.5">{formatINR(s22PrincipalCY + s22InterestCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22PrincipalPY + s22InterestPY)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-2 px-3 font-medium">
                                       (b) The amount of interest paid by the buyer in terms of section 16 of the MSMED Act, along with the amount of the payment made to the supplier beyond the appointed day during each accounting year.
                                     </td>
-                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">₹0.00</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntPaidCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22IntPaidPY)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-2 px-3 font-medium">
                                       (c) The amount of interest due and payable for the period of delay in making payment (which have been paid but beyond the appointed day during the year) but without adding the interest specified under the MSMED Act.
                                     </td>
-                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">₹0.00</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntDueCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22IntDuePY)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-2 px-3 font-medium">
                                       (d) The amount of interest accrued and remaining unpaid at the end of each accounting year.
                                     </td>
-                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">₹0.00</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22IntAccruedCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22IntAccruedPY)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-2 px-3 font-medium">
                                       (e) The amount of further interest remaining due and payable even in the succeeding years, until such date when the interest dues above are actually paid to the small enterprise.
                                     </td>
-                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">₹0.00</td>
-                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">{formatINR(s22FurtherIntCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(s22FurtherIntPY)}</td>
                                   </tr>
                                 </tbody>
                               </table>
@@ -761,9 +872,19 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
                             {/* Trade Payables Aging Schedule */}
                             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5 overflow-x-auto">
-                              <h4 className="font-bold text-slate-900 uppercase tracking-wide pb-1 border-b border-slate-200">
-                                Trade Payables Aging Schedule as at {config.reportingPeriod}
-                              </h4>
+                              <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+                                <h4 className="font-bold text-slate-900 uppercase tracking-wide">
+                                  Trade Payables Aging Schedule as at {config.reportingPeriod}
+                                </h4>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsTradePayablesModalOpen(true)}
+                                  className="text-[11px] text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Sliders className="w-3 h-3" />
+                                  <span>Edit Aging Buckets</span>
+                                </button>
+                              </div>
                               <table className="w-full text-left text-[11px] border-collapse">
                                 <thead>
                                   <tr className="bg-slate-200/80 text-slate-800 font-bold">
@@ -778,43 +899,43 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                 <tbody className="divide-y divide-slate-200 text-slate-700">
                                   <tr>
                                     <td className="py-1.5 px-3 font-medium">(i) MSME</td>
-                                    <td className="py-1.5 px-2 text-right font-mono">{formatINR(msmeTotalCY)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-3 text-right font-mono font-bold">{formatINR(msmeTotalCY)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono">{formatINR(agMsme_lt1)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_12)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_23)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agMsme_m3)}</td>
+                                    <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{formatINR(agMsme_tot)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-1.5 px-3 font-medium">(ii) Others</td>
-                                    <td className="py-1.5 px-2 text-right font-mono">{formatINR(otherTotalCY)}</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-3 text-right font-mono font-bold">{formatINR(otherTotalCY)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono">{formatINR(agOth_lt1)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agOth_12)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agOth_23)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agOth_m3)}</td>
+                                    <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{formatINR(agOth_tot)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-1.5 px-3 font-medium">(iii) Disputed dues - MSME</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-3 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_lt1)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_12)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_23)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispMsme_m3)}</td>
+                                    <td className="py-1.5 px-3 text-right font-mono text-slate-400">{formatINR(agDispMsme_tot)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-1.5 px-3 font-medium">(iv) Disputed dues - Others</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
-                                    <td className="py-1.5 px-3 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_lt1)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_12)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_23)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">{formatINR(agDispOth_m3)}</td>
+                                    <td className="py-1.5 px-3 text-right font-mono text-slate-400">{formatINR(agDispOth_tot)}</td>
                                   </tr>
                                   <tr className="bg-slate-100 font-bold text-slate-900">
                                     <td className="py-2 px-3">Total Trade Payables</td>
-                                    <td className="py-2 px-2 text-right font-mono">{formatINR(totalCY)}</td>
-                                    <td className="py-2 px-2 text-right font-mono">₹0.00</td>
-                                    <td className="py-2 px-2 text-right font-mono">₹0.00</td>
-                                    <td className="py-2 px-2 text-right font-mono">₹0.00</td>
-                                    <td className="py-2 px-3 text-right font-mono text-emerald-800">{formatINR(totalCY)}</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_lt1 + agOth_lt1 + agDispMsme_lt1 + agDispOth_lt1)}</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_12 + agOth_12 + agDispMsme_12 + agDispOth_12)}</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_23 + agOth_23 + agDispMsme_23 + agDispOth_23)}</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(agMsme_m3 + agOth_m3 + agDispMsme_m3 + agDispOth_m3)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-emerald-800">{formatINR(grandAgingCY)}</td>
                                   </tr>
                                 </tbody>
                               </table>
@@ -911,6 +1032,15 @@ export const NotesView: React.FC<NotesViewProps> = ({
         onUpdateConfig={onUpdateConfig || (() => {})}
         noteSchedule={noteSchedules[3]}
         profitAndLoss={profitAndLoss}
+      />
+
+      {/* Note 9 Statutory Trade Payables MSME & Aging Manager Modal */}
+      <TradePayablesMsmeModal
+        isOpen={isTradePayablesModalOpen}
+        onClose={() => setIsTradePayablesModalOpen(false)}
+        config={config}
+        onUpdateConfig={onUpdateConfig || (() => {})}
+        noteSchedule={noteSchedules[9]}
       />
     </div>
   );

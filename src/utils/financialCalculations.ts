@@ -1156,32 +1156,47 @@ export function computePeriodTotals(
   // Note 9: Trade payables (with MSME vs Other sub-classification as per ICAI NCE format)
   let tradePayablesMsme = 0;
   let tradePayablesOther = 0;
-  noteSchedules[9]?.items.forEach((it) => {
-    const sub = (it.subCategory || '').toLowerCase();
-    const name = (it.accountName || '').toLowerCase();
-    const isOtherThanMsme =
-      sub.includes('other than micro') ||
-      name.includes('other than micro') ||
-      sub.includes('other creditors') ||
-      name.includes('other creditors') ||
-      sub.includes('(b)');
+  const tpConfig = config.tradePayablesConfig;
+  const isCYPeriod = periodLabel !== 'Previous Period';
 
-    const isMsme = !isOtherThanMsme && (
-      sub.includes('msme') ||
-      name.includes('msme') ||
-      sub.includes('micro') ||
-      name.includes('micro') ||
-      sub.includes('small enterprise') ||
-      sub.includes('(a)')
-    );
+  if (tpConfig && isCYPeriod && (tpConfig.msmeAmountCY !== undefined || tpConfig.othersAmountCY !== undefined)) {
+    tradePayablesMsme = tpConfig.msmeAmountCY || 0;
+    tradePayablesOther = tpConfig.othersAmountCY !== undefined
+      ? tpConfig.othersAmountCY
+      : Math.max(0, (noteSchedules[9]?.totalAmount || 0) - tradePayablesMsme);
+  } else if (tpConfig && !isCYPeriod && (tpConfig.msmeAmountPY !== undefined || tpConfig.othersAmountPY !== undefined)) {
+    tradePayablesMsme = tpConfig.msmeAmountPY || 0;
+    tradePayablesOther = tpConfig.othersAmountPY !== undefined
+      ? tpConfig.othersAmountPY
+      : Math.max(0, (noteSchedules[9]?.totalAmount || 0) - tradePayablesMsme);
+  } else {
+    noteSchedules[9]?.items.forEach((it) => {
+      const sub = (it.subCategory || '').toLowerCase();
+      const name = (it.accountName || '').toLowerCase();
+      const isOtherThanMsme =
+        sub.includes('other than micro') ||
+        name.includes('other than micro') ||
+        sub.includes('other creditors') ||
+        name.includes('other creditors') ||
+        sub.includes('(b)');
 
-    const bal = it.displayBalance !== undefined ? it.displayBalance : it.netBalance;
-    if (isMsme) {
-      tradePayablesMsme += bal;
-    } else {
-      tradePayablesOther += bal;
-    }
-  });
+      const isMsme = !isOtherThanMsme && (
+        sub.includes('msme') ||
+        name.includes('msme') ||
+        sub.includes('micro') ||
+        name.includes('micro') ||
+        sub.includes('small enterprise') ||
+        sub.includes('(a)')
+      );
+
+      const bal = it.displayBalance !== undefined ? it.displayBalance : it.netBalance;
+      if (isMsme) {
+        tradePayablesMsme += bal;
+      } else {
+        tradePayablesOther += bal;
+      }
+    });
+  }
   const tradePayables = noteSchedules[9]?.totalAmount ?? (tradePayablesMsme + tradePayablesOther);
   if (tradePayablesMsme === 0 && tradePayablesOther === 0 && tradePayables > 0) {
     tradePayablesOther = tradePayables;

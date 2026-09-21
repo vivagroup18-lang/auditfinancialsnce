@@ -310,6 +310,60 @@ export interface YearEndAdjustments {
   customAdjustments?: CustomAdjustmentEntry[];
 }
 
+export interface TradePayablesMsmeConfig {
+  // Statutory Sub-classification (CY & PY)
+  msmeAmountCY?: number;
+  msmeAmountPY?: number;
+  othersAmountCY?: number;
+  othersAmountPY?: number;
+
+  // MSMED Act Section 22 Disclosures (CY & PY)
+  // Clause (a): Principal & Interest
+  msmeSec22PrincipalCY?: number;
+  msmeSec22PrincipalPY?: number;
+  msmeSec22InterestCY?: number;
+  msmeSec22InterestPY?: number;
+
+  // Clause (b): Delayed payments & Interest paid under Sec 16
+  msmeSec22DelayedPaymentsCY?: number;
+  msmeSec22DelayedPaymentsPY?: number;
+  msmeSec22InterestPaidCY?: number;
+  msmeSec22InterestPaidPY?: number;
+
+  // Clause (c): Interest due and payable for delay without MSMED interest
+  msmeSec22InterestDueDelayCY?: number;
+  msmeSec22InterestDueDelayPY?: number;
+
+  // Clause (d): Interest accrued and remaining unpaid
+  msmeSec22InterestAccruedCY?: number;
+  msmeSec22InterestAccruedPY?: number;
+
+  // Clause (e): Further interest remaining due in succeeding years
+  msmeSec22FurtherInterestCY?: number;
+  msmeSec22FurtherInterestPY?: number;
+
+  // Trade Payables Aging Schedule (CY)
+  agingMsmeLess1Yr?: number;
+  agingMsme1To2Yrs?: number;
+  agingMsme2To3Yrs?: number;
+  agingMsmeMore3Yrs?: number;
+
+  agingOthersLess1Yr?: number;
+  agingOthers1To2Yrs?: number;
+  agingOthers2To3Yrs?: number;
+  agingOthersMore3Yrs?: number;
+
+  agingDisputedMsmeLess1Yr?: number;
+  agingDisputedMsme1To2Yrs?: number;
+  agingDisputedMsme2To3Yrs?: number;
+  agingDisputedMsmeMore3Yrs?: number;
+
+  agingDisputedOthersLess1Yr?: number;
+  agingDisputedOthers1To2Yrs?: number;
+  agingDisputedOthers2To3Yrs?: number;
+  agingDisputedOthersMore3Yrs?: number;
+}
+
 export interface EntityConfig {
   entityName: string;
   entityType: 'Partnership Firm' | 'Sole Proprietorship' | 'LLP' | 'AOP/BOI';
@@ -335,6 +389,7 @@ export interface EntityConfig {
   yearEndAdjustments?: YearEndAdjustments;
   partnerCapitalSchedule?: PartnerCapitalRecord[];
   pyPartnerCapitalSchedule?: PartnerCapitalRecord[];
+  tradePayablesConfig?: TradePayablesMsmeConfig;
   partners?: Array<{
     name: string;
     profitSharePercent?: number;
