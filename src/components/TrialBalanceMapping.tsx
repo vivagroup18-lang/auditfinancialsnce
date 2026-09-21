@@ -500,7 +500,7 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                 type="file"
                 ref={pyFileInputRef}
                 className="hidden"
-                accept=".xlsx,.xls,.csv,.txt"
+                accept=".xlsx,.xls,.csv,.pdf,.txt"
                 onChange={(e) => {
                   if (e.target.files && e.target.files[0] && onUploadPYTB) {
                     onUploadPYTB(e.target.files[0]);
@@ -509,7 +509,7 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
               />
               <FileSpreadsheet className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
               <p className="text-xs font-semibold text-slate-800">
-                Click to browse or drag &amp; drop Previous Year TB (.xlsx, .csv)
+                Click to browse or drag &amp; drop Previous Year TB (.xlsx, .pdf, .csv)
               </p>
               <p className="text-[11px] text-slate-500 mt-1">
                 Tally, Busy, SAP, Marg, or custom CA Trial Balance format
@@ -705,7 +705,7 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                   type="file"
                   ref={pyFileInputRef}
                   className="hidden"
-                  accept=".xlsx,.xls,.csv,.txt"
+                  accept=".xlsx,.xls,.csv,.pdf,.txt"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0] && onUploadPYTB) {
                       onUploadPYTB(e.target.files[0]);

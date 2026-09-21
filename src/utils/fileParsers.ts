@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist';
 import {
   TrialBalanceRow,
   UploadedFinancialLineItem,
@@ -8,6 +9,308 @@ import {
   PartnerCapitalRecord,
 } from '../types';
 import { generateAttractiveExcelReport } from './excelExporter';
+
+// Configure pdfjs worker for browser/client-side execution
+if (typeof window !== 'undefined') {
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
+  } catch {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '4.10.38'}/build/pdf.worker.min.mjs`;
+  }
+}
+
+export const KNOWN_TALLY_GROUP_NAMES = new Set([
+  'capital account', 'capital accounts',
+  'loans (liability)', 'loans (liabilities)', 'loan (liability)', 'loans liability',
+  'secured loans', 'unsecured loans',
+  'current liabilities',
+  'sundry creditors',
+  'duties & taxes', 'duties and taxes',
+  'provisions',
+  'fixed assets',
+  'investments',
+  'current assets',
+  'sundry debtors',
+  'stock-in-hand', 'opening stock',
+  'bank accounts',
+  'cash-in-hand',
+  'loans & advances (asset)', 'loans and advances (asset)', 'deposits (asset)',
+  'sales accounts', // NOTE: Plural is the Tally group; singular 'sales account' is the ledger
+  'purchase accounts', // NOTE: Plural is the Tally group; singular 'purchase account' is the ledger
+  'direct incomes', 'direct income',
+  'direct expenses', 'direct expense',
+  'indirect incomes', 'indirect income',
+  'indirect expenses', 'indirect expense',
+  'branch / divisions',
+  'misc. expenses (asset)',
+  'suspense account', 'suspense a/c'
+]);
+
+export const isPotentialGroup = (name: string): boolean => {
+  const lower = name.toLowerCase().trim();
+  if (KNOWN_TALLY_GROUP_NAMES.has(lower)) return true;
+  if (
+    lower.endsWith(' accounts') ||
+    lower.endsWith(' liabilities') ||
+    lower.endsWith(' assets') ||
+    lower.endsWith(' expenses') ||
+    lower.endsWith(' incomes')
+  ) {
+    if (!lower.endsWith(' account')) return true;
+  }
+  return false;
+};
+
+export function parseNumStrict(val: any): number {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (!val) return 0;
+  const str = String(val).trim();
+  // If string contains words with 3 or more letters (e.g. "Apr", "Mar", "Clinic", "Particulars"), it is text, not a balance
+  if (/[a-zA-Z]{3,}/.test(str)) return 0;
+  // Clean currency symbols, commas, spaces
+  let clean = str.replace(/,/g, '').replace(/[₹$]/g, '').trim();
+  let isNegative = false;
+  if (clean.startsWith('(') && clean.endsWith(')')) {
+    isNegative = true;
+    clean = clean.slice(1, -1).trim();
+  }
+  // Strip trailing or leading Dr / Cr / Debit / Credit indicators
+  clean = clean.replace(/\s*(dr|cr|debit|credit)\.?$/i, '').trim();
+  clean = clean.replace(/^(dr|cr|debit|credit)\.?\s*/i, '').trim();
+  if (/^[-+]?\d+(\.\d+)?$/.test(clean)) {
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : (isNegative ? -Math.abs(num) : num);
+  }
+  return 0;
+}
+
+export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Promise<TrialBalanceRow[]> {
+  const uint8 = data instanceof Uint8Array ? data : new Uint8Array(data);
+  const loadingTask = pdfjsLib.getDocument({ data: uint8 });
+  const doc = await loadingTask.promise;
+
+  let drColThreshold = 310;
+  let fileGrandTotalDr = 0;
+  let fileGrandTotalCr = 0;
+
+  interface RawPdfLine {
+    page: number;
+    y: number;
+    name: string;
+    indentX: number;
+    debit: number;
+    credit: number;
+  }
+
+  const rawLines: RawPdfLine[] = [];
+
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items as any[];
+    const rowMap = new Map<number, { x: number; text: string }[]>();
+
+    for (const it of items) {
+      const text = (it.str || '').trim();
+      if (!text) continue;
+      const x = Math.round(it.transform[4] * 10) / 10;
+      const y = Math.round(it.transform[5] * 10) / 10;
+
+      let matchedY: number | null = null;
+      for (const existingY of rowMap.keys()) {
+        if (Math.abs(existingY - y) <= 4) {
+          matchedY = existingY;
+          break;
+        }
+      }
+
+      if (matchedY !== null) {
+        rowMap.get(matchedY)!.push({ x, text });
+      } else {
+        rowMap.set(y, [{ x, text }]);
+      }
+    }
+
+    const sortedYs = Array.from(rowMap.keys()).sort((a, b) => b - a);
+
+    for (const y of sortedYs) {
+      const lineItems = rowMap.get(y)!.sort((a, b) => a.x - b.x);
+      const fullText = lineItems.map((it) => it.text).join(' ').trim();
+      const lowerText = fullText.toLowerCase();
+
+      // Check header row for Debit and Credit column anchors
+      const debitItem = lineItems.find((it) => {
+        const t = it.text.toLowerCase().trim();
+        return t === 'debit' || t === 'dr' || t === 'dr.' || t === 'debit amount' || t === 'closing debit';
+      });
+      const creditItem = lineItems.find((it) => {
+        const t = it.text.toLowerCase().trim();
+        return t === 'credit' || t === 'cr' || t === 'cr.' || t === 'credit amount' || t === 'closing credit';
+      });
+      if (debitItem && creditItem) {
+        drColThreshold = (debitItem.x + creditItem.x) / 2;
+        continue;
+      }
+
+      // Check Grand Total row
+      if (lowerText.startsWith('grand total') || lowerText === 'total' || lowerText === 'total:') {
+        const numItems = lineItems.filter((it) => {
+          const clean = it.text.replace(/,/g, '').trim();
+          return /^[-+]?\d+(\.\d+)?$/.test(clean);
+        });
+        if (numItems.length >= 2) {
+          fileGrandTotalDr = parseFloat(numItems[0].text.replace(/,/g, '')) || 0;
+          fileGrandTotalCr = parseFloat(numItems[1].text.replace(/,/g, '')) || 0;
+        }
+        continue;
+      }
+
+      // Metadata / non-financial rows
+      const isMeta =
+        lowerText.includes('trial balance') ||
+        lowerText.includes('particulars') ||
+        lowerText.includes('closing balance') ||
+        lowerText.includes('opening balance') ||
+        lowerText.includes('page ') ||
+        lowerText.includes('dr.gajanan') ||
+        lowerText.includes('clinic') ||
+        lowerText.includes('hospital') ||
+        /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z-]*[\s\-\/]*\d{2,4}.*\bto\b/i.test(fullText) ||
+        /^\d{1,2}[-\/]\w{3,}[-\/]\d{2,4}\s+to\s+\d{1,2}[-\/]\w{3,}[-\/]\d{2,4}/i.test(fullText) ||
+        fullText.startsWith('1-Apr-') ||
+        lowerText.includes('for the period') ||
+        lowerText.includes('for the year');
+
+      if (isMeta) continue;
+
+      // Extract account name (text items before number columns)
+      const nameItems = lineItems.filter((it) => it.x < Math.min(drColThreshold - 30, 240));
+      if (nameItems.length === 0) continue;
+
+      const name = nameItems.map((it) => it.text).join(' ').trim();
+      const indentX = nameItems[0].x;
+
+      let dr = 0;
+      let cr = 0;
+
+      const numItems = lineItems.filter((it) => {
+        if (it.x < Math.min(drColThreshold - 30, 240)) return false;
+        const clean = it.text.replace(/,/g, '').trim();
+        return /^[-+]?\d+(\.\d+)?$/.test(clean);
+      });
+
+      for (const numIt of numItems) {
+        const val = parseFloat(numIt.text.replace(/,/g, '')) || 0;
+        if (numIt.x < drColThreshold) {
+          dr = val;
+        } else {
+          cr = val;
+        }
+      }
+
+      if (dr > 0 || cr > 0) {
+        rawLines.push({
+          page: p,
+          y,
+          name,
+          indentX,
+          debit: dr,
+          credit: cr,
+        });
+      }
+    }
+  }
+
+  // Pass 2: Parent Group Filtering
+  const excludedGroupIndices = new Set<number>();
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    const lower = line.name.toLowerCase().trim();
+
+    // Check Proof 1: immediate duplicate next line
+    if (i + 1 < rawLines.length) {
+      const next = rawLines[i + 1];
+      if (
+        Math.abs(line.debit - next.debit) < 0.01 &&
+        Math.abs(line.credit - next.credit) < 0.01 &&
+        (KNOWN_TALLY_GROUP_NAMES.has(lower) || line.indentX < next.indentX)
+      ) {
+        excludedGroupIndices.add(i);
+        continue;
+      }
+    }
+
+    // Check Proof 2: subsequent lines summing up to parent
+    let sumDr = 0;
+    let sumCr = 0;
+    let count = 0;
+
+    for (let j = i + 1; j < rawLines.length; j++) {
+      const child = rawLines[j];
+      if (excludedGroupIndices.has(j)) continue;
+
+      sumDr += child.debit;
+      sumCr += child.credit;
+      count++;
+
+      const drMatch = Math.abs(line.debit - sumDr) < 0.05;
+      const crMatch = Math.abs(line.credit - sumCr) < 0.05;
+
+      if (drMatch && crMatch && count >= 1) {
+        excludedGroupIndices.add(i);
+        break;
+      }
+
+      if ((line.debit > 0 && sumDr > line.debit + 0.05) || (line.credit > 0 && sumCr > line.credit + 0.05)) {
+        break;
+      }
+    }
+
+    // Check Proof 3: Top-level indentation rule for known Tally groups
+    if (!excludedGroupIndices.has(i) && line.indentX < 60 && KNOWN_TALLY_GROUP_NAMES.has(lower)) {
+      const hasIndentedChildren = i + 1 < rawLines.length && rawLines[i + 1].indentX > line.indentX + 5;
+      if (hasIndentedChildren) {
+        excludedGroupIndices.add(i);
+      }
+    }
+  }
+
+  let finalLines = rawLines.filter((_, idx) => !excludedGroupIndices.has(idx));
+
+  // Reconcile against Grand Total if stated in file
+  let currentDr = Math.round(finalLines.reduce((s, r) => s + r.debit, 0) * 100) / 100;
+  let currentCr = Math.round(finalLines.reduce((s, r) => s + r.credit, 0) * 100) / 100;
+
+  if (fileGrandTotalDr > 0 && Math.abs(currentDr - fileGrandTotalDr) > 0.05) {
+    for (let i = 0; i < finalLines.length; i++) {
+      const candidate = finalLines[i];
+      if (KNOWN_TALLY_GROUP_NAMES.has(candidate.name.toLowerCase().trim())) {
+        if (Math.abs(currentDr - candidate.debit - fileGrandTotalDr) < 0.05) {
+          finalLines.splice(i, 1);
+          currentDr -= candidate.debit;
+          currentCr -= candidate.credit;
+          break;
+        }
+      }
+    }
+  }
+
+  return finalLines.map((line, idx) => {
+    const net = Math.abs(line.debit - line.credit) || (line.debit > 0 ? line.debit : line.credit);
+    return {
+      id: `tb-pdf-${idx}-${line.page}`,
+      accountName: line.name,
+      closingDebit: line.debit,
+      closingCredit: line.credit,
+      netBalance: net,
+      rawLineIndex: idx,
+    };
+  });
+}
 
 export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBalanceRow[] {
   const workbook = XLSX.read(data, { type: typeof data === 'string' ? 'string' : 'array' });
@@ -21,8 +324,6 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
     throw new Error('The uploaded file is empty or could not be parsed.');
   }
 
-  // Find header row — scan up to 40 rows to handle Indian TB files with many
-  // metadata lines at the top (firm name, address, GSTIN, date range, etc.)
   let headerIndex = -1;
   let colAccountName = -1;
   let colAccountCode = -1;
@@ -30,35 +331,46 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
   let colCredit = -1;
   let colNetBalance = -1;
 
+  // Scan up to 40 rows for header
   for (let r = 0; r < Math.min(rawRows.length, 40); r++) {
     const row = rawRows[r].map((cell: any) => String(cell || '').trim().toLowerCase());
 
-    let accIdx = row.findIndex((c: string) =>
-      c.includes('particular') ||
-      c.includes('account name') ||
-      c.includes('ledger') ||
-      c.includes('head of account') ||
-      c.includes('account description') ||
-      c.includes('account head') ||
-      c.includes('name of account') ||
-      c === 'name' ||
-      c === 'account'
-    );
-
-    // Find all debit and credit column indices in the row
     const drIndices: number[] = [];
     const crIndices: number[] = [];
+
     row.forEach((c: string, idx: number) => {
-      if (c.includes('debit') || c.includes('dr.') || c.includes('dr amount') || c === 'dr' || c === 'debits') {
-        drIndices.push(idx);
-      }
-      if (c.includes('credit') || c.includes('cr.') || c.includes('cr amount') || c === 'cr' || c === 'credits') {
-        crIndices.push(idx);
-      }
+      // Strict regex matching: ensure "Dr.Gajanan Gaude Clinic", "Dr. Ambedkar Road" are not treated as Debit column!
+      const isDebitHeader =
+        (c === 'debit' || c === 'dr' || c === 'dr.' || c === 'debits' ||
+         c === 'dr amount' || c === 'debit amount' || c === 'closing debit' ||
+         c === 'amount (dr)' || c === 'debit balance' ||
+         /^(closing\s+)?(debit|dr\.?|dr\s+amount|debit\s+balance|amount\s*\(dr\))\b/i.test(c)) &&
+        !c.includes('clinic') && !c.includes('hospital') && !c.includes('road') && !c.includes('street');
+
+      const isCreditHeader =
+        (c === 'credit' || c === 'cr' || c === 'cr.' || c === 'credits' ||
+         c === 'cr amount' || c === 'credit amount' || c === 'closing credit' ||
+         c === 'amount (cr)' || c === 'credit balance' ||
+         /^(closing\s+)?(credit|cr\.?|cr\s+amount|credit\s+balance|amount\s*\(cr\))\b/i.test(c));
+
+      if (isDebitHeader) drIndices.push(idx);
+      if (isCreditHeader) crIndices.push(idx);
     });
 
-    // If Dr/Cr found on this row, find particulars on this row or look up to 5 rows above
-    if (drIndices.length > 0 || crIndices.length > 0) {
+    if (drIndices.length > 0 && crIndices.length > 0) {
+      let accIdx = row.findIndex((c: string) =>
+        c.includes('particular') ||
+        c.includes('account name') ||
+        c.includes('ledger') ||
+        c.includes('head of account') ||
+        c.includes('account description') ||
+        c.includes('account head') ||
+        c.includes('name of account') ||
+        c === 'name' ||
+        c === 'account'
+      );
+
+      // If not on this row, look up up to 5 rows above
       if (accIdx === -1) {
         for (let back = 1; back <= Math.min(5, r); back++) {
           const prevRow = rawRows[r - back].map((cell: any) => String(cell || '').trim().toLowerCase());
@@ -81,37 +393,32 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
       headerIndex = r;
       colAccountName = accIdx;
 
-      // Check if any debit index is explicitly labeled "closing" in current row or parent row above
+      // Select closing debit / credit or last debit / credit column
       let chosenDr = drIndices.find((idx) => {
         const text = row[idx];
         const parentText = r > 0 ? String(rawRows[r - 1]?.[idx] || '').toLowerCase() : '';
         return text.includes('closing') || parentText.includes('closing');
       });
-      // If not explicitly labeled, pick the LAST debit column (Closing Dr comes after Opening Dr)
       if (chosenDr === undefined && drIndices.length > 0) {
         chosenDr = drIndices[drIndices.length - 1];
       }
       colDebit = chosenDr !== undefined ? chosenDr : -1;
 
-      // Check if any credit index is explicitly labeled "closing" in current row or parent row above
       let chosenCr = crIndices.find((idx) => {
         const text = row[idx];
         const parentText = r > 0 ? String(rawRows[r - 1]?.[idx] || '').toLowerCase() : '';
         return text.includes('closing') || parentText.includes('closing');
       });
-      // If not explicitly labeled, pick the LAST credit column (Closing Cr comes after Opening Cr)
       if (chosenCr === undefined && crIndices.length > 0) {
         chosenCr = crIndices[crIndices.length - 1];
       }
       colCredit = chosenCr !== undefined ? chosenCr : -1;
 
-      // Check for code column
       colAccountCode = row.findIndex((c: string) =>
         c.includes('code') || c.includes('acc no') || c.includes('gl') ||
         c.includes('a/c no') || c.includes('ledger code') || c.includes('acct no')
       );
 
-      // Check for net balance column
       colNetBalance = row.findIndex((c: string) =>
         c.includes('closing') || c.includes('net balance') ||
         (c.includes('balance') && !c.includes('opening'))
@@ -121,9 +428,8 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
     }
   }
 
-  // Fallback heuristic if standard header words aren't found in first 40 rows
+  // Fallback heuristic if standard header row isn't found
   if (headerIndex === -1) {
-    // Try column 0 as name, column 1 as debit, column 2 as credit
     headerIndex = 0;
     colAccountName = 0;
     colDebit = 1;
@@ -146,15 +452,7 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
     const row = rawRows[r];
     if (!row || row.length === 0) continue;
 
-    const parseNum = (val: any): number => {
-      if (typeof val === 'number') return val;
-      if (!val) return 0;
-      const cleanStr = String(val).replace(/,/g, '').replace(/[₹$]/g, '').trim();
-      const num = parseFloat(cleanStr);
-      return isNaN(num) ? 0 : num;
-    };
-
-    // 1. First extract ledger name - scan primary column & adjacent non-numeric columns if empty
+    // 1. Extract ledger name
     let nameCell = String(row[colAccountName] || '').trim();
     if (!nameCell) {
       for (let c = 0; c < (colDebit !== -1 ? colDebit : row.length); c++) {
@@ -169,14 +467,30 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
     if (!nameCell) continue;
     const lowerName = nameCell.toLowerCase().trim();
 
-    // 2. Extract Debit and Credit balances first
-    let dr = colDebit !== -1 ? parseNum(row[colDebit]) : 0;
-    let cr = colCredit !== -1 ? parseNum(row[colCredit]) : 0;
+    // 2. Filter metadata / date ranges / sheet headers first BEFORE balance checks
+    const isHeaderOrMeta =
+      lowerName.includes('trial balance') ||
+      lowerName.includes('closing balance') ||
+      lowerName.includes('opening balance') ||
+      lowerName.includes('page ') ||
+      lowerName.includes('dr.gajanan') ||
+      lowerName.includes('clinic') ||
+      lowerName.includes('hospital') ||
+      /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z-]*[\s\-\/]*\d{2,4}.*\bto\b/i.test(nameCell) ||
+      /^\d{1,2}[-\/]\w{3,}[-\/]\d{2,4}\s+to\s+\d{1,2}[-\/]\w{3,}[-\/]\d{2,4}/i.test(nameCell) ||
+      nameCell.startsWith('1-Apr-') ||
+      /^\d+$/.test(nameCell);
 
-    // If single balance column exists with Dr/Cr sign
+    if (isHeaderOrMeta) continue;
+
+    // 3. Extract Debit and Credit balances using strict number parsing
+    let dr = colDebit !== -1 ? parseNumStrict(row[colDebit]) : 0;
+    let cr = colCredit !== -1 ? parseNumStrict(row[colCredit]) : 0;
+
+    // If single net balance column with Dr/Cr text
     if (colNetBalance !== -1 && dr === 0 && cr === 0) {
       const netValStr = String(row[colNetBalance] || '').toLowerCase();
-      const num = parseNum(netValStr);
+      const num = parseNumStrict(netValStr);
       if (netValStr.includes('dr') || netValStr.includes('debit')) {
         dr = Math.abs(num);
       } else if (netValStr.includes('cr') || netValStr.includes('credit')) {
@@ -187,23 +501,27 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
       }
     }
 
-    // Fallback: If both colDebit & colCredit were 0, scan remaining numeric cells in row
+    // Column-aware Fallback: If both colDebit & colCredit are 0, check other numeric cells in row
     if (dr === 0 && cr === 0) {
-      const numsInRow: number[] = [];
+      const numsInRow: { colIdx: number; val: number }[] = [];
       row.forEach((cell: any, cIdx: number) => {
         if (cIdx !== colAccountName && cell !== undefined && cell !== null && cell !== '') {
-          const str = String(cell).replace(/,/g, '').trim();
-          if (/^-?\d+(\.\d+)?$/.test(str)) {
-            const n = parseFloat(str);
-            if (n > 0) numsInRow.push(n);
-          }
+          const n = parseNumStrict(cell);
+          if (n > 0) numsInRow.push({ colIdx: cIdx, val: n });
         }
       });
+
       if (numsInRow.length === 1) {
-        dr = numsInRow[0];
+        const single = numsInRow[0];
+        // If the number's column is at or after colCredit, or past colDebit, treat as credit!
+        if (colCredit !== -1 && (single.colIdx === colCredit || (colDebit !== -1 && single.colIdx > colDebit))) {
+          cr = single.val;
+        } else {
+          dr = single.val;
+        }
       } else if (numsInRow.length >= 2) {
-        dr = numsInRow[numsInRow.length - 2];
-        cr = numsInRow[numsInRow.length - 1];
+        dr = numsInRow[numsInRow.length - 2].val;
+        cr = numsInRow[numsInRow.length - 1].val;
       }
     }
 
@@ -225,7 +543,7 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
       continue;
     }
 
-    // Standard column header words (skip even if numeric cells exist, as column totals/index headers)
+    // Standard column header words
     const isStandardHeaderWord =
       lowerName === 'particulars' ||
       lowerName === 'ledger account name' ||
@@ -238,54 +556,10 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
       lowerName === 'dr' || lowerName === 'cr' ||
       lowerName === 'debit' || lowerName === 'credit';
 
-    if (isStandardHeaderWord) {
-      continue;
-    }
+    if (isStandardHeaderWord) continue;
 
     const hasBalance = dr > 0 || cr > 0;
-
-    // Header metadata, date ranges, pin codes, address headers, and sheet titles
-    // Only check these for rows WITHOUT a financial balance (hasBalance === false).
-    if (!hasBalance) {
-      const isHeaderOrMeta =
-        lowerName.includes('trial balance') ||
-        lowerName.includes('closing balance') ||
-        lowerName.includes('opening balance') ||
-        lowerName.includes('debit balance') ||
-        lowerName.includes('credit balance') ||
-        lowerName.includes('page no') ||
-        lowerName.includes('s. no') ||
-        lowerName.includes('sr. no') ||
-        lowerName.includes('sl. no') ||
-        /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z-]*[\s\-\/]*\d{2,4}.*\bto\b/i.test(nameCell) ||
-        /\b\d{6}\b/.test(nameCell) ||
-        /^(no|plot|flat|door|h\.?no|survey|road|street|nagar|marg)[.\s-]+\d/i.test(nameCell) ||
-        /^\d[\d\s,.-]*$/.test(nameCell) ||
-        lowerName.includes('kelkar bag') || lowerName.includes('belgaum') ||
-        lowerName.includes('rainbow offset') ||
-        nameCell.length < 3 ||
-        /^\d+$/.test(nameCell) ||
-        lowerName.includes('offset') ||
-        lowerName.includes('limited') ||
-        lowerName.includes('pvt') ||
-        lowerName.includes('llp') ||
-        lowerName.includes('address') ||
-        lowerName.includes('city') ||
-        lowerName.includes('state') ||
-        lowerName.includes('phone') ||
-        lowerName.includes('email') ||
-        lowerName.includes('gstin') ||
-        lowerName.includes('pan') ||
-        lowerName.includes('date') ||
-        lowerName.includes('period') ||
-        lowerName.includes('firm');
-
-      if (isHeaderOrMeta) {
-        continue;
-      }
-      // If row has no balance and is not header/meta, skip empty group/ledger
-      continue;
-    }
+    if (!hasBalance) continue;
 
     const code = colAccountCode !== -1 ? String(row[colAccountCode] || '').trim() : undefined;
 
@@ -300,46 +574,6 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
   }
 
   // ── PASS 2: Intelligent Parent-Group Reconciliation ──
-  // In Tally and accounting ERPs, trial balances often include top-level parent group summary lines
-  // (e.g. "Capital Account", "Current Liabilities", "Sales Accounts", "Fixed Assets") alongside the actual child ledgers.
-  // CRITICAL RULES:
-  // - Never unconditionally skip names like "Sales Account" or "Purchase Account" (singular), as these are the actual ledgers!
-  // - Only mark a candidate as a parent group if it has child rows beneath it whose balances duplicate or sum to it.
-  // - If an entity only has "Sales Accounts" or "Capital Account" without child ledgers, it must NEVER be discarded.
-
-  const KNOWN_TALLY_GROUP_NAMES = new Set([
-    'capital account', 'capital accounts',
-    'loans (liability)', 'loans (liabilities)', 'loan (liability)',
-    'current liabilities',
-    'fixed assets',
-    'investments',
-    'current assets',
-    'sales accounts', // NOTE: Plural is the Tally group; singular 'sales account' is the ledger
-    'purchase accounts', // NOTE: Plural is the Tally group; singular 'purchase account' is the ledger
-    'direct incomes', 'direct income',
-    'direct expenses', 'direct expense',
-    'indirect incomes', 'indirect income',
-    'indirect expenses', 'indirect expense',
-    'branch / divisions',
-    'misc. expenses (asset)',
-    'suspense account', 'suspense a/c'
-  ]);
-
-  const isPotentialGroup = (name: string): boolean => {
-    if (KNOWN_TALLY_GROUP_NAMES.has(name)) return true;
-    if (
-      name.endsWith(' accounts') ||
-      name.endsWith(' liabilities') ||
-      name.endsWith(' assets') ||
-      name.endsWith(' expenses') ||
-      name.endsWith(' incomes')
-    ) {
-      // Do not treat standard singular ledger names as groups
-      if (!name.endsWith(' account')) return true;
-    }
-    return false;
-  };
-
   const isParentGroup = new Set<number>();
 
   for (let i = 0; i < rawCandidates.length; i++) {
@@ -347,10 +581,6 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
     if (!isPotentialGroup(curr.lowerName)) continue;
 
     // Check Proof 1: Immediate duplicate child with identical non-zero balance
-    // e.g. "Sales Accounts" (Cr 98,66,104) immediately followed by "Sales Account" (Cr 98,66,104)
-    // "Purchase Accounts" (Dr 1,19,60,009.35) immediately followed by "Purchase Account" (Dr 1,19,60,009.35)
-    // "Capital Account" (Cr 46,09,149.06) immediately followed by "Parasharam Patil Capital A/C" (Cr 46,09,149.06)
-    // "Current Liabilities" immediately followed by "Sundry Creditors" with same amounts
     if (i + 1 < rawCandidates.length) {
       const next = rawCandidates[i + 1];
       const drMatch = Math.abs(curr.debit - next.debit) < 0.01;
@@ -362,11 +592,6 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
     }
 
     // Check Proof 2: Consecutive child rows summing up to parent
-    // e.g. "Fixed Assets" = Mobile Phone + Vehicle + Weight Machine
-    // "Current Assets" = Opening Stock + Sundry Debtors + Cash + Bank + GST + Inputs
-    // "Direct Expenses" = Hamali + Loading + Packing
-    // "Indirect Incomes" = Discount Received + Interest Received + Interest on IT Refund + Round Off
-    // "Indirect Expenses" = Audit Fee + Bank Charges + Interest + Discount + Late Fees
     let accDr = 0;
     let accCr = 0;
     let childCount = 0;
@@ -382,12 +607,11 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
       const drMatch = Math.abs(curr.debit - accDr) < 0.05;
       const crMatch = Math.abs(curr.credit - accCr) < 0.05;
 
-      if (drMatch && crMatch && childCount > 1) {
+      if (drMatch && crMatch && childCount >= 1) {
         isParentGroup.add(i);
         break;
       }
 
-      // If sum exceeds parent amount by more than 0.05, stop checking this parent
       if ((curr.debit > 0 && accDr > curr.debit + 0.05) || (curr.credit > 0 && accCr > curr.credit + 0.05)) {
         break;
       }
@@ -395,13 +619,11 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
   }
 
   // Stated Grand Total safety check:
-  // If the file stated a Grand Total and some parent group was missed, or if dropping a group reconciles the total:
   let kept = rawCandidates.filter((_, idx) => !isParentGroup.has(idx));
   let currentDrTotal = kept.reduce((sum, r) => sum + r.debit, 0);
   let currentCrTotal = kept.reduce((sum, r) => sum + r.credit, 0);
 
   if (fileGrandTotalDr > 0 && Math.abs(currentDrTotal - fileGrandTotalDr) > 0.05) {
-    // Check if any remaining candidate that is a known group can be excluded to match fileGrandTotalDr exactly
     for (let i = 0; i < rawCandidates.length; i++) {
       if (!isParentGroup.has(i) && isPotentialGroup(rawCandidates[i].lowerName)) {
         if (Math.abs(currentDrTotal - rawCandidates[i].debit - fileGrandTotalDr) < 0.05) {
@@ -428,6 +650,31 @@ export function parseTrialBalanceExcelOrCsv(data: ArrayBuffer | string): TrialBa
   });
 
   return parsedLedgers;
+}
+
+export async function parseTrialBalanceFile(
+  file: File | { name: string; data: ArrayBuffer | Uint8Array | string }
+): Promise<TrialBalanceRow[]> {
+  const fileName = 'name' in file ? file.name.toLowerCase() : '';
+  const isPdf = fileName.endsWith('.pdf');
+
+  if (isPdf) {
+    let buffer: ArrayBuffer | Uint8Array;
+    if ('arrayBuffer' in file && typeof file.arrayBuffer === 'function') {
+      buffer = await file.arrayBuffer();
+    } else {
+      buffer = (file as any).data;
+    }
+    return parseTrialBalancePdf(buffer);
+  }
+
+  let buffer: ArrayBuffer | string;
+  if ('arrayBuffer' in file && typeof file.arrayBuffer === 'function') {
+    buffer = await file.arrayBuffer();
+  } else {
+    buffer = (file as any).data;
+  }
+  return parseTrialBalanceExcelOrCsv(buffer);
 }
 
 export function parseNCEFormatsFile(data: ArrayBuffer): {

@@ -304,13 +304,13 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
                     Click to browse or drag and drop your Trial Balance here
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    Auto-detects Account Name, Group, Debit, and Credit columns
+                    Supports Excel (.xlsx, .xls), PDF (.pdf), and CSV/TXT (.csv, .txt) with automatic group reconciliation
                   </p>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.xls,.csv,.pdf,.txt"
                   className="hidden"
                   onChange={handleFileSelect}
                 />

@@ -962,7 +962,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                           <div className="text-sm font-semibold text-slate-800">
                             Drag &amp; Drop Current Year Trial Balance here
                           </div>
-                          <div className="text-xs text-slate-500 mt-0.5">or choose a file from your computer</div>
+                          <div className="text-xs text-slate-500 mt-0.5">Supports Excel (.xlsx, .xls), PDF (.pdf), and CSV (.csv, .txt)</div>
                         </div>
                       </div>
                     )}
@@ -972,7 +972,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                     <input
                       ref={cyInputRef}
                       type="file"
-                      accept=".xlsx,.xls,.csv"
+                      accept=".xlsx,.xls,.csv,.pdf,.txt"
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
@@ -1092,7 +1092,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                             Upload Prior Year Trial Balance
                           </div>
                           <div className="text-xs text-slate-500 mt-0.5">
-                            Automatically fills comparative figures across all statutory schedules
+                            Supports Excel, PDF, CSV; automatically fills comparative figures across all statutory schedules
                           </div>
                         </div>
                       </div>
@@ -1103,7 +1103,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                     <input
                       ref={pyInputRef}
                       type="file"
-                      accept=".xlsx,.xls,.csv"
+                      accept=".xlsx,.xls,.csv,.pdf,.txt"
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {

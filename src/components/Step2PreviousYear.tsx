@@ -319,13 +319,13 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
                     Click to browse or drag and drop Previous Year Trial Balance here
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    Supports .xlsx, .xls, .csv with Account Name, Debit, and Credit columns
+                    Supports Excel (.xlsx, .xls), PDF (.pdf), and CSV/TXT (.csv, .txt) with Account Name, Debit, and Credit columns
                   </p>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.xls,.csv,.pdf,.txt"
                   className="hidden"
                   onChange={handleFileSelect}
                 />

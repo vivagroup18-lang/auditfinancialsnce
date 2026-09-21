@@ -47,6 +47,7 @@ import { CREDIT_COSTS } from './data/subscriptionPlans';
 import { mapTrialBalanceLedgers } from './utils/mappingEngine';
 import { computeFinancialStatements } from './utils/financialCalculations';
 import {
+  parseTrialBalanceFile,
   parseTrialBalanceExcelOrCsv,
   parseNCEFormatsFile,
   exportFinancialStatementsToExcel,
@@ -1066,8 +1067,7 @@ export default function App() {
   const handleUploadTB = async (file: File) => {
     try {
       setNotification({ type: 'info', message: `Parsing Current Year TB (${file.name})...` });
-      const arrayBuffer = await file.arrayBuffer();
-      const parsedRows = parseTrialBalanceExcelOrCsv(arrayBuffer);
+      const parsedRows = await parseTrialBalanceFile(file);
 
       if (parsedRows.length === 0) {
         throw new Error('No valid ledger rows found in the uploaded file.');
@@ -1078,7 +1078,7 @@ export default function App() {
 
       // If no company is active yet, create one automatically
       if (!activeCompanyId || companies.length === 0) {
-        const entityName = file.name.replace(/\.(xlsx?|csv)$/i, '').replace(/[-_]/g, ' ').trim() || 'New Entity';
+        const entityName = file.name.replace(/\.(xlsx?|csv|pdf|txt)$/i, '').replace(/[-_]/g, ' ').trim() || 'New Entity';
         const newId = `comp-uploaded-${Date.now()}`;
         const newCfg = { ...config, entityName };
         const newCompany: Company = {
@@ -1125,8 +1125,7 @@ export default function App() {
   const handleUploadPYTB = async (file: File) => {
     try {
       setNotification({ type: 'info', message: `Parsing Previous Year TB (${file.name})...` });
-      const arrayBuffer = await file.arrayBuffer();
-      const parsedRows = parseTrialBalanceExcelOrCsv(arrayBuffer);
+      const parsedRows = await parseTrialBalanceFile(file);
 
       if (parsedRows.length === 0) {
         throw new Error('No valid ledger rows found in the uploaded Previous Year file.');
