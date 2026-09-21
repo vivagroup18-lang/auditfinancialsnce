@@ -196,10 +196,16 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
               <span>Financial Year: <strong className="text-emerald-400">FY {config.financialYear}</strong></span>
               <span>•</span>
               <span>Reporting Date: {config.reportingPeriod || 'March 31, 2025'}</span>
-              {config.auditorName && (
+              {(config.auditorFirmName || config.auditorName) && (
                 <>
                   <span>•</span>
-                  <span>Auditor: {config.auditorName} (M.No: {config.auditorMembershipNo || '-'})</span>
+                  <span>
+                    Auditor: {config.auditorName || 'Chartered Accountant'}
+                    {config.auditorRole ? ` (${config.auditorRole})` : ''}
+                    {config.auditorFirmName ? ` • ${config.auditorFirmName}` : ''}
+                    {config.firmRegistrationNo ? ` (FRN: ${config.firmRegistrationNo})` : ''}
+                    {config.auditorMembershipNo ? ` (M.No: ${config.auditorMembershipNo})` : ''}
+                  </span>
                 </>
               )}
             </div>

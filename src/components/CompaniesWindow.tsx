@@ -71,7 +71,9 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
   const [newPan, setNewPan] = useState('');
   const [newGstin, setNewGstin] = useState('');
+  const [newAuditorFirmName, setNewAuditorFirmName] = useState('');
   const [newAuditorName, setNewAuditorName] = useState('');
+  const [newAuditorRole, setNewAuditorRole] = useState<'Partner' | 'Proprietor'>('Partner');
   const [newMembershipNo, setNewMembershipNo] = useState('');
   const [newFirmRegNo, setNewFirmRegNo] = useState('');
   const [newUdin, setNewUdin] = useState('');
@@ -139,7 +141,9 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       placeOfSigning: newPlaceOfSigning.trim() || undefined,
       dateOfSigning: newDateOfSigning.trim() || undefined,
       proprietorName: newEntityType === 'Sole Proprietorship' ? (newProprietorName.trim() || undefined) : undefined,
+      auditorFirmName: newAuditorFirmName.trim() || undefined,
       auditorName: newAuditorName.trim() || undefined,
+      auditorRole: newAuditorRole || undefined,
       auditorMembershipNo: newMembershipNo.trim() || undefined,
       firmRegistrationNo: newFirmRegNo.trim() || undefined,
       udin: newUdin.trim() || undefined,
@@ -156,7 +160,9 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
     setNewPlaceOfSigning('');
     setNewDateOfSigning('');
     setNewProprietorName('');
+    setNewAuditorFirmName('');
     setNewAuditorName('');
+    setNewAuditorRole('Partner');
     setNewMembershipNo('');
     setNewFirmRegNo('');
     setNewUdin('');
@@ -784,25 +790,78 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block">Auditor Name</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. CA Vishal Sutar"
-                          value={newAuditorName}
-                          onChange={(e) => setNewAuditorName(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
-                        />
+                    {/* Auditor / CA Firm Credentials */}
+                    <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                      <div className="flex items-center gap-1.5 text-slate-700 font-semibold text-[11px]">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Statutory Auditor &amp; CA Firm Credentials</span>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block">CA / Audit Firm Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. M/s Sutar & Associates"
+                            value={newAuditorFirmName}
+                            onChange={(e) => setNewAuditorFirmName(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block">Chartered Accountant Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. CA Vishal Sutar"
+                            value={newAuditorName}
+                            onChange={(e) => setNewAuditorName(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block">Role / Designation</label>
+                          <select
+                            value={newAuditorRole}
+                            onChange={(e) => setNewAuditorRole(e.target.value as 'Partner' | 'Proprietor')}
+                            className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                          >
+                            <option value="Partner">Partner</option>
+                            <option value="Proprietor">Proprietor</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block">Membership No.</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 142536"
+                            value={newMembershipNo}
+                            onChange={(e) => setNewMembershipNo(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block">Firm Reg. No. (FRN)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 109876W"
+                            value={newFirmRegNo}
+                            onChange={(e) => setNewFirmRegNo(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                          />
+                        </div>
+                      </div>
+
                       <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block">Membership No.</label>
+                        <label className="text-[11px] font-semibold text-slate-600 block">UDIN (Unique Document Identification Number)</label>
                         <input
                           type="text"
-                          placeholder="e.g. 142536"
-                          value={newMembershipNo}
-                          onChange={(e) => setNewMembershipNo(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                          placeholder="e.g. 25142536AAAAAA1234 (optional)"
+                          value={newUdin}
+                          onChange={(e) => setNewUdin(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs uppercase"
                         />
                       </div>
                     </div>
@@ -974,6 +1033,87 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                     value={editConfig.dateOfSigning || ''}
                     onChange={(e) => setEditConfig({ ...editConfig, dateOfSigning: e.target.value })}
                     className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Statutory Auditor & CA Firm Details */}
+              <div className="border-t border-slate-200 pt-3 space-y-2.5">
+                <div className="flex items-center gap-1.5 text-slate-800 font-bold text-xs">
+                  <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                  <span>Statutory Auditor &amp; CA Firm Details</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 block">CA / Audit Firm Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. M/s Sutar & Associates"
+                      value={editConfig.auditorFirmName || ''}
+                      onChange={(e) => setEditConfig({ ...editConfig, auditorFirmName: e.target.value })}
+                      className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 block">Chartered Accountant Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CA Vishal Sutar"
+                      value={editConfig.auditorName || ''}
+                      onChange={(e) => setEditConfig({ ...editConfig, auditorName: e.target.value })}
+                      className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 block">Role / Designation</label>
+                    <select
+                      value={editConfig.auditorRole || 'Partner'}
+                      onChange={(e) =>
+                        setEditConfig({
+                          ...editConfig,
+                          auditorRole: e.target.value as 'Partner' | 'Proprietor',
+                        })
+                      }
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium"
+                    >
+                      <option value="Partner">Partner</option>
+                      <option value="Proprietor">Proprietor</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 block">ICAI Membership No.</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 142536"
+                      value={editConfig.auditorMembershipNo || ''}
+                      onChange={(e) => setEditConfig({ ...editConfig, auditorMembershipNo: e.target.value })}
+                      className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 block">Firm Reg. No. (FRN)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 109876W"
+                      value={editConfig.firmRegistrationNo || ''}
+                      onChange={(e) => setEditConfig({ ...editConfig, firmRegistrationNo: e.target.value })}
+                      className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">Unique Document Identification No. (UDIN)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 25142536AAAAAA1234 (optional)"
+                    value={editConfig.udin || ''}
+                    onChange={(e) => setEditConfig({ ...editConfig, udin: e.target.value })}
+                    className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs uppercase"
                   />
                 </div>
               </div>

@@ -382,7 +382,9 @@ export interface EntityConfig {
   dateOfSigning?: string;
   proprietorName?: string;
   currencyUnit?: 'INR' | 'Lakhs' | 'Crores';
+  auditorFirmName?: string;
   auditorName?: string;
+  auditorRole?: 'Partner' | 'Proprietor';
   auditorMembershipNo?: string;
   firmRegistrationNo?: string;
   udin?: string;

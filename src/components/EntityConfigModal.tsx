@@ -249,16 +249,46 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
 
           <div className="border-t border-slate-200 pt-3">
             <h4 className="font-bold text-slate-800 mb-2">Auditor Details & Statutory Credentials</h4>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Auditor / Firm Name</label>
+                <label className="block font-medium text-slate-700 mb-1">CA / Audit Firm Name</label>
+                <input
+                  type="text"
+                  value={formData.auditorFirmName || ''}
+                  onChange={(e) => setFormData({ ...formData, auditorFirmName: e.target.value })}
+                  placeholder="e.g. M/s Sutar & Associates, Chartered Accountants"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Chartered Accountant Name</label>
                 <input
                   type="text"
                   value={formData.auditorName || ''}
                   onChange={(e) => setFormData({ ...formData, auditorName: e.target.value })}
-                  placeholder="CA. Rajesh Sharma"
+                  placeholder="e.g. CA. Vishal Sutar"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Role / Designation</label>
+                <select
+                  value={formData.auditorRole || 'Partner'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      auditorRole: e.target.value as 'Partner' | 'Proprietor',
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white font-medium"
+                >
+                  <option value="Partner">Partner</option>
+                  <option value="Proprietor">Proprietor</option>
+                </select>
               </div>
 
               <div>
@@ -267,34 +297,32 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
                   type="text"
                   value={formData.auditorMembershipNo || ''}
                   onChange={(e) => setFormData({ ...formData, auditorMembershipNo: e.target.value })}
-                  placeholder="098765"
+                  placeholder="e.g. 142536"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Firm Reg. No. (FRN)</label>
+                <input
+                  type="text"
+                  value={formData.firmRegistrationNo || ''}
+                  onChange={(e) => setFormData({ ...formData, firmRegistrationNo: e.target.value })}
+                  placeholder="e.g. 109876W"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Firm Registration No. (FRN)</label>
-                <input
-                  type="text"
-                  value={formData.firmRegistrationNo || ''}
-                  onChange={(e) => setFormData({ ...formData, firmRegistrationNo: e.target.value })}
-                  placeholder="101234W"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Unique Document Identification Number (UDIN)</label>
-                <input
-                  type="text"
-                  value={formData.udin || ''}
-                  onChange={(e) => setFormData({ ...formData, udin: e.target.value })}
-                  placeholder="25098765ABCA1234"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
+            <div className="mt-3">
+              <label className="block font-medium text-slate-700 mb-1">Unique Document Identification Number (UDIN)</label>
+              <input
+                type="text"
+                value={formData.udin || ''}
+                onChange={(e) => setFormData({ ...formData, udin: e.target.value })}
+                placeholder="e.g. 25142536AAAAAA1234 (optional)"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none uppercase"
+              />
             </div>
           </div>
 

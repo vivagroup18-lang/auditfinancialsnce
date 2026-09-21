@@ -75,8 +75,13 @@ export const CA_EMAIL_TEMPLATES: EmailTemplateOption[] = [
     <p>Kindly review the statements and convey your approval or any adjustments so we may finalize the audit sign-off and tax return preparations.</p>
 
     <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
-      <p style="margin: 0 0 4px 0;"><strong>Chartered Accountants</strong></p>
-      <p style="margin: 0;">Sent via CA Financial Automation &amp; Audit Workspace</p>
+      <p style="margin: 0 0 4px 0;"><strong>For ${config.auditorFirmName || config.auditorName || 'Chartered Accountants'}</strong></p>
+      ${config.auditorFirmName ? '<p style="margin: 0 0 2px 0;">Chartered Accountants</p>' : ''}
+      ${config.auditorName ? `<p style="margin: 0 0 2px 0; font-weight: bold; color: #0f172a;">${config.auditorName}${config.auditorRole ? ` (${config.auditorRole})` : ''}</p>` : ''}
+      ${config.auditorMembershipNo ? `<p style="margin: 0 0 2px 0;">Membership No: ${config.auditorMembershipNo}</p>` : ''}
+      ${config.firmRegistrationNo ? `<p style="margin: 0 0 2px 0;">Firm Reg. No (FRN): ${config.firmRegistrationNo}</p>` : ''}
+      ${config.udin ? `<p style="margin: 0 0 2px 0;">UDIN: ${config.udin}</p>` : ''}
+      <p style="margin: 6px 0 0 0; font-size: 11px; color: #94a3b8;">Sent via CA Financial Automation &amp; Audit Workspace</p>
     </div>
   </div>
 </div>

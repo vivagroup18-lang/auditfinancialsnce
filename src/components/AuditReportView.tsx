@@ -339,6 +339,17 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div>
+              <label className="block font-medium text-slate-700 mb-1">CA / Audit Firm Name</label>
+              <input
+                type="text"
+                value={config.auditorFirmName || ''}
+                onChange={(e) => onUpdateConfig({ auditorFirmName: e.target.value })}
+                placeholder="e.g. M/s Sutar & Associates, Chartered Accountants"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
               <label className="block font-medium text-slate-700 mb-1">Chartered Accountant Name</label>
               <input
                 type="text"
@@ -347,6 +358,18 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
                 placeholder="e.g. CA. Rajesh Sharma"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
               />
+            </div>
+
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Role / Designation</label>
+              <select
+                value={config.auditorRole || 'Partner'}
+                onChange={(e) => onUpdateConfig({ auditorRole: e.target.value as 'Partner' | 'Proprietor' })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white font-medium"
+              >
+                <option value="Partner">Partner</option>
+                <option value="Proprietor">Proprietor</option>
+              </select>
             </div>
 
             <div>
@@ -481,12 +504,19 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
               <div>
                 <div>Place: {config.placeOfSigning || 'Mumbai / New Delhi'}</div>
                 <div>Date: {config.dateOfSigning || new Date().toLocaleDateString('en-IN')}</div>
-                <div>UDIN: {generatedUDIN || 'PENDING'}</div>
+                <div>UDIN: {generatedUDIN || config.udin || 'PENDING'}</div>
               </div>
               <div className="text-right">
+                <div className="font-bold text-white text-xs">
+                  For {config.auditorFirmName || config.auditorName || 'Chartered Accountants'}
+                </div>
+                <div className="text-[10px] text-slate-300">Chartered Accountants</div>
+                <div className="text-[10px] text-slate-400">Firm Reg. No: {config.firmRegistrationNo || 'N/A'}</div>
+                <div className="my-1.5 border-b border-slate-700 w-28 ml-auto"></div>
                 <div className="font-bold text-white text-xs">{config.auditorName || 'Chartered Accountant'}</div>
-                <div>Membership No: {config.auditorMembershipNo || 'N/A'}</div>
-                <div>Firm Reg. No: {config.firmRegistrationNo || 'N/A'}</div>
+                <div className="text-[10px] text-slate-300">
+                  {config.auditorRole || 'Partner'} • M. No: {config.auditorMembershipNo || 'N/A'}
+                </div>
               </div>
             </div>
           </div>

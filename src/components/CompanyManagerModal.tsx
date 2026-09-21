@@ -73,7 +73,9 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
     placeOfSigning: '',
     dateOfSigning: '',
     proprietorName: '',
+    auditorFirmName: '',
     auditorName: '',
+    auditorRole: 'Partner',
     auditorMembershipNo: '',
     firmRegistrationNo: '',
     udin: '',
@@ -126,7 +128,9 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
       placeOfSigning: '',
       dateOfSigning: '',
       proprietorName: '',
+      auditorFirmName: '',
       auditorName: '',
+      auditorRole: 'Partner',
       auditorMembershipNo: '',
       firmRegistrationNo: '',
       udin: '',
@@ -294,11 +298,13 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                             PY Ledgers:{' '}
                             <strong className="text-slate-800">{pyCount}</strong>
                           </span>
-                          {company.config.auditorName && (
+                          {(company.config.auditorFirmName || company.config.auditorName) && (
                             <>
                               <span className="text-slate-300">•</span>
-                              <span className="text-slate-500 truncate max-w-[200px]">
-                                Auditor: {company.config.auditorName}
+                              <span className="text-slate-500 truncate max-w-[260px]" title={`${company.config.auditorFirmName ? `${company.config.auditorFirmName} • ` : ''}${company.config.auditorName || ''} (${company.config.auditorRole || 'Partner'})`}>
+                                Auditor: {company.config.auditorName || company.config.auditorFirmName}
+                                {company.config.auditorRole ? ` (${company.config.auditorRole})` : ''}
+                                {company.config.auditorMembershipNo ? ` • M:${company.config.auditorMembershipNo}` : ''}
                               </span>
                             </>
                           )}
@@ -701,54 +707,82 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">Auditor / CA Name</label>
+                    <label className="block font-medium text-slate-700 mb-1">CA / Audit Firm Name</label>
                     <input
                       type="text"
-                      value={newConfig.auditorName}
-                      onChange={(e) => setNewConfig({ ...newConfig, auditorName: e.target.value })}
-                      placeholder="CA. Rajesh Sharma"
+                      value={newConfig.auditorFirmName || ''}
+                      onChange={(e) => setNewConfig({ ...newConfig, auditorFirmName: e.target.value })}
+                      placeholder="e.g. M/s Sutar & Associates, Chartered Accountants"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">Chartered Accountant Name</label>
+                    <input
+                      type="text"
+                      value={newConfig.auditorName || ''}
+                      onChange={(e) => setNewConfig({ ...newConfig, auditorName: e.target.value })}
+                      placeholder="e.g. CA. Vishal Sutar"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">Role / Designation</label>
+                    <select
+                      value={newConfig.auditorRole || 'Partner'}
+                      onChange={(e) =>
+                        setNewConfig({
+                          ...newConfig,
+                          auditorRole: e.target.value as 'Partner' | 'Proprietor',
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white font-medium"
+                    >
+                      <option value="Partner">Partner</option>
+                      <option value="Proprietor">Proprietor</option>
+                    </select>
                   </div>
 
                   <div>
                     <label className="block font-medium text-slate-700 mb-1">ICAI Membership No.</label>
                     <input
                       type="text"
-                      value={newConfig.auditorMembershipNo}
+                      value={newConfig.auditorMembershipNo || ''}
                       onChange={(e) =>
                         setNewConfig({ ...newConfig, auditorMembershipNo: e.target.value })
                       }
-                      placeholder="098765"
+                      placeholder="e.g. 142536"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">Firm Registration No. (FRN)</label>
+                    <label className="block font-medium text-slate-700 mb-1">Firm Reg. No. (FRN)</label>
                     <input
                       type="text"
                       value={newConfig.firmRegistrationNo || ''}
                       onChange={(e) =>
                         setNewConfig({ ...newConfig, firmRegistrationNo: e.target.value })
                       }
-                      placeholder="101234W"
+                      placeholder="e.g. 109876W"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">Unique Document Identification Number (UDIN)</label>
-                    <input
-                      type="text"
-                      value={newConfig.udin || ''}
-                      onChange={(e) => setNewConfig({ ...newConfig, udin: e.target.value })}
-                      placeholder="25098765ABCA1234"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                    />
-                  </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Unique Document Identification Number (UDIN)</label>
+                  <input
+                    type="text"
+                    value={newConfig.udin || ''}
+                    onChange={(e) => setNewConfig({ ...newConfig, udin: e.target.value })}
+                    placeholder="e.g. 25142536AAAAAA1234 (optional)"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none uppercase"
+                  />
                 </div>
               </div>
 
@@ -1005,16 +1039,48 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">Auditor / Firm Name</label>
+                    <label className="block font-medium text-slate-700 mb-1">CA / Audit Firm Name</label>
+                    <input
+                      type="text"
+                      value={editFormData.auditorFirmName || ''}
+                      onChange={(e) =>
+                        setEditFormData({ ...editFormData, auditorFirmName: e.target.value })
+                      }
+                      placeholder="e.g. M/s Sutar & Associates, Chartered Accountants"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">Chartered Accountant Name</label>
                     <input
                       type="text"
                       value={editFormData.auditorName || ''}
                       onChange={(e) =>
                         setEditFormData({ ...editFormData, auditorName: e.target.value })
                       }
-                      placeholder="CA. Rajesh Sharma"
+                      placeholder="e.g. CA. Vishal Sutar"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">Role / Designation</label>
+                    <select
+                      value={editFormData.auditorRole || 'Partner'}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          auditorRole: e.target.value as 'Partner' | 'Proprietor',
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white font-medium"
+                    >
+                      <option value="Partner">Partner</option>
+                      <option value="Proprietor">Proprietor</option>
+                    </select>
                   </div>
 
                   <div>
@@ -1025,36 +1091,34 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                       onChange={(e) =>
                         setEditFormData({ ...editFormData, auditorMembershipNo: e.target.value })
                       }
-                      placeholder="098765"
+                      placeholder="e.g. 142536"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">Firm Registration No. (FRN)</label>
+                    <label className="block font-medium text-slate-700 mb-1">Firm Reg. No. (FRN)</label>
                     <input
                       type="text"
                       value={editFormData.firmRegistrationNo || ''}
                       onChange={(e) =>
                         setEditFormData({ ...editFormData, firmRegistrationNo: e.target.value })
                       }
-                      placeholder="101234W"
+                      placeholder="e.g. 109876W"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">UDIN (Unique Document Identification Number)</label>
-                    <input
-                      type="text"
-                      value={editFormData.udin || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, udin: e.target.value })}
-                      placeholder="25098765ABCA1234"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                    />
-                  </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Unique Document Identification Number (UDIN)</label>
+                  <input
+                    type="text"
+                    value={editFormData.udin || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, udin: e.target.value })}
+                    placeholder="e.g. 25142536AAAAAA1234 (optional)"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none uppercase"
+                  />
                 </div>
               </div>
 
