@@ -256,8 +256,9 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
   // Handle cell edit in schedule
   const handleCellChange = (
     index: number,
-    field: keyof PartnerCapitalRecord,
-    value: string | number
+    field: keyof PartnerCapitalRecord | 'openingNature',
+    value: string | number,
+    natureOverride?: 'Cr' | 'Dr'
   ) => {
     setActiveRows((prev) => {
       const updated = [...prev];
@@ -273,9 +274,28 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
         const num = parseFloat(String(value)) || 0;
         row.remunerationSharePercent = num;
         row.remunerationShareRatio = `${num}%`;
+      } else if (field === 'openingNature') {
+        const newNature = (value as 'Cr' | 'Dr') || 'Cr';
+        row.openingNature = newNature;
+        const currentAbs = Math.abs(row.openingBalance || 0);
+        row.openingBalance = newNature === 'Dr' ? -currentAbs : currentAbs;
+
+        // Recalculate closing balance
+        const open = row.openingBalance;
+        const intro = row.capitalIntroduced || 0;
+        const rem = row.remuneration || 0;
+        const intVal = row.interestOnCapital || 0;
+        const draw = row.withdrawals || 0;
+        const prof = row.shareOfProfit || 0;
+        row.closingBalance =
+          Math.round((open + intro + rem + intVal - draw + prof) * 100) / 100;
       } else {
         const num = parseFloat(String(value)) || 0;
         (row as any)[field] = num;
+
+        if (field === 'openingBalance' && natureOverride) {
+          row.openingNature = natureOverride;
+        }
 
         // Auto-calculate closing balance if one of the components was changed
         if (field !== 'closingBalance') {
@@ -506,12 +526,14 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
       const pClosing = Math.round(dp.capitalBal * 100) / 100;
       const pOpening = Math.round((pClosing - dp.introBal - pRemun + dp.drawingsBal - pProfit) * 100) / 100;
 
+      const effectiveOpening = pOpening;
       return {
         srNo: idx + 1,
         partnerName: dp.name,
         profitSharePercent: psr,
         profitShareRatio: `${psr}%`,
-        openingBalance: pOpening >= 0 ? pOpening : pClosing,
+        openingBalance: effectiveOpening,
+        openingNature: effectiveOpening < 0 ? 'Dr' : 'Cr',
         capitalIntroduced: dp.introBal,
         remuneration: pRemun,
         interestOnCapital: 0,
@@ -541,6 +563,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
       const last = { ...updated[updated.length - 1] };
       last.closingBalance = Math.round((last.closingBalance + variance) * 100) / 100;
       last.openingBalance = Math.round((last.openingBalance + variance) * 100) / 100;
+      last.openingNature = last.openingBalance < 0 ? 'Dr' : 'Cr';
       updated[updated.length - 1] = last;
       return updated;
     });
@@ -721,6 +744,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
         isWorkingPartner: r.isWorkingPartner,
         isDesignatedPartner: r.isDesignatedPartner,
         openingBalance: r.openingBalance,
+        openingNature: r.openingNature || (r.openingBalance < 0 ? 'Dr' : 'Cr'),
         capitalIntroduced: r.capitalIntroduced,
         remuneration: r.remuneration,
         interestOnCapital: r.interestOnCapital,
@@ -1012,7 +1036,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
 
               {/* Editable Table */}
               <div className="overflow-x-auto border border-emerald-300/80 rounded-xl shadow-xs">
-                <table className={`w-full text-left text-[11px] border-collapse ${isProprietor ? 'min-w-[800px]' : 'min-w-[960px]'}`}>
+                <table className={`w-full text-left text-[11px] border-collapse ${isProprietor ? 'min-w-[850px]' : 'min-w-[1020px]'}`}>
                   <thead>
                     <tr className="bg-emerald-900 text-white font-semibold">
                       <th className="py-2.5 px-2 text-center w-10">Sr.</th>
@@ -1023,7 +1047,7 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                           <th className="py-2.5 px-2 text-center w-18" title="Remuneration Sharing Ratio u/s 40(b)">Remun (%)</th>
                         </>
                       )}
-                      <th className="py-2.5 px-2 text-right w-26">As at 1st April (Opening)</th>
+                      <th className="py-2.5 px-2 text-right min-w-[150px]">As at 1st April (Opening)</th>
                       <th className="py-2.5 px-2 text-right w-24">Capital Introduced</th>
                       {!isProprietor && (
                         <th className="py-2.5 px-2 text-right w-24">Remuneration</th>
@@ -1083,13 +1107,47 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                           </>
                         )}
                         <td className="py-1.5 px-1 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={row.openingBalance}
-                            onChange={(e) => handleCellChange(idx, 'openingBalance', e.target.value)}
-                            className="w-full px-2 py-1 text-right bg-white border border-slate-200 rounded font-mono text-xs focus:ring-1 focus:ring-emerald-500"
-                          />
+                          <div className="flex items-center gap-1 min-w-[145px]">
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={Math.abs(row.openingBalance || 0) === 0 ? '' : Math.abs(row.openingBalance || 0)}
+                              onChange={(e) => {
+                                const raw = e.target.value.trim();
+                                const currentNature = row.openingNature || ((row.openingBalance || 0) < 0 ? 'Dr' : 'Cr');
+                                if (raw === '') {
+                                  handleCellChange(idx, 'openingBalance', 0, currentNature);
+                                  return;
+                                }
+                                let isDr = currentNature === 'Dr';
+                                if (raw.startsWith('-')) {
+                                  isDr = true;
+                                }
+                                const val = Math.abs(parseFloat(raw) || 0);
+                                handleCellChange(idx, 'openingBalance', isDr ? -val : val, isDr ? 'Dr' : 'Cr');
+                              }}
+                              className={`w-full px-1.5 py-1 text-right bg-white border rounded font-mono text-xs focus:ring-1 focus:ring-emerald-500 ${
+                                (row.openingNature === 'Dr' || (row.openingBalance || 0) < 0)
+                                  ? 'border-rose-300 text-rose-800'
+                                  : 'border-slate-200 text-slate-900'
+                              }`}
+                              title={(row.openingNature === 'Dr' || (row.openingBalance || 0) < 0) ? 'Debit balance (Overdrawn/Deficit)' : 'Credit balance (Normal Capital)'}
+                            />
+                            <select
+                              value={row.openingNature || ((row.openingBalance || 0) < 0 ? 'Dr' : 'Cr')}
+                              onChange={(e) => handleCellChange(idx, 'openingNature', e.target.value as 'Cr' | 'Dr')}
+                              className={`px-1.5 py-1 rounded text-[11px] font-bold border transition cursor-pointer shrink-0 ${
+                                (row.openingNature === 'Dr' || (row.openingBalance || 0) < 0)
+                                  ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
+                                  : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                              }`}
+                              title="Select Cr (Credit - Normal Capital) or Dr (Debit - Overdrawn/Deficit)"
+                            >
+                              <option value="Cr">Cr</option>
+                              <option value="Dr">Dr</option>
+                            </select>
+                          </div>
                         </td>
                         <td className="py-1.5 px-1 text-right">
                           <input
@@ -1178,7 +1236,9 @@ export const PartnerCapitalModal: React.FC<PartnerCapitalModalProps> = ({
                         </>
                       )}
                       <td className="py-2.5 px-2 text-right font-mono font-bold">
-                        {formatINR(totalOpening)}
+                        <span className={totalOpening < 0 ? 'text-rose-800' : 'text-emerald-950'}>
+                          {formatINR(Math.abs(totalOpening))} {totalOpening < 0 ? 'Dr' : 'Cr'}
+                        </span>
                       </td>
                       <td className="py-2.5 px-2 text-right font-mono font-bold">
                         {formatINR(totalIntroduced)}

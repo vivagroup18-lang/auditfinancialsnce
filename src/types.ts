@@ -98,6 +98,7 @@ export interface PartnerCapitalRecord {
   isWorkingPartner?: boolean;
   isDesignatedPartner?: boolean;
   openingBalance: number;
+  openingNature?: 'Cr' | 'Dr';
   capitalIntroduced: number;
   remuneration: number;
   partnersRemuneration?: number;
@@ -108,6 +109,7 @@ export interface PartnerCapitalRecord {
   shareOfProfitOrLoss?: number;
   closingBalance: number;
   pyOpeningBalance?: number;
+  pyOpeningNature?: 'Cr' | 'Dr';
   pyCapitalIntroduced?: number;
   pyRemuneration?: number;
   pyInterestOnCapital?: number;
@@ -397,6 +399,7 @@ export interface EntityConfig {
     isWorkingPartner?: boolean;
     isDesignatedPartner?: boolean;
     openingBalance?: number;
+    openingNature?: 'Cr' | 'Dr';
     capitalIntroduced?: number;
     remuneration?: number;
     interestOnCapital?: number;

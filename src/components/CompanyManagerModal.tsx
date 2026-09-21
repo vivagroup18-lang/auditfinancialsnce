@@ -757,8 +757,8 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                 <PartnerConfigForm
                   entityType={newConfig.entityType}
                   partners={newConfig.partners || [
-                    { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
-                    { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+                    { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0, openingNature: 'Cr' },
+                    { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0, openingNature: 'Cr' },
                   ]}
                   onChange={(updated) => setNewConfig({ ...newConfig, partners: updated })}
                 />
@@ -1063,8 +1063,8 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                 <PartnerConfigForm
                   entityType={editFormData.entityType}
                   partners={editFormData.partners || [
-                    { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
-                    { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+                    { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0, openingNature: 'Cr' },
+                    { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0, openingNature: 'Cr' },
                   ]}
                   onChange={(updated) => setEditFormData({ ...editFormData, partners: updated })}
                 />

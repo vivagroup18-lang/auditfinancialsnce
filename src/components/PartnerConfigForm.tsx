@@ -1,5 +1,6 @@
 import React from 'react';
 import { Users, Plus, Trash2, CheckCircle2, AlertTriangle, RefreshCw, Percent, ShieldCheck } from 'lucide-react';
+import { formatINR } from '../utils/financialCalculations';
 
 export interface PartnerConfigItem {
   name: string;
@@ -8,6 +9,7 @@ export interface PartnerConfigItem {
   isWorkingPartner?: boolean;
   isDesignatedPartner?: boolean;
   openingBalance?: number;
+  openingNature?: 'Cr' | 'Dr';
 }
 
 interface PartnerConfigFormProps {
@@ -45,6 +47,10 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
   const isPsrValid = Math.abs(totalPsr - 100) < 0.01;
   const isRsrValid = Math.abs(totalRsr - 100) < 0.01;
 
+  const totalOpening = Math.round(
+    partners.reduce((sum, p) => sum + (p.openingBalance || 0), 0) * 100
+  ) / 100;
+
   // Field change
   const handleFieldChange = (
     index: number,
@@ -72,6 +78,7 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
       isWorkingPartner: true,
       isDesignatedPartner: true,
       openingBalance: 0,
+      openingNature: 'Cr',
     };
     onChange([...partners, newPartner]);
   };
@@ -240,19 +247,72 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-0.5">
-                  Opening Capital (₹) <span className="text-slate-400 font-normal">(Optional)</span>
+                <label className="block text-slate-600 font-semibold mb-0.5 flex items-center justify-between">
+                  <span>Opening Capital (₹) <span className="text-slate-400 font-normal">(Optional)</span></span>
+                  <span className="text-[10px] text-slate-400">Dr / Cr</span>
                 </label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="0.00"
-                  value={partner.openingBalance || ''}
-                  onChange={(e) =>
-                    handleFieldChange(idx, 'openingBalance', parseFloat(e.target.value) || 0)
-                  }
-                  className="w-full px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                />
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="0.00"
+                    value={Math.abs(partner.openingBalance || 0) === 0 ? '' : Math.abs(partner.openingBalance || 0)}
+                    onChange={(e) => {
+                      const raw = e.target.value.trim();
+                      const currentNature = partner.openingNature || ((partner.openingBalance || 0) < 0 ? 'Dr' : 'Cr');
+                      if (raw === '') {
+                        const updated = [...partners];
+                        updated[idx] = {
+                          ...updated[idx],
+                          openingBalance: 0,
+                          openingNature: currentNature,
+                        };
+                        onChange(updated);
+                        return;
+                      }
+                      let isDr = currentNature === 'Dr';
+                      if (raw.startsWith('-')) {
+                        isDr = true;
+                      }
+                      const val = Math.abs(parseFloat(raw) || 0);
+                      const updated = [...partners];
+                      updated[idx] = {
+                        ...updated[idx],
+                        openingBalance: isDr ? -val : val,
+                        openingNature: isDr ? 'Dr' : 'Cr',
+                      };
+                      onChange(updated);
+                    }}
+                    className={`flex-1 px-2.5 py-1 rounded-lg bg-slate-50 border text-slate-900 font-mono text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none ${
+                      (partner.openingNature === 'Dr' || (partner.openingBalance || 0) < 0)
+                        ? 'border-rose-300 text-rose-800'
+                        : 'border-slate-200'
+                    }`}
+                  />
+                  <select
+                    value={partner.openingNature || ((partner.openingBalance || 0) < 0 ? 'Dr' : 'Cr')}
+                    onChange={(e) => {
+                      const newNature = e.target.value as 'Cr' | 'Dr';
+                      const currentAbs = Math.abs(partner.openingBalance || 0);
+                      const updated = [...partners];
+                      updated[idx] = {
+                        ...updated[idx],
+                        openingBalance: newNature === 'Dr' ? -currentAbs : currentAbs,
+                        openingNature: newNature,
+                      };
+                      onChange(updated);
+                    }}
+                    className={`px-2 py-1 rounded-lg text-xs font-bold border transition cursor-pointer shrink-0 ${
+                      (partner.openingNature === 'Dr' || (partner.openingBalance || 0) < 0)
+                        ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                    }`}
+                    title="Cr: Normal Credit Capital | Dr: Overdrawn / Debit Capital"
+                  >
+                    <option value="Cr">Cr</option>
+                    <option value="Dr">Dr</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -293,6 +353,18 @@ export const PartnerConfigForm: React.FC<PartnerConfigFormProps> = ({
             <span>Total Remuneration Share: {totalRsr}%</span>
             {!isRsrValid && <span className="font-normal">(Must equal 100%)</span>}
           </div>
+
+          {totalOpening !== 0 && (
+            <div
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold border ${
+                totalOpening >= 0
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : 'bg-rose-50 text-rose-800 border-rose-300'
+              }`}
+            >
+              <span>Total Opening: ₹{formatINR(Math.abs(totalOpening))} {totalOpening < 0 ? 'Dr' : 'Cr'}</span>
+            </div>
+          )}
         </div>
 
         <span className="text-[10px] text-slate-400">

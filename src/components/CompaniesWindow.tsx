@@ -225,11 +225,12 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
             isWorkingPartner: p.isWorkingPartner !== false,
             isDesignatedPartner: p.isDesignatedPartner !== false,
             openingBalance: p.openingBalance || 0,
+            openingNature: ((p.openingNature === 'Dr' || (p.openingBalance || 0) < 0) ? 'Dr' : 'Cr') as 'Cr' | 'Dr',
           }))
         : company.config.entityType === 'Partnership Firm' || company.config.entityType === 'LLP'
         ? [
-            { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
-            { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
+            { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0, openingNature: 'Cr' as const },
+            { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0, openingNature: 'Cr' as const },
           ]
         : [];
 
