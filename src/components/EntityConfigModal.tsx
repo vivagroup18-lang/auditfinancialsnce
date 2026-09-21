@@ -104,6 +104,59 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
             </div>
           </div>
 
+          {/* Proprietor Name for Sole Proprietorship */}
+          {formData.entityType === 'Sole Proprietorship' && (
+            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg">
+              <label className="block font-semibold text-amber-950 mb-1">
+                Name of Proprietor <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.proprietorName || ''}
+                onChange={(e) => setFormData({ ...formData, proprietorName: e.target.value })}
+                placeholder="e.g. Shri Ramesh Kumar / Proprietor Legal Name"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+              <span className="text-[10px] text-amber-800 block mt-0.5">
+                Disclosed on Note 3 (Proprietor's Capital Account), Balance Sheet, and Statutory Sign-off
+              </span>
+            </div>
+          )}
+
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">Registered Office / Principal Place of Business</label>
+            <input
+              type="text"
+              value={formData.registeredAddress || formData.address || ''}
+              onChange={(e) => setFormData({ ...formData, registeredAddress: e.target.value, address: e.target.value })}
+              placeholder="e.g. Shop No. 4, Market Yard, Pune - 411037"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Place of Signing</label>
+              <input
+                type="text"
+                value={formData.placeOfSigning || ''}
+                onChange={(e) => setFormData({ ...formData, placeOfSigning: e.target.value })}
+                placeholder="e.g. Pune / Mumbai"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Date of Signing</label>
+              <input
+                type="text"
+                value={formData.dateOfSigning || ''}
+                onChange={(e) => setFormData({ ...formData, dateOfSigning: e.target.value })}
+                placeholder="e.g. March 31, 2025"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-medium text-slate-700 mb-1">Current Reporting Period Date</label>

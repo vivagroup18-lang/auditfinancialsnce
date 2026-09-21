@@ -75,6 +75,10 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   const [newMembershipNo, setNewMembershipNo] = useState('');
   const [newFirmRegNo, setNewFirmRegNo] = useState('');
   const [newUdin, setNewUdin] = useState('');
+  const [newRegisteredAddress, setNewRegisteredAddress] = useState('');
+  const [newPlaceOfSigning, setNewPlaceOfSigning] = useState('');
+  const [newDateOfSigning, setNewDateOfSigning] = useState('');
+  const [newProprietorName, setNewProprietorName] = useState('');
 
   // Partners configured during Companies Stage
   const [newPartners, setNewPartners] = useState<PartnerConfigItem[]>([
@@ -130,6 +134,11 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       transferProfitTo: newEntityType === 'LLP' ? 'reserves' : 'partners_capital',
       pan: newPan.trim().toUpperCase() || undefined,
       gstin: newGstin.trim().toUpperCase() || undefined,
+      address: newRegisteredAddress.trim() || undefined,
+      registeredAddress: newRegisteredAddress.trim() || undefined,
+      placeOfSigning: newPlaceOfSigning.trim() || undefined,
+      dateOfSigning: newDateOfSigning.trim() || undefined,
+      proprietorName: newEntityType === 'Sole Proprietorship' ? (newProprietorName.trim() || undefined) : undefined,
       auditorName: newAuditorName.trim() || undefined,
       auditorMembershipNo: newMembershipNo.trim() || undefined,
       firmRegistrationNo: newFirmRegNo.trim() || undefined,
@@ -143,6 +152,10 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
     setNewEntityName('');
     setNewPan('');
     setNewGstin('');
+    setNewRegisteredAddress('');
+    setNewPlaceOfSigning('');
+    setNewDateOfSigning('');
+    setNewProprietorName('');
     setNewAuditorName('');
     setNewMembershipNo('');
     setNewFirmRegNo('');
@@ -680,6 +693,25 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                 </div>
               )}
 
+              {/* Name of Proprietor for Sole Proprietorship */}
+              {newEntityType === 'Sole Proprietorship' && (
+                <div className="space-y-1 p-3 rounded-xl bg-amber-50/70 border border-amber-200">
+                  <label className="font-semibold text-amber-950 block text-xs">
+                    Name of Proprietor <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Shri Ramesh Kumar / Proprietor Legal Name"
+                    value={newProprietorName}
+                    onChange={(e) => setNewProprietorName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <span className="text-[10px] text-amber-800 block">
+                    Disclosed in Note 3 (Proprietor's Capital Account), Balance Sheet, and Statutory Sign-off
+                  </span>
+                </div>
+              )}
+
               {/* Toggle Optional Additional Details */}
               <div>
                 <button
@@ -687,11 +719,45 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                   onClick={() => setShowAdditionalDetails((prev) => !prev)}
                   className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1"
                 >
-                  <span>{showAdditionalDetails ? '− Hide' : '+ Optional Details:'} PAN, GSTIN &amp; Auditor</span>
+                  <span>{showAdditionalDetails ? '− Hide' : '+ Additional Details:'} Address, Signing Details, PAN, GSTIN &amp; Auditor</span>
                 </button>
 
                 {showAdditionalDetails && (
                   <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block">Registered Office / Principal Place of Business</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Shop No. 4, Market Yard, Pune - 411037"
+                        value={newRegisteredAddress}
+                        onChange={(e) => setNewRegisteredAddress(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block">Place of Signing</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Pune / Mumbai"
+                          value={newPlaceOfSigning}
+                          onChange={(e) => setNewPlaceOfSigning(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block">Date of Signing</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. March 31, 2025"
+                          value={newDateOfSigning}
+                          onChange={(e) => setNewDateOfSigning(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[11px] font-semibold text-slate-600 block">PAN Number</label>
@@ -854,6 +920,59 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                     value={editConfig.gstin || ''}
                     onChange={(e) => setEditConfig({ ...editConfig, gstin: e.target.value.toUpperCase() })}
                     className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs uppercase"
+                  />
+                </div>
+              </div>
+
+              {/* Name of Proprietor for Sole Proprietorship */}
+              {editConfig.entityType === 'Sole Proprietorship' && (
+                <div className="space-y-1 p-3 rounded-xl bg-amber-50/70 border border-amber-200">
+                  <label className="font-semibold text-amber-950 block text-xs">
+                    Name of Proprietor <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Shri Ramesh Kumar / Proprietor Legal Name"
+                    value={editConfig.proprietorName || ''}
+                    onChange={(e) => setEditConfig({ ...editConfig, proprietorName: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <span className="text-[10px] text-amber-800 block">
+                    Disclosed in Note 3 (Proprietor's Capital Account), Balance Sheet, and Statutory Sign-off
+                  </span>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700 block">Registered Office / Principal Place of Business</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Shop No. 4, Market Yard, Pune - 411037"
+                  value={editConfig.registeredAddress || editConfig.address || ''}
+                  onChange={(e) => setEditConfig({ ...editConfig, registeredAddress: e.target.value, address: e.target.value })}
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">Place of Signing</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Pune / Mumbai"
+                    value={editConfig.placeOfSigning || ''}
+                    onChange={(e) => setEditConfig({ ...editConfig, placeOfSigning: e.target.value })}
+                    className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">Date of Signing</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. March 31, 2025"
+                    value={editConfig.dateOfSigning || ''}
+                    onChange={(e) => setEditConfig({ ...editConfig, dateOfSigning: e.target.value })}
+                    className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
                   />
                 </div>
               </div>

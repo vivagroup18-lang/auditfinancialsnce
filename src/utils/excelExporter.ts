@@ -1,4 +1,7 @@
-import * as XLSX from 'xlsx-js-style';
+import type { WorkSheet, WorkBook } from 'xlsx-js-style';
+import * as XLSXModule from 'xlsx-js-style';
+// Support both Vite browser bundling and Node/tsx execution environments
+const XLSX: any = (XLSXModule as any).default || XLSXModule;
 import JSZip from 'jszip';
 import {
   BalanceSheetData,
@@ -304,7 +307,7 @@ export interface PrintSetupOptions {
  * standard print margins, running headers/footers, freeze panes, and visible gridlines.
  */
 function applyPrintSetup(
-  ws: XLSX.WorkSheet,
+  ws: WorkSheet,
   optionsOrOrientation: 'portrait' | 'landscape' | PrintSetupOptions = 'portrait'
 ) {
   const options: PrintSetupOptions =
@@ -389,9 +392,9 @@ function appendExecutiveHeaderBanner(
   const titleRow: any[] = [];
   for (let c = 0; c < colCount; c++) {
     titleRow.push(
-      textCell(c === 0 ? entityName.toUpperCase() : '', {
+      textCell(c === 0 ? `Name of the Non-Corporate Entity: ${entityName.toUpperCase()}` : '', {
         bold: true,
-        sz: 14,
+        sz: 13,
         color: PALETTE.white,
         bg: PALETTE.navyPrimary,
         align: 'center',
@@ -510,11 +513,18 @@ function appendSignOffBlock(
 
   // Split into Management (Left) and Auditor (Right)
   const halfCol = Math.floor(colCount / 2);
-  const dateStr = new Date().toLocaleDateString('en-IN', {
+  const isProprietor = entityConfig.entityType === 'Sole Proprietorship';
+  const defaultDateStr = new Date().toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   });
+  const effectiveDate = entityConfig.dateOfSigning || defaultDateStr;
+  const effectivePlace = entityConfig.placeOfSigning || 'India';
+
+  const managementSigner = isProprietor
+    ? `Proprietor${entityConfig.proprietorName ? `: ${entityConfig.proprietorName}` : ''}`
+    : 'Partner / Designated Partner / Authorized Signatory';
 
   const blockLines = [
     {
@@ -536,7 +546,7 @@ function appendSignOffBlock(
       hpt: 20,
     },
     {
-      left: '',
+      left: isProprietor && entityConfig.proprietorName ? `Proprietor Legal Name: ${entityConfig.proprietorName}` : '',
       right: `Firm Registration No. (FRN): ${entityConfig.firmRegistrationNo || 'N/A'}`,
       bold: false,
       hpt: 20,
@@ -548,20 +558,20 @@ function appendSignOffBlock(
       hpt: 34, // Designated signature line with vertical space for physical signing & seal
     },
     {
-      left: 'Partner / Proprietor / Authorized Signatory',
+      left: managementSigner,
       right: `Partner / Proprietor (M. No.: ${entityConfig.auditorMembershipNo || 'N/A'})`,
       bold: true,
       hpt: 20,
     },
     {
-      left: `Place: India`,
+      left: `Place: ${effectivePlace}`,
       right: `UDIN: ${entityConfig.udin || 'Applicable at signing'}`,
       bold: false,
       hpt: 20,
     },
     {
-      left: `Date: ${dateStr}`,
-      right: `Date: ${dateStr}`,
+      left: `Date: ${effectiveDate}`,
+      right: `Date: ${effectiveDate}`,
       bold: false,
       hpt: 20,
     },
@@ -600,7 +610,7 @@ export function buildAttractiveExcelWorkbook({
   exceptions,
   rawRows = [],
   mappedLedgers = [],
-}: ExportExcelParams): { wb: XLSX.WorkBook; cleanFileName: string; sheetConfigs: SheetPrintConfig[] } {
+}: ExportExcelParams): { wb: WorkBook; cleanFileName: string; sheetConfigs: SheetPrintConfig[] } {
   const wb = XLSX.utils.book_new();
 
   const entityName = entityConfig.entityName || 'NON-CORPORATE ENTITY';
@@ -1507,14 +1517,32 @@ export function buildAttractiveExcelWorkbook({
     // SPECIAL HANDLING FOR NOTE 1: BRIEF ABOUT THE ENTITY
     // ========================================================
     if (i === 1) {
-      const entityInfoRows = [
-        ['Constitution / Legal Status', entityConfig.entityType || 'Partnership Firm'],
+      const entityInfoRows: Array<[string, string]> = [
+        ['Legal Entity Name', entityConfig.entityName || 'Non-Corporate Entity'],
+        ['Constitution / Legal Form of Business', entityConfig.entityType || 'Partnership Firm'],
+        ['Registered Office / Principal Place of Business', entityConfig.registeredAddress || entityConfig.address || 'India'],
+      ];
+
+      if (isProprietor && entityConfig.proprietorName) {
+        entityInfoRows.push(['Name of Sole Proprietor', entityConfig.proprietorName]);
+      }
+
+      entityInfoRows.push(
         ['Principal Business Activities', entityConfig.natureOfBusiness || 'Commercial Business Operations'],
         ['Permanent Account Number (PAN)', entityConfig.pan || 'N/A'],
-        ['Goods & Services Tax (GSTIN)', entityConfig.gstin || 'N/A'],
-        ['Registered Principal Place of Business', entityConfig.address || 'India'],
-        ['Reporting Currency', 'Indian Rupee (₹) rounded to nearest rupee'],
-      ];
+        ['Goods & Services Tax (GSTIN)', entityConfig.gstin || 'N/A']
+      );
+
+      if (entityConfig.placeOfSigning) {
+        entityInfoRows.push(['Place of Signing / Adoption', entityConfig.placeOfSigning]);
+      }
+      if (entityConfig.dateOfSigning) {
+        entityInfoRows.push(['Date of Signing / Adoption', entityConfig.dateOfSigning]);
+      }
+
+      entityInfoRows.push(
+        ['Reporting Currency', 'Indian Rupee (₹) rounded to nearest rupee']
+      );
 
       entityInfoRows.forEach(([head, val]) => {
         addNotesRow([
@@ -1728,8 +1756,47 @@ export function buildAttractiveExcelWorkbook({
       });
     }
 
-    // Note 9: Statutory MSMED Act, 2006 Delayed Payment Disclosures (Page 8)
+    // Note 9: Statutory MSMED Act, 2006 Delayed Payment Disclosures & Aging Schedule
     if (i === 9) {
+      const msmeCY = (balanceSheet as any).tradePayablesMsme || 0;
+      const msmePY = (balanceSheet.previousYear as any)?.tradePayablesMsme || 0;
+      const otherCY = (balanceSheet as any).tradePayablesOther ?? sched.totalAmount;
+      const otherPY = (balanceSheet.previousYear as any)?.tradePayablesOther ?? (sched.previousYearAmount || 0);
+
+      // 1. Statutory Sub-classification
+      const subClassHdrIdx = notesRows.length;
+      const subClassHdr: any[] = [];
+      for (let c = 0; c < notesColCount; c++) {
+        subClassHdr.push(
+          textCell(c === 0 ? "STATUTORY SUB-CLASSIFICATION OF TRADE PAYABLES (ICAI GUIDANCE NOTE FORMAT)" : '', {
+            bold: true,
+            sz: 9.5,
+            color: PALETTE.navyDark,
+            bg: PALETTE.subSectionBg,
+          })
+        );
+      }
+      addNotesRow(subClassHdr, 22);
+      notesMerges.push({ s: { r: subClassHdrIdx, c: 0 }, e: { r: subClassHdrIdx, c: notesColCount - 1 } });
+
+      const subClassRows = [
+        ['(a)', 'Total outstanding dues of micro, small and medium enterprises (MSME)', 'MSME Creditors', msmeCY, msmePY],
+        ['(b)', 'Total outstanding dues of creditors other than micro, small and medium enterprises', 'Other Creditors', otherCY, otherPY],
+      ];
+
+      subClassRows.forEach(([code, desc, subCat, amtCY, amtPY], idx) => {
+        const bg = idx % 2 === 1 ? PALETTE.zebraOdd : PALETTE.white;
+        addNotesRow([
+          textCell('Note 9', { align: 'center', sz: 9, color: '64748B', bg }),
+          textCell(code as string, { align: 'center', sz: 9.5, bold: true, color: PALETTE.navyAccent, bg }),
+          textCell(desc as string, { bold: true, sz: 9.5, color: '1E293B', bg }),
+          textCell(subCat as string, { sz: 9, color: '64748B', bg }),
+          numCell(amtCY as number, { bg }),
+          numCell(amtPY as number, { bg }),
+        ], 22);
+      });
+
+      // 2. MSMED Act Section 22 Disclosures
       const msmeHeaderIdx = notesRows.length;
       const msmeHdr: any[] = [];
       for (let c = 0; c < notesColCount; c++) {
@@ -1746,24 +1813,134 @@ export function buildAttractiveExcelWorkbook({
       notesMerges.push({ s: { r: msmeHeaderIdx, c: 0 }, e: { r: msmeHeaderIdx, c: notesColCount - 1 } });
 
       const msmeClauses = [
-        ['(a)', 'Principal amount and interest due thereon remaining unpaid to any supplier as at the end of each accounting year:', (balanceSheet as any).tradePayablesMsme || 0],
-        ['(b)', 'Interest paid by the buyer under MSMED Act along with delayed payments made beyond the appointed day during the year:', 0],
-        ['(c)', 'Interest due and payable for the period of delay in making payment beyond the appointed day without adding interest under MSMED Act:', 0],
-        ['(d)', 'Interest accrued and remaining unpaid at the end of each accounting year:', 0],
-        ['(e)', 'Further interest remaining due and payable in the succeeding years until such date when the interest dues are actually paid:', 0],
+        ['(a)', 'Principal amount and interest due thereon remaining unpaid to any supplier as at the end of each accounting year:', msmeCY, msmePY],
+        ['(b)', 'Interest paid by the buyer under MSMED Act along with delayed payments made beyond the appointed day during the year:', 0, 0],
+        ['(c)', 'Interest due and payable for the period of delay in making payment beyond the appointed day without adding interest under MSMED Act:', 0, 0],
+        ['(d)', 'Interest accrued and remaining unpaid at the end of each accounting year:', 0, 0],
+        ['(e)', 'Further interest remaining due and payable in the succeeding years until such date when the interest dues are actually paid:', 0, 0],
       ];
 
-      msmeClauses.forEach(([clause, desc, amt], cIdx) => {
+      msmeClauses.forEach(([clause, desc, amtCY, amtPY], cIdx) => {
         const bg = cIdx % 2 === 1 ? PALETTE.zebraOdd : PALETTE.white;
         addNotesRow([
           textCell('Note 9', { align: 'center', sz: 9, color: '64748B', bg }),
           textCell(clause as string, { align: 'center', sz: 9.5, bold: true, color: PALETTE.navyAccent, bg }),
           textCell(desc as string, { sz: 9.5, color: '1E293B', bg }),
-          textCell(desc.length > 30 ? 'MSMED Clause' : 'MSME Due', { sz: 9, color: '64748B', bg }),
-          numCell(amt as number, { bg }),
-          textCell('-', { align: 'right', sz: 9.5, color: '94A3B8', bg }),
+          textCell('MSMED Section 22', { sz: 9, color: '64748B', bg }),
+          numCell(amtCY as number, { bg }),
+          numCell(amtPY as number, { bg }),
         ], 22);
       });
+
+      // 3. Trade Payables Aging Schedule
+      const agingHdrIdx = notesRows.length;
+      const agingHdr: any[] = [];
+      for (let c = 0; c < notesColCount; c++) {
+        agingHdr.push(
+          textCell(c === 0 ? `TRADE PAYABLES AGING SCHEDULE AS AT ${currentPeriod.toUpperCase()} (OUTSTANDING FROM DUE DATE)` : '', {
+            bold: true,
+            sz: 9.5,
+            color: PALETTE.navyDark,
+            bg: PALETTE.subSectionBg,
+          })
+        );
+      }
+      addNotesRow(agingHdr, 22);
+      notesMerges.push({ s: { r: agingHdrIdx, c: 0 }, e: { r: agingHdrIdx, c: notesColCount - 1 } });
+
+      addNotesRow([
+        thCell('Note 9', 'center', PALETTE.navyPrimary),
+        thCell('Particulars', 'left', PALETTE.navyPrimary),
+        thCell('Less than 1 yr (₹)', 'right', PALETTE.navyPrimary),
+        thCell('1 - 2 Years (₹)', 'right', PALETTE.navyPrimary),
+        thCell('2 - 3 Yrs / > 3 Yrs (₹)', 'right', PALETTE.navyPrimary),
+        thCell('Total (₹)', 'right', PALETTE.navyPrimary),
+      ], 24);
+
+      const agingRows = [
+        ['(i) MSME', msmeCY, 0, 0, msmeCY],
+        ['(ii) Others', otherCY, 0, 0, otherCY],
+        ['(iii) Disputed dues - MSME', 0, 0, 0, 0],
+        ['(iv) Disputed dues - Others', 0, 0, 0, 0],
+      ];
+
+      agingRows.forEach(([title, lt1, y12, y23, tot], aIdx) => {
+        const bg = aIdx % 2 === 1 ? PALETTE.zebraOdd : PALETTE.white;
+        addNotesRow([
+          textCell('Aging', { align: 'center', sz: 9, color: '64748B', bg }),
+          textCell(title as string, { bold: true, sz: 9.5, bg }),
+          numCell(lt1 as number, { bg }),
+          numCell(y12 as number, { bg }),
+          numCell(y23 as number, { bg }),
+          numCell(tot as number, { bold: true, bg }),
+        ], 20);
+      });
+
+      addNotesRow([
+        textCell('', { bg: PALETTE.grandTotalBg }),
+        textCell('Total Trade Payables Aging', { bold: true, sz: 10, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
+        numCell(sched.totalAmount, { isGrandTotal: true }),
+        numCell(0, { isGrandTotal: true }),
+        numCell(0, { isGrandTotal: true }),
+        numCell(sched.totalAmount, { isGrandTotal: true }),
+      ], 22);
+    }
+
+    // Note 16: Trade Receivables Aging Schedule
+    if (i === 16) {
+      const agingRecHdrIdx = notesRows.length;
+      const agingRecHdr: any[] = [];
+      for (let c = 0; c < notesColCount; c++) {
+        agingRecHdr.push(
+          textCell(c === 0 ? `TRADE RECEIVABLES AGING SCHEDULE AS AT ${currentPeriod.toUpperCase()} (OUTSTANDING FROM DUE DATE)` : '', {
+            bold: true,
+            sz: 9.5,
+            color: PALETTE.navyDark,
+            bg: PALETTE.subSectionBg,
+          })
+        );
+      }
+      addNotesRow(agingRecHdr, 22);
+      notesMerges.push({ s: { r: agingRecHdrIdx, c: 0 }, e: { r: agingRecHdrIdx, c: notesColCount - 1 } });
+
+      addNotesRow([
+        thCell('Note 16', 'center', PALETTE.navyPrimary),
+        thCell('Particulars', 'left', PALETTE.navyPrimary),
+        thCell('Less than 6 mos (₹)', 'right', PALETTE.navyPrimary),
+        thCell('6 mos - 1 yr (₹)', 'right', PALETTE.navyPrimary),
+        thCell('1 - 2 Yrs / > 2 Yrs (₹)', 'right', PALETTE.navyPrimary),
+        thCell('Total (₹)', 'right', PALETTE.navyPrimary),
+      ], 24);
+
+      const recAgingRows = [
+        ['(i) Undisputed - considered good', sched.totalAmount, 0, 0, sched.totalAmount],
+        ['(ii) Undisputed - significant credit risk', 0, 0, 0, 0],
+        ['(iii) Undisputed - credit impaired', 0, 0, 0, 0],
+        ['(iv) Disputed - considered good', 0, 0, 0, 0],
+        ['(v) Disputed - significant credit risk', 0, 0, 0, 0],
+        ['(vi) Disputed - credit impaired', 0, 0, 0, 0],
+      ];
+
+      recAgingRows.forEach(([title, lt6m, m61, y12, tot], rIdx) => {
+        const bg = rIdx % 2 === 1 ? PALETTE.zebraOdd : PALETTE.white;
+        addNotesRow([
+          textCell('Aging', { align: 'center', sz: 9, color: '64748B', bg }),
+          textCell(title as string, { bold: true, sz: 9.5, bg }),
+          numCell(lt6m as number, { bg }),
+          numCell(m61 as number, { bg }),
+          numCell(y12 as number, { bg }),
+          numCell(tot as number, { bold: true, bg }),
+        ], 20);
+      });
+
+      addNotesRow([
+        textCell('', { bg: PALETTE.grandTotalBg }),
+        textCell('Total Trade Receivables Aging', { bold: true, sz: 10, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
+        numCell(sched.totalAmount, { isGrandTotal: true }),
+        numCell(0, { isGrandTotal: true }),
+        numCell(0, { isGrandTotal: true }),
+        numCell(sched.totalAmount, { isGrandTotal: true }),
+      ], 22);
     }
 
     // Spacer
@@ -1894,11 +2071,11 @@ export function buildAttractiveExcelWorkbook({
   XLSX.utils.book_append_sheet(wb, wsMasterNotes, 'Notes 1 to 25');
 
   // ==========================================
-  // SHEET: PARTNERS' / OWNERS' CAPITAL ACCOUNT (NOTE 3 - 8 OR 11-COLUMN SCHEDULE)
+  // SHEET: PARTNERS' / OWNERS' CAPITAL ACCOUNT (NOTE 3 - 8 OR 10-COLUMN STATUTORY SCHEDULE)
   // ==========================================
   const capRows: any[][] = [];
   const capRowHeights: Array<{ hpt?: number; hidden?: boolean }> = [];
-  const capColCount = isProprietor ? 8 : 11;
+  const capColCount = isProprietor ? 8 : 10;
   const capitalSheetName = isProprietor ? 'Proprietor Capital (Note 3)' : 'Partner Capital (Note 3)';
   const capitalReportTitle = isProprietor ? "PROPRIETOR'S CAPITAL ACCOUNT" : "PARTNERS' CAPITAL ACCOUNT";
 
@@ -1929,14 +2106,13 @@ export function buildAttractiveExcelWorkbook({
     capRows.push([
       thCell('Sr. No.', 'center', PALETTE.navyPrimary),
       thCell('Name of Partner / Owner', 'left', PALETTE.navyPrimary),
-      thCell('Profit Sharing Ratio (%)', 'center', PALETTE.navyPrimary),
-      thCell('Remuneration Share (%)', 'center', PALETTE.navyPrimary),
+      thCell('Share of profit/\n(loss) (%)', 'center', PALETTE.navyPrimary),
       thCell(`Opening Balance\nas on 01.04.${fyCY.substring(0, 4)} (₹)`, 'right', PALETTE.navyPrimary),
       thCell('Capital Introduced\nduring the year (₹)', 'right', PALETTE.navyPrimary),
-      thCell("Partners' Remuneration\n(Sec 40(b)) (₹)", 'right', PALETTE.navyPrimary),
-      thCell('Interest on Capital\nduring the year (₹)', 'right', PALETTE.navyPrimary),
-      thCell('Drawings /\nWithdrawals (₹)', 'right', PALETTE.navyPrimary),
-      thCell('Share of Profit /\n(Loss) for the year (₹)', 'right', PALETTE.navyPrimary),
+      thCell("Remuneration\nfor the year (₹)", 'right', PALETTE.navyPrimary),
+      thCell('Interest for\nthe year (₹)', 'right', PALETTE.navyPrimary),
+      thCell('Withdrawals\nduring the year (₹)', 'right', PALETTE.navyPrimary),
+      thCell('Share of Profit /\nLoss for the year (₹)', 'right', PALETTE.navyPrimary),
       thCell(`Closing Balance\nas on ${currentPeriod} (₹)`, 'right', PALETTE.navyPrimary),
     ]);
   }
@@ -1956,7 +2132,6 @@ export function buildAttractiveExcelWorkbook({
   if (pList.length > 0) {
     pList.forEach((p, idx) => {
       const psrText = p.profitSharePercent ? `${p.profitSharePercent}%` : (p.profitShareRatio || 'Equal');
-      const rsrText = p.remunerationSharePercent !== undefined ? `${p.remunerationSharePercent}%` : psrText;
       const remunVal = p.remuneration ?? p.partnersRemuneration ?? 0;
       const drawVal = p.withdrawals ?? p.drawings ?? 0;
       const profitVal = p.shareOfProfit ?? p.shareOfProfitOrLoss ?? 0;
@@ -1986,7 +2161,6 @@ export function buildAttractiveExcelWorkbook({
           textCell(`${idx + 1}`, { align: 'center', sz: 9.5, bold: true, bg }),
           textCell(p.isDesignatedPartner ? `${p.partnerName} (DP)` : p.partnerName, { bold: true, sz: 10, bg }),
           textCell(psrText, { align: 'center', sz: 9.5, bg }),
-          textCell(rsrText, { align: 'center', sz: 9.5, bg }),
           numCell(p.openingBalance, { bg }),
           numCell(p.capitalIntroduced, { bg }),
           numCell(remunVal, { bg }),
@@ -2009,7 +2183,7 @@ export function buildAttractiveExcelWorkbook({
     if (isProprietor) {
       capRows.push([
         textCell('1', { align: 'center', sz: 9.5, bold: true }),
-        textCell(entityName, { bold: true, sz: 10 }),
+        textCell(entityConfig.proprietorName || entityName, { bold: true, sz: 10 }),
         numCell(singleOpen),
         numCell(netDiff > 0 ? netDiff : 0),
         numCell(0),
@@ -2021,7 +2195,6 @@ export function buildAttractiveExcelWorkbook({
       capRows.push([
         textCell('1', { align: 'center', sz: 9.5, bold: true }),
         textCell(entityName, { bold: true, sz: 10 }),
-        textCell('100.0%', { align: 'center', sz: 9.5 }),
         textCell('100.0%', { align: 'center', sz: 9.5 }),
         numCell(singleOpen),
         numCell(netDiff > 0 ? netDiff : 0),
@@ -2043,7 +2216,7 @@ export function buildAttractiveExcelWorkbook({
     totClose = singleClose;
   }
 
-  // Total Row
+  // Total Row (Current Year)
   if (isProprietor) {
     capRows.push([
       textCell('', { bg: PALETTE.grandTotalBg }),
@@ -2060,7 +2233,6 @@ export function buildAttractiveExcelWorkbook({
       textCell('', { bg: PALETTE.grandTotalBg }),
       textCell("TOTAL OWNERS' / PARTNERS' CAPITAL", { bold: true, sz: 10.5, bg: PALETTE.grandTotalBg, color: PALETTE.grandTotalText }),
       textCell('100.0%', { align: 'center', bold: true, sz: 9.5, bg: PALETTE.grandTotalBg }),
-      textCell('100.0%', { align: 'center', bold: true, sz: 9.5, bg: PALETTE.grandTotalBg }),
       numCell(totOpen, { isGrandTotal: true }),
       numCell(totIntro, { isGrandTotal: true }),
       numCell(totRemun, { isGrandTotal: true }),
@@ -2070,6 +2242,76 @@ export function buildAttractiveExcelWorkbook({
       numCell(totClose, { isGrandTotal: true }),
     ]);
   }
+  capRowHeights.push({ hpt: 26 });
+
+  // Comparative Previous Year (PY) Row
+  const pyClose = balanceSheet.previousYear?.ownersCapital || sched3Data?.previousYearAmount || 0;
+  const pyProf = profitAndLoss.previousYear?.profitAfterTax || 0;
+  const pyRemun = isProprietor ? 0 : (profitAndLoss.previousYear?.partnersRemuneration || 0);
+
+  let pySumOpen = 0;
+  let pySumIntro = 0;
+  let pySumRemun = 0;
+  let pySumInt = 0;
+  let pySumDraw = 0;
+  let pySumProf = 0;
+  let hasExplicitPY = false;
+
+  pList.forEach((p) => {
+    if (p.pyOpeningBalance !== undefined || p.pyClosingBalance !== undefined) {
+      hasExplicitPY = true;
+      pySumOpen += p.pyOpeningBalance || 0;
+      pySumIntro += p.pyCapitalIntroduced || 0;
+      pySumRemun += p.pyRemuneration || 0;
+      pySumInt += p.pyInterestOnCapital || 0;
+      pySumDraw += p.pyWithdrawals || 0;
+      pySumProf += p.pyShareOfProfit || 0;
+    }
+  });
+
+  const finalPyClose = pyClose;
+  let finalPyOpen = hasExplicitPY ? pySumOpen : 0;
+  let finalPyIntro = hasExplicitPY ? pySumIntro : 0;
+  let finalPyRemun = hasExplicitPY ? pySumRemun : pyRemun;
+  let finalPyInt = hasExplicitPY ? pySumInt : 0;
+  let finalPyDraw = hasExplicitPY ? pySumDraw : 0;
+  let finalPyProf = hasExplicitPY ? pySumProf : pyProf;
+
+  if (!hasExplicitPY && finalPyClose > 0) {
+    const netPY = finalPyClose - finalPyProf - finalPyRemun;
+    if (netPY > 0) {
+      finalPyOpen = netPY;
+    } else {
+      finalPyDraw = Math.abs(netPY);
+    }
+  }
+
+  if (isProprietor) {
+    capRows.push([
+      textCell('', { bg: 'F1F5F9' }),
+      textCell('Previous Year Comparative', { bold: true, sz: 10, bg: 'F1F5F9', color: '475569' }),
+      numCell(finalPyOpen, { bg: 'F1F5F9' }),
+      numCell(finalPyIntro, { bg: 'F1F5F9' }),
+      numCell(finalPyInt, { bg: 'F1F5F9' }),
+      numCell(finalPyDraw, { bg: 'F1F5F9' }),
+      numCell(finalPyProf, { bg: 'F1F5F9' }),
+      numCell(finalPyClose, { bold: true, bg: 'F1F5F9' }),
+    ]);
+  } else {
+    capRows.push([
+      textCell('', { bg: 'F1F5F9' }),
+      textCell('Previous Year Comparative', { bold: true, sz: 10, bg: 'F1F5F9', color: '475569' }),
+      textCell('-', { align: 'center', sz: 9.5, bg: 'F1F5F9' }),
+      numCell(finalPyOpen, { bg: 'F1F5F9' }),
+      numCell(finalPyIntro, { bg: 'F1F5F9' }),
+      numCell(finalPyRemun, { bg: 'F1F5F9' }),
+      numCell(finalPyInt, { bg: 'F1F5F9' }),
+      numCell(finalPyDraw, { bg: 'F1F5F9' }),
+      numCell(finalPyProf, { bg: 'F1F5F9' }),
+      numCell(finalPyClose, { bold: true, bg: 'F1F5F9' }),
+    ]);
+  }
+  capRowHeights.push({ hpt: 22 });
   capRowHeights.push({ hpt: 26 });
 
   // Verification Row comparing to Balance Sheet Note 3
@@ -2124,16 +2366,15 @@ export function buildAttractiveExcelWorkbook({
   } else {
     wsCap['!cols'] = [
       { wch: 8 },
-      { wch: 28 },
-      { wch: 14 },
-      { wch: 14 },
+      { wch: 30 },
       { wch: 18 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 18 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
       { wch: 18 },
       { wch: 18 },
       { wch: 20 },
+      { wch: 22 },
     ];
   }
   wsCap['!rows'] = capRowHeights;

@@ -383,6 +383,44 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
                 <option value="adverse">Adverse Opinion</option>
               </select>
             </div>
+
+            {/* Proprietor Name if Sole Proprietorship */}
+            {config.entityType === 'Sole Proprietorship' && (
+              <div className="md:col-span-2 p-3 bg-amber-50/70 border border-amber-200 rounded-lg">
+                <label className="block font-semibold text-amber-950 mb-1">
+                  Name of Sole Proprietor
+                </label>
+                <input
+                  type="text"
+                  value={config.proprietorName || ''}
+                  onChange={(e) => onUpdateConfig({ proprietorName: e.target.value })}
+                  placeholder="e.g. Shri Ramesh Kumar"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Place of Signing</label>
+              <input
+                type="text"
+                value={config.placeOfSigning || ''}
+                onChange={(e) => onUpdateConfig({ placeOfSigning: e.target.value })}
+                placeholder="e.g. Pune / Mumbai"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Date of Signing</label>
+              <input
+                type="text"
+                value={config.dateOfSigning || ''}
+                onChange={(e) => onUpdateConfig({ dateOfSigning: e.target.value })}
+                placeholder="e.g. March 31, 2025"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+            </div>
           </div>
 
           {/* UDIN Generator Box */}
@@ -428,7 +466,9 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
                 INDEPENDENT AUDITOR'S REPORT
               </h4>
               <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                To the Partners / Proprietor of {config.entityName}
+                {config.entityType === 'Sole Proprietorship'
+                  ? `To the Proprietor of ${config.entityName}${config.proprietorName ? ` (${config.proprietorName})` : ''}`
+                  : `To the Partners of ${config.entityName}`}
               </p>
             </div>
             <p>
@@ -439,8 +479,8 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
             </p>
             <div className="pt-3 border-t border-slate-800 flex justify-between items-end font-sans text-[11px] text-slate-400">
               <div>
-                <div>Place: Mumbai / New Delhi</div>
-                <div>Date: {new Date().toLocaleDateString('en-IN')}</div>
+                <div>Place: {config.placeOfSigning || 'Mumbai / New Delhi'}</div>
+                <div>Date: {config.dateOfSigning || new Date().toLocaleDateString('en-IN')}</div>
                 <div>UDIN: {generatedUDIN || 'PENDING'}</div>
               </div>
               <div className="text-right">

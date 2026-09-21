@@ -181,6 +181,26 @@ export function computeOwnersCapitalTable(
 
   // Check if configured partners exist
   let partnerConfigs = config.partners && config.partners.length > 0 ? [...config.partners] : [];
+  if (isProprietorship) {
+    const pName = config.proprietorName || config.partners?.[0]?.name || (config.entityName ? `${config.entityName} (Proprietor)` : 'Proprietor');
+    if (partnerConfigs.length === 0) {
+      partnerConfigs = [{
+        name: pName,
+        profitSharePercent: 100,
+        remunerationSharePercent: 0,
+        isWorkingPartner: true,
+        isDesignatedPartner: false,
+        openingBalance: 0,
+      }];
+    } else {
+      partnerConfigs[0] = {
+        ...partnerConfigs[0],
+        name: pName,
+        profitSharePercent: 100,
+        remunerationSharePercent: 0,
+      };
+    }
+  }
 
   // 2. Priority 2: Configured partners with individual balances
   if (partnerConfigs.length > 0) {
@@ -365,7 +385,7 @@ export function computeOwnersCapitalTable(
 
   // Sole Proprietorship fallback
   if (isProprietorship) {
-    const propName = config.entityName ? `${config.entityName} (Proprietor)` : 'Proprietor';
+    const propName = config.proprietorName || (config.entityName ? `${config.entityName} (Proprietor)` : 'Proprietor');
     const pOpening = Math.round((totalClosing - interestOnCapital - pat) * 100) / 100;
     return [
       {
@@ -1133,8 +1153,39 @@ export function computePeriodTotals(
   const totalNonCurrentLiabilities = longTermBorrowings + deferredTaxLiabilities + otherLongTermLiabilities + longTermProvisions;
 
   // 3. Current liabilities
-  // Note 9: Trade payables
-  const tradePayables = noteSchedules[9]?.totalAmount || 0;
+  // Note 9: Trade payables (with MSME vs Other sub-classification as per ICAI NCE format)
+  let tradePayablesMsme = 0;
+  let tradePayablesOther = 0;
+  noteSchedules[9]?.items.forEach((it) => {
+    const sub = (it.subCategory || '').toLowerCase();
+    const name = (it.accountName || '').toLowerCase();
+    const isOtherThanMsme =
+      sub.includes('other than micro') ||
+      name.includes('other than micro') ||
+      sub.includes('other creditors') ||
+      name.includes('other creditors') ||
+      sub.includes('(b)');
+
+    const isMsme = !isOtherThanMsme && (
+      sub.includes('msme') ||
+      name.includes('msme') ||
+      sub.includes('micro') ||
+      name.includes('micro') ||
+      sub.includes('small enterprise') ||
+      sub.includes('(a)')
+    );
+
+    const bal = it.displayBalance !== undefined ? it.displayBalance : it.netBalance;
+    if (isMsme) {
+      tradePayablesMsme += bal;
+    } else {
+      tradePayablesOther += bal;
+    }
+  });
+  const tradePayables = noteSchedules[9]?.totalAmount ?? (tradePayablesMsme + tradePayablesOther);
+  if (tradePayablesMsme === 0 && tradePayablesOther === 0 && tradePayables > 0) {
+    tradePayablesOther = tradePayables;
+  }
 
   // Note 10: Other current liabilities (plus income tax provision if computed)
   let otherCurrentLiabilities = noteSchedules[10]?.totalAmount || 0;
@@ -1261,6 +1312,8 @@ export function computePeriodTotals(
     totalNonCurrentLiabilities,
     shortTermBorrowings,
     tradePayables,
+    tradePayablesMsme,
+    tradePayablesOther,
     otherCurrentLiabilities,
     shortTermProvisions,
     totalCurrentLiabilities,
@@ -1339,6 +1392,8 @@ export function computeFinancialStatements(
       totalNonCurrentLiabilities: py.balanceSheet.totalNonCurrentLiabilities,
       shortTermBorrowings: py.balanceSheet.shortTermBorrowings,
       tradePayables: py.balanceSheet.tradePayables,
+      tradePayablesMsme: py.balanceSheet.tradePayablesMsme,
+      tradePayablesOther: py.balanceSheet.tradePayablesOther,
       otherCurrentLiabilities: py.balanceSheet.otherCurrentLiabilities,
       shortTermProvisions: py.balanceSheet.shortTermProvisions,
       totalCurrentLiabilities: py.balanceSheet.totalCurrentLiabilities,
@@ -1509,6 +1564,8 @@ export function computeFinancialStatements(
       totalNonCurrentLiabilities: totNonCurrL,
       shortTermBorrowings: stBorrow,
       tradePayables: trdPay,
+      tradePayablesMsme: impBS.tradePayablesMsme ?? 0,
+      tradePayablesOther: impBS.tradePayablesOther ?? trdPay,
       otherCurrentLiabilities: othCurL,
       shortTermProvisions: stProv,
       totalCurrentLiabilities: totCurL,
@@ -1594,6 +1651,8 @@ export function computeFinancialStatements(
       totalNonCurrentLiabilities: 0,
       shortTermBorrowings: 0,
       tradePayables: 0,
+      tradePayablesMsme: 0,
+      tradePayablesOther: 0,
       otherCurrentLiabilities: 0,
       shortTermProvisions: 0,
       totalCurrentLiabilities: 0,

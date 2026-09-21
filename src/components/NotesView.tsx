@@ -249,13 +249,33 @@ export const NotesView: React.FC<NotesViewProps> = ({
                   {def.noteNumber === 1 && (
                     <div className="space-y-3 text-xs text-slate-700 leading-relaxed bg-slate-50/50 p-4 rounded-lg border border-slate-200">
                       <p>
-                        <strong>1.1 General Information:</strong> {config.entityName} is a {config.entityType} domiciled in India. The entity is engaged in manufacturing, trading, and contracting operations. The financial statements for the reporting period ended {config.reportingPeriod} (Comparative period ended {config.previousReportingPeriod || 'March 31, 2024'}) have been prepared in accordance with the Guidance Note on Financial Statements of Non-Corporate Entities issued by the Institute of Chartered Accountants of India (ICAI).
+                        <strong>1.1 General Information:</strong> {config.entityName} is a {config.entityType} domiciled in India. The entity is engaged in commercial business operations. The financial statements for the reporting period ended {config.reportingPeriod} (Comparative period ended {config.previousReportingPeriod || 'March 31, 2024'}) have been prepared in accordance with the Guidance Note on Financial Statements of Non-Corporate Entities issued by the Institute of Chartered Accountants of India (ICAI).
+                      </p>
+                      {config.registeredAddress && (
+                        <p>
+                          <strong>1.2 Registered Principal Place of Business:</strong> {config.registeredAddress}
+                        </p>
+                      )}
+                      {config.entityType === 'Sole Proprietorship' && config.proprietorName && (
+                        <p>
+                          <strong>1.3 Sole Proprietor:</strong> The entity is owned and managed by <strong>{config.proprietorName}</strong> as Sole Proprietor.
+                        </p>
+                      )}
+                      {config.placeOfSigning && (
+                        <p>
+                          <strong>1.4 Place of Signing:</strong> {config.placeOfSigning}
+                        </p>
+                      )}
+                      {config.dateOfSigning && (
+                        <p>
+                          <strong>1.5 Date of Signing / Adoption:</strong> {config.dateOfSigning}
+                        </p>
+                      )}
+                      <p>
+                        <strong>1.6 Entity Classification:</strong> For the purpose of applicability of Accounting Standards, the entity is classified as a Non-Corporate Entity (Level II / Level III) under ICAI criteria based on turnover and borrowings thresholds.
                       </p>
                       <p>
-                        <strong>1.2 Entity Classification:</strong> For the purpose of applicability of Accounting Standards, the entity is classified as a Non-Corporate Entity (Level II / Level III) under ICAI criteria based on turnover and borrowings thresholds.
-                      </p>
-                      <p>
-                        <strong>1.3 Rounding of Amounts:</strong> Figures have been stated in Indian Rupees (₹) rounded off to the nearest rupee. Comparative prior period figures have been regrouped/reclassified wherever necessary to conform to current period presentation.
+                        <strong>1.7 Rounding of Amounts:</strong> Figures have been stated in Indian Rupees (₹) rounded off to the nearest rupee. Comparative prior period figures have been regrouped/reclassified wherever necessary to conform to current period presentation.
                       </p>
                     </div>
                   )}
@@ -632,68 +652,248 @@ export const NotesView: React.FC<NotesViewProps> = ({
                         </div>
                       )}
 
-                      {/* Note 9: Statutory MSMED Act Interest & Delayed Payments Disclosure (Page 9 & 10) */}
-                      {def.noteNumber === 9 && (
-                        <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5">
-                          <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                            <h4 className="font-bold text-slate-900 uppercase tracking-wide">
-                              Disclosure relating to suppliers registered under MSMED Act (Based on info available with entity)
-                            </h4>
-                            <span className="text-[10px] text-slate-500 font-mono">(Amount in Rs.)</span>
+                      {/* Note 9: Statutory MSMED Act Interest & Delayed Payments Disclosure & Aging Schedule */}
+                      {def.noteNumber === 9 && (() => {
+                        const msmeCreditors = schedule?.items.filter((it) =>
+                          (it.subCategory && it.subCategory.toLowerCase().includes('msme')) ||
+                          it.accountName.toLowerCase().includes('msme')
+                        ) || [];
+                        const msmeTotalCY = msmeCreditors.reduce(
+                          (acc, it) => acc + (it.displayBalance !== undefined ? it.displayBalance : it.netBalance),
+                          0
+                        );
+                        const msmeTotalPY = msmeCreditors.reduce(
+                          (acc, it) => acc + (it.previousYearBalance || 0),
+                          0
+                        );
+                        const totalCY = schedule?.totalAmount || 0;
+                        const totalPY = schedule?.previousYearAmount || 0;
+                        const otherTotalCY = Math.max(0, totalCY - msmeTotalCY);
+                        const otherTotalPY = Math.max(0, totalPY - msmeTotalPY);
+
+                        return (
+                          <div className="mt-4 space-y-4">
+                            {/* Sub-classification */}
+                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+                              <h4 className="font-bold text-slate-900 uppercase tracking-wide pb-1 border-b border-slate-200">
+                                Trade Payables Statutory Sub-Classification (ICAI NCE Format)
+                              </h4>
+                              <div className="space-y-1.5 text-[11px]">
+                                <div className="flex justify-between py-1 border-b border-slate-100">
+                                  <span className="text-slate-700">
+                                    (a) Total outstanding dues of micro, small and medium enterprises (MSME)
+                                  </span>
+                                  <span className="font-mono font-bold text-slate-900">{formatINR(msmeTotalCY)}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-slate-100">
+                                  <span className="text-slate-700">
+                                    (b) Total outstanding dues of creditors other than micro, small and medium enterprises
+                                  </span>
+                                  <span className="font-mono font-bold text-slate-900">{formatINR(otherTotalCY)}</span>
+                                </div>
+                                <div className="flex justify-between py-1 font-bold bg-emerald-50/70 px-2 rounded">
+                                  <span className="text-emerald-950">Total Trade Payables</span>
+                                  <span className="font-mono text-emerald-900">{formatINR(totalCY)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* MSMED Act Section 22 Disclosures */}
+                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5">
+                              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                                <h4 className="font-bold text-slate-900 uppercase tracking-wide">
+                                  Disclosure relating to suppliers registered under MSMED Act (Section 22)
+                                </h4>
+                                <span className="text-[10px] text-slate-500 font-mono">(Amount in Rs.)</span>
+                              </div>
+                              <table className="w-full text-left text-[11px] border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-200/80 text-slate-800 font-bold">
+                                    <th className="py-2 px-3">Particulars</th>
+                                    <th className="py-2 px-3 w-36 text-right">CY ({config.reportingPeriod || '31 March 2026'})</th>
+                                    <th className="py-2 px-3 w-36 text-right">PY ({config.previousReportingPeriod || '31 March 2025'})</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 text-slate-700">
+                                  <tr>
+                                    <td className="py-2 px-3 font-medium">
+                                      (a) Principal amount and interest due thereon remaining unpaid to any supplier as at the end of each accounting year:
+                                      <div className="pl-4 text-slate-500 text-[10px] space-y-0.5 mt-0.5">
+                                        <div>- Principal amount: {formatINR(msmeTotalCY)}</div>
+                                        <div>- Interest due thereon: ₹0.00</div>
+                                        <div className="font-semibold text-slate-700">- Total: {formatINR(msmeTotalCY)}</div>
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono font-medium align-top pt-2.5">{formatINR(msmeTotalCY)}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">{formatINR(msmeTotalPY)}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 px-3 font-medium">
+                                      (b) The amount of interest paid by the buyer in terms of section 16 of the MSMED Act, along with the amount of the payment made to the supplier beyond the appointed day during each accounting year.
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">₹0.00</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 px-3 font-medium">
+                                      (c) The amount of interest due and payable for the period of delay in making payment (which have been paid but beyond the appointed day during the year) but without adding the interest specified under the MSMED Act.
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">₹0.00</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 px-3 font-medium">
+                                      (d) The amount of interest accrued and remaining unpaid at the end of each accounting year.
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">₹0.00</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 px-3 font-medium">
+                                      (e) The amount of further interest remaining due and payable even in the succeeding years, until such date when the interest dues above are actually paid to the small enterprise.
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono align-top pt-2.5">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">₹0.00</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Trade Payables Aging Schedule */}
+                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5 overflow-x-auto">
+                              <h4 className="font-bold text-slate-900 uppercase tracking-wide pb-1 border-b border-slate-200">
+                                Trade Payables Aging Schedule as at {config.reportingPeriod}
+                              </h4>
+                              <table className="w-full text-left text-[11px] border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-200/80 text-slate-800 font-bold">
+                                    <th className="py-2 px-3">Particulars</th>
+                                    <th className="py-2 px-2 text-right">&lt; 1 Year</th>
+                                    <th className="py-2 px-2 text-right">1 - 2 Years</th>
+                                    <th className="py-2 px-2 text-right">2 - 3 Years</th>
+                                    <th className="py-2 px-2 text-right">&gt; 3 Years</th>
+                                    <th className="py-2 px-3 text-right">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 text-slate-700">
+                                  <tr>
+                                    <td className="py-1.5 px-3 font-medium">(i) MSME</td>
+                                    <td className="py-1.5 px-2 text-right font-mono">{formatINR(msmeTotalCY)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-3 text-right font-mono font-bold">{formatINR(msmeTotalCY)}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-1.5 px-3 font-medium">(ii) Others</td>
+                                    <td className="py-1.5 px-2 text-right font-mono">{formatINR(otherTotalCY)}</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-3 text-right font-mono font-bold">{formatINR(otherTotalCY)}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-1.5 px-3 font-medium">(iii) Disputed dues - MSME</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-3 text-right font-mono text-slate-400">₹0.00</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-1.5 px-3 font-medium">(iv) Disputed dues - Others</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                    <td className="py-1.5 px-3 text-right font-mono text-slate-400">₹0.00</td>
+                                  </tr>
+                                  <tr className="bg-slate-100 font-bold text-slate-900">
+                                    <td className="py-2 px-3">Total Trade Payables</td>
+                                    <td className="py-2 px-2 text-right font-mono">{formatINR(totalCY)}</td>
+                                    <td className="py-2 px-2 text-right font-mono">₹0.00</td>
+                                    <td className="py-2 px-2 text-right font-mono">₹0.00</td>
+                                    <td className="py-2 px-2 text-right font-mono">₹0.00</td>
+                                    <td className="py-2 px-3 text-right font-mono text-emerald-800">{formatINR(totalCY)}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
-                          <table className="w-full text-left text-[11px] border-collapse">
-                            <thead>
-                              <tr className="bg-slate-200/80 text-slate-800 font-bold">
-                                <th className="py-2 px-3">Particulars</th>
-                                <th className="py-2 px-3 w-36 text-right">CY ({config.reportingPeriod || '31 March 2026'})</th>
-                                <th className="py-2 px-3 w-36 text-right">PY ({config.previousReportingPeriod || '31 March 2025'})</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 text-slate-700">
-                              <tr>
-                                <td className="py-2 px-3 font-medium">
-                                  (a) Amount remaining unpaid to any supplier at the end of each accounting year:
-                                  <div className="pl-4 text-slate-500 text-[10px] space-y-0.5 mt-0.5">
-                                    <div>- Principal amount: ₹0.00</div>
-                                    <div>- Interest due thereon: ₹0.00</div>
-                                    <div className="font-semibold text-slate-700">- Total: ₹0.00</div>
-                                  </div>
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono font-medium align-top pt-2.5">-</td>
-                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
-                              </tr>
-                              <tr>
-                                <td className="py-2 px-3 font-medium">
-                                  (b) The amount of interest paid by the buyer in terms of section 16 of the MSMED Act, along with the amount of the payment made to the supplier beyond the appointed day during each accounting year.
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono align-top pt-2.5">-</td>
-                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
-                              </tr>
-                              <tr>
-                                <td className="py-2 px-3 font-medium">
-                                  (c) The amount of interest due and payable for the period of delay in making payment (which have been paid but beyond the appointed day during the year) but without adding the interest specified under the MSMED Act.
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono align-top pt-2.5">-</td>
-                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
-                              </tr>
-                              <tr>
-                                <td className="py-2 px-3 font-medium">
-                                  (d) The amount of interest accrued and remaining unpaid at the end of each accounting year.
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono align-top pt-2.5">-</td>
-                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
-                              </tr>
-                              <tr>
-                                <td className="py-2 px-3 font-medium">
-                                  (e) The amount of further interest remaining due and payable even in the succeeding years, until such date when the interest dues above are actually paid to the small enterprise, for the purpose of disallowance of a deductible expenditure under section 23 of the MSMED Act.
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono align-top pt-2.5">-</td>
-                                <td className="py-2 px-3 text-right font-mono text-slate-500 align-top pt-2.5">-</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                        );
+                      })()}
+
+                      {/* Note 16: Trade Receivables Aging Schedule */}
+                      {def.noteNumber === 16 && (() => {
+                        const recTotalCY = schedule?.totalAmount || 0;
+                        return (
+                          <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5 overflow-x-auto">
+                            <h4 className="font-bold text-slate-900 uppercase tracking-wide pb-1 border-b border-slate-200">
+                              Trade Receivables Aging Schedule as at {config.reportingPeriod}
+                            </h4>
+                            <table className="w-full text-left text-[11px] border-collapse">
+                              <thead>
+                                <tr className="bg-slate-200/80 text-slate-800 font-bold">
+                                  <th className="py-2 px-3">Particulars</th>
+                                  <th className="py-2 px-2 text-right">&lt; 6 Months</th>
+                                  <th className="py-2 px-2 text-right">6 Mos - 1 Yr</th>
+                                  <th className="py-2 px-2 text-right">1 - 2 Years</th>
+                                  <th className="py-2 px-2 text-right">2 - 3 Years</th>
+                                  <th className="py-2 px-2 text-right">&gt; 3 Years</th>
+                                  <th className="py-2 px-3 text-right">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200 text-slate-700">
+                                <tr>
+                                  <td className="py-1.5 px-3 font-medium">(i) Undisputed Trade receivables - considered good</td>
+                                  <td className="py-1.5 px-2 text-right font-mono">{formatINR(recTotalCY)}</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-3 text-right font-mono font-bold">{formatINR(recTotalCY)}</td>
+                                </tr>
+                                <tr>
+                                  <td className="py-1.5 px-3 font-medium">(ii) Undisputed - significant credit risk</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-3 text-right font-mono text-slate-400">₹0.00</td>
+                                </tr>
+                                <tr>
+                                  <td className="py-1.5 px-3 font-medium">(iii) Undisputed - credit impaired</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-3 text-right font-mono text-slate-400">₹0.00</td>
+                                </tr>
+                                <tr>
+                                  <td className="py-1.5 px-3 font-medium">(iv) Disputed - considered good</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-2 text-right font-mono text-slate-400">₹0.00</td>
+                                  <td className="py-1.5 px-3 text-right font-mono text-slate-400">₹0.00</td>
+                                </tr>
+                                <tr className="bg-slate-100 font-bold text-slate-900">
+                                  <td className="py-2 px-3">Total Trade Receivables</td>
+                                  <td className="py-2 px-2 text-right font-mono">{formatINR(recTotalCY)}</td>
+                                  <td className="py-2 px-2 text-right font-mono">₹0.00</td>
+                                  <td className="py-2 px-2 text-right font-mono">₹0.00</td>
+                                  <td className="py-2 px-2 text-right font-mono">₹0.00</td>
+                                  <td className="py-2 px-2 text-right font-mono">₹0.00</td>
+                                  <td className="py-2 px-3 text-right font-mono text-emerald-800">{formatINR(recTotalCY)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

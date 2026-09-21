@@ -107,6 +107,13 @@ export interface PartnerCapitalRecord {
   shareOfProfit: number;
   shareOfProfitOrLoss?: number;
   closingBalance: number;
+  pyOpeningBalance?: number;
+  pyCapitalIntroduced?: number;
+  pyRemuneration?: number;
+  pyInterestOnCapital?: number;
+  pyWithdrawals?: number;
+  pyShareOfProfit?: number;
+  pyClosingBalance?: number;
 }
 
 export interface BalanceSheetData {
@@ -174,6 +181,8 @@ export interface BalanceSheetData {
     totalNonCurrentLiabilities: number;
     shortTermBorrowings: number;
     tradePayables: number;
+    tradePayablesMsme?: number;
+    tradePayablesOther?: number;
     otherCurrentLiabilities: number;
     shortTermProvisions: number;
     totalCurrentLiabilities: number;
@@ -312,6 +321,10 @@ export interface EntityConfig {
   pan?: string;
   gstin?: string;
   address?: string;
+  registeredAddress?: string;
+  placeOfSigning?: string;
+  dateOfSigning?: string;
+  proprietorName?: string;
   currencyUnit?: 'INR' | 'Lakhs' | 'Crores';
   auditorName?: string;
   auditorMembershipNo?: string;
