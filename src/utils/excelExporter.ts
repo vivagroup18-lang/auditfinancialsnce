@@ -654,10 +654,10 @@ export function buildAttractiveExcelWorkbook({
   const entityName = entityConfig.entityName || 'NON-CORPORATE ENTITY';
   const entityType = entityConfig.entityType || 'Partnership Firm';
   const isProprietor = entityType === 'Sole Proprietorship';
-  const currentPeriod = entityConfig.reportingPeriod || 'March 31, 2025';
-  const previousPeriod = entityConfig.previousReportingPeriod || 'March 31, 2024';
-  const fyCY = entityConfig.financialYear || '2024-25';
-  const fyPY = entityConfig.previousFinancialYear || '2023-24';
+  const currentPeriod = entityConfig.reportingPeriod || 'March 31, 2026';
+  const previousPeriod = entityConfig.previousReportingPeriod || 'March 31, 2025';
+  const fyCY = entityConfig.financialYear || '2025-26';
+  const fyPY = entityConfig.previousFinancialYear || '2024-25';
 
   const effectiveAddress = (entityConfig.registeredAddress || entityConfig.address || '').trim();
   const activeSigningPartner =

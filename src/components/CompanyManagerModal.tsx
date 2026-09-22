@@ -61,10 +61,10 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
   const [newConfig, setNewConfig] = useState<EntityConfig>({
     entityName: '',
     entityType: 'Partnership Firm',
-    financialYear: '2024-25',
-    reportingPeriod: 'March 31, 2025',
-    previousFinancialYear: '2023-24',
-    previousReportingPeriod: 'March 31, 2024',
+    financialYear: '2025-26',
+    reportingPeriod: 'March 31, 2026',
+    previousFinancialYear: '2024-25',
+    previousReportingPeriod: 'March 31, 2025',
     currencyUnit: 'INR',
     taxRatePercent: 30,
     transferProfitTo: 'partners_capital',
@@ -120,10 +120,10 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
     setNewConfig({
       entityName: '',
       entityType: 'Partnership Firm',
-      financialYear: '2024-25',
-      reportingPeriod: 'March 31, 2025',
-      previousFinancialYear: '2023-24',
-      previousReportingPeriod: 'March 31, 2024',
+      financialYear: '2025-26',
+      reportingPeriod: 'March 31, 2026',
+      previousFinancialYear: '2024-25',
+      previousReportingPeriod: 'March 31, 2025',
       currencyUnit: 'INR',
       taxRatePercent: 30,
       transferProfitTo: 'partners_capital',
@@ -288,7 +288,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                             FY {company.config.financialYear} ({company.config.reportingPeriod})
                           </span>
                           <span className="text-slate-300">•</span>
-                          <span>Comp. FY {company.config.previousFinancialYear || '2023-24'}</span>
+                          <span>Comp. FY {company.config.previousFinancialYear || '2024-25'}</span>
                           <span className="text-slate-300">•</span>
                           <span>Tax Rate: {company.config.taxRatePercent}%</span>
                         </div>
@@ -626,7 +626,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                       type="text"
                       value={newConfig.financialYear}
                       onChange={(e) => setNewConfig({ ...newConfig, financialYear: e.target.value })}
-                      placeholder="2024-25"
+                      placeholder="2025-26"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -637,7 +637,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                       type="text"
                       value={newConfig.reportingPeriod}
                       onChange={(e) => setNewConfig({ ...newConfig, reportingPeriod: e.target.value })}
-                      placeholder="March 31, 2025"
+                      placeholder="March 31, 2026"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -648,11 +648,11 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                     <label className="block font-medium text-slate-700 mb-1">Previous Financial Year (Comparative)</label>
                     <input
                       type="text"
-                      value={newConfig.previousFinancialYear || '2023-24'}
+                      value={newConfig.previousFinancialYear || '2024-25'}
                       onChange={(e) =>
                         setNewConfig({ ...newConfig, previousFinancialYear: e.target.value })
                       }
-                      placeholder="2023-24"
+                      placeholder="2024-25"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -661,11 +661,11 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                     <label className="block font-medium text-slate-700 mb-1">Previous Reporting Period Date</label>
                     <input
                       type="text"
-                      value={newConfig.previousReportingPeriod || 'March 31, 2024'}
+                      value={newConfig.previousReportingPeriod || 'March 31, 2025'}
                       onChange={(e) =>
                         setNewConfig({ ...newConfig, previousReportingPeriod: e.target.value })
                       }
-                      placeholder="March 31, 2024"
+                      placeholder="March 31, 2025"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -958,7 +958,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, financialYear: e.target.value })
                     }
-                    placeholder="2024-25"
+                    placeholder="2025-26"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
@@ -971,7 +971,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, reportingPeriod: e.target.value })
                     }
-                    placeholder="March 31, 2025"
+                    placeholder="March 31, 2026"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
@@ -982,11 +982,11 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                   <label className="block font-medium text-slate-700 mb-1">Previous Financial Year (Comparative)</label>
                   <input
                     type="text"
-                    value={editFormData.previousFinancialYear || '2023-24'}
+                    value={editFormData.previousFinancialYear || '2024-25'}
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, previousFinancialYear: e.target.value })
                     }
-                    placeholder="2023-24"
+                    placeholder="2024-25"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
@@ -995,11 +995,11 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                   <label className="block font-medium text-slate-700 mb-1">Previous Reporting Period Date</label>
                   <input
                     type="text"
-                    value={editFormData.previousReportingPeriod || 'March 31, 2024'}
+                    value={editFormData.previousReportingPeriod || 'March 31, 2025'}
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, previousReportingPeriod: e.target.value })
                     }
-                    placeholder="March 31, 2024"
+                    placeholder="March 31, 2025"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>

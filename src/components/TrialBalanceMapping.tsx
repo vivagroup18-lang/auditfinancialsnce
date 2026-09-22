@@ -322,8 +322,8 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
   onUploadPYTB,
   onClearPYTB,
   onClearTB,
-  cyYearLabel = '2024-25',
-  pyYearLabel = '2023-24',
+  cyYearLabel = '2025-26',
+  pyYearLabel = '2024-25',
 }) => {
   const [selectedYear, setSelectedYear] = useState<'CY' | 'PY'>('CY');
   const [searchTerm, setSearchTerm] = useState('');

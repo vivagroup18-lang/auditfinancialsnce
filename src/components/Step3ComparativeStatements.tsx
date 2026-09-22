@@ -51,8 +51,8 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
   const schedules = computedFinancials.noteSchedules;
 
   const isProprietor = config.entityType === 'Sole Proprietorship';
-  const cyYear = config.financialYear;
-  const pyYear = config.previousFinancialYear || '2023-24';
+  const cyYear = config.financialYear || '2025-26';
+  const pyYear = config.previousFinancialYear || '2024-25';
   const hasPY = bs.isPreviousYearUploaded;
 
   const formatINR = (val?: number) => {

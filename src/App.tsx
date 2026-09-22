@@ -114,10 +114,10 @@ export default function App() {
     return initialCompany?.config || {
       entityName: '',
       entityType: 'Partnership Firm',
-      financialYear: '2024-25',
-      reportingPeriod: 'March 31, 2025',
-      previousFinancialYear: '2023-24',
-      previousReportingPeriod: 'March 31, 2024',
+      financialYear: '2025-26',
+      reportingPeriod: 'March 31, 2026',
+      previousFinancialYear: '2024-25',
+      previousReportingPeriod: 'March 31, 2025',
       taxRatePercent: 30,
       transferProfitTo: 'partners_capital',
     };
@@ -635,10 +635,10 @@ export default function App() {
         setConfig({
           entityName: '',
           entityType: 'Partnership Firm',
-          financialYear: '2024-25',
-          reportingPeriod: 'March 31, 2025',
-          previousFinancialYear: '2023-24',
-          previousReportingPeriod: 'March 31, 2024',
+          financialYear: '2025-26',
+          reportingPeriod: 'March 31, 2026',
+          previousFinancialYear: '2024-25',
+          previousReportingPeriod: 'March 31, 2025',
           taxRatePercent: 30,
           transferProfitTo: 'partners_capital',
         });
@@ -767,9 +767,9 @@ export default function App() {
       entityName: dataset.name,
       entityType: dataset.entityType,
       financialYear: dataset.financialYear,
-      reportingPeriod: dataset.reportingPeriod || 'March 31, 2025',
-      previousFinancialYear: dataset.previousFinancialYear || '2023-24',
-      previousReportingPeriod: dataset.previousReportingPeriod || 'March 31, 2024',
+      reportingPeriod: dataset.reportingPeriod || 'March 31, 2026',
+      previousFinancialYear: dataset.previousFinancialYear || '2024-25',
+      previousReportingPeriod: dataset.previousReportingPeriod || 'March 31, 2025',
       taxRatePercent: 30,
       transferProfitTo: 'partners_capital' as const,
     };
@@ -785,7 +785,7 @@ export default function App() {
 
     if (dataset.previousYearRows && dataset.previousYearRows.length > 0) {
       pyRows = dataset.previousYearRows;
-      pyFileName = dataset.name + ' - PY Trial Balance (FY ' + (dataset.previousFinancialYear || '2023-24') + ').xlsx';
+      pyFileName = dataset.name + ' - PY Trial Balance (FY ' + (dataset.previousFinancialYear || '2024-25') + ').xlsx';
       const pyResult = mapTrialBalanceLedgers(dataset.previousYearRows);
       pyMapped = pyResult.mappedLedgers;
       pyExceptions = pyResult.exceptions;
@@ -1918,7 +1918,7 @@ export default function App() {
         uploadedPYBalanceSheet={uploadedPYBalanceSheet}
         uploadedPYProfitAndLoss={uploadedPYProfitAndLoss}
         entityName={config.entityName}
-        financialYear={aiMappingTarget === 'PY' ? (config.previousFinancialYear || '2023-24') : config.financialYear}
+        financialYear={aiMappingTarget === 'PY' ? (config.previousFinancialYear || '2024-25') : (config.financialYear || '2025-26')}
       />
 
       {/* User Authentication Modal */}

@@ -311,7 +311,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
                         </span>
                       </div>
                       <div className="border-l border-slate-300 pl-3">
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">PY ({config.previousFinancialYear || '2023-24'})</span>
+                        <span className="text-[9px] text-slate-500 block uppercase font-bold">PY ({config.previousFinancialYear || '2024-25'})</span>
                         <span className="font-mono font-semibold text-slate-700 text-xs">
                           ₹{formatINR(schedule?.previousYearAmount || 0)}
                         </span>

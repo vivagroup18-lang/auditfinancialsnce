@@ -152,8 +152,8 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
                 {focusPeriod === 'PY'
-                  ? `Enter Closing Stock valuation & comparative adjustment items for Previous Year (FY ${config.previousFinancialYear || '2023-24'})`
-                  : `Enter Closing Stock valuation & missing year-end adjustment items for FY ${config.financialYear}`}
+                  ? `Enter Closing Stock valuation & comparative adjustment items for Previous Year (FY ${config.previousFinancialYear || '2024-25'})`
+                  : `Enter Closing Stock valuation & missing year-end adjustment items for FY ${config.financialYear || '2025-26'}`}
               </p>
             </div>
           </div>
@@ -221,7 +221,7 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
               <div className={`p-2.5 rounded-xl transition ${focusPeriod === 'PY' ? 'bg-white shadow-2xs border border-indigo-300 ring-2 ring-indigo-400/25' : 'bg-transparent'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-bold text-slate-800">
-                    Previous Year Closing Stock (FY {config.previousFinancialYear || '2023-24'})
+                    Previous Year Closing Stock (FY {config.previousFinancialYear || '2024-25'})
                   </label>
                   {focusPeriod === 'PY' && (
                     <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 font-bold border border-indigo-300">

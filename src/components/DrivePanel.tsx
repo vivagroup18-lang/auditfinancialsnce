@@ -312,7 +312,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       });
 
       // 2. Locate or create client folder in Google Drive
-      const fy = config.financialYear || '2024-25';
+      const fy = config.financialYear || '2025-26';
       const entityFolder = await findOrCreateEntityFolder(
         accessToken,
         config.entityName || 'Entity',
@@ -351,7 +351,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
     setStatusMessage(null);
 
     try {
-      const fy = config.financialYear || '2024-25';
+      const fy = config.financialYear || '2025-26';
       const backupPayload = {
         app: 'CA Financial Statement Automation',
         version: '1.0.0',
@@ -766,7 +766,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
             </h3>
             <div className="flex items-center gap-3 text-xs text-slate-300 mt-1 flex-wrap">
               <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-medium">
-                FY {config.financialYear || '2024-25'}
+                FY {config.financialYear || '2025-26'}
               </span>
               <span>•</span>
               <span>{config.entityType || 'Partnership Firm'}</span>
@@ -1140,7 +1140,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
                   type="text"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="e.g. Audit Vouchers FY 2024-25"
+                  placeholder="e.g. Audit Vouchers FY 2025-26"
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
                   autoFocus
                   required

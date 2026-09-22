@@ -98,7 +98,7 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
                 type="text"
                 value={formData.financialYear}
                 onChange={(e) => setFormData({ ...formData, financialYear: e.target.value })}
-                placeholder="2024-25"
+                placeholder="2025-26"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -173,9 +173,9 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
               <label className="block font-medium text-slate-700 mb-1">Previous Financial Year (Comparative)</label>
               <input
                 type="text"
-                value={formData.previousFinancialYear || '2023-24'}
+                value={formData.previousFinancialYear || '2024-25'}
                 onChange={(e) => setFormData({ ...formData, previousFinancialYear: e.target.value })}
-                placeholder="2023-24"
+                placeholder="2024-25"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -186,9 +186,9 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
               <label className="block font-medium text-slate-700 mb-1">Previous Reporting Period Date</label>
               <input
                 type="text"
-                value={formData.previousReportingPeriod || 'March 31, 2024'}
+                value={formData.previousReportingPeriod || 'March 31, 2025'}
                 onChange={(e) => setFormData({ ...formData, previousReportingPeriod: e.target.value })}
-                placeholder="March 31, 2024"
+                placeholder="March 31, 2025"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
               />
             </div>

@@ -90,7 +90,7 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isDataAvailable = pyMappedLedgers && pyMappedLedgers.length > 0;
-  const pyYearLabel = config.previousFinancialYear || '2023-24';
+  const pyYearLabel = config.previousFinancialYear || '2024-25';
 
   const handleProceedWithPYAdjustmentsCheck = () => {
     if (isDataAvailable && config.yearEndAdjustments?.closingStockPY === undefined && onOpenYearEndAdjustments) {

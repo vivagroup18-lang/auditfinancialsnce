@@ -14,6 +14,7 @@ export const POPULAR_INDIAN_FY_PRESETS: FinancialYearPair[] = [
     pyYear: '2024-25',
     pyPeriod: 'March 31, 2025',
     assessmentYear: '2026-27',
+    isCurrentActive: true,
   },
   {
     cyYear: '2024-25',
@@ -46,7 +47,7 @@ export const POPULAR_INDIAN_FY_PRESETS: FinancialYearPair[] = [
 ];
 
 /**
- * Parses a financial year string (e.g., "2024-25" or "2024-2025") into start and end years.
+ * Parses a financial year string (e.g., "2025-26" or "2025-2026") into start and end years.
  */
 export function parseFY(fyStr: string): { startYear: number; endYear: number } | null {
   if (!fyStr) return null;
@@ -75,10 +76,10 @@ export function derivePriorYearDetails(cyYear: string): {
   const parsed = parseFY(cyYear);
   if (!parsed) {
     return {
-      pyYear: '2023-24',
-      cyPeriod: 'March 31, 2025',
-      pyPeriod: 'March 31, 2024',
-      assessmentYear: '2025-26',
+      pyYear: '2024-25',
+      cyPeriod: 'March 31, 2026',
+      pyPeriod: 'March 31, 2025',
+      assessmentYear: '2026-27',
     };
   }
 
@@ -115,10 +116,10 @@ export function rollForwardOneYear(cyYear: string): {
   const parsed = parseFY(cyYear);
   if (!parsed) {
     return {
-      newCY: '2025-26',
-      newCYPeriod: 'March 31, 2026',
-      newPY: cyYear || '2024-25',
-      newPYPeriod: 'March 31, 2025',
+      newCY: '2026-27',
+      newCYPeriod: 'March 31, 2027',
+      newPY: cyYear || '2025-26',
+      newPYPeriod: 'March 31, 2026',
     };
   }
 
@@ -147,10 +148,10 @@ export function rollBackOneYear(cyYear: string): {
   const parsed = parseFY(cyYear);
   if (!parsed) {
     return {
-      newCY: '2023-24',
-      newCYPeriod: 'March 31, 2024',
-      newPY: '2022-23',
-      newPYPeriod: 'March 31, 2023',
+      newCY: '2024-25',
+      newCYPeriod: 'March 31, 2025',
+      newPY: '2023-24',
+      newPYPeriod: 'March 31, 2024',
     };
   }
 

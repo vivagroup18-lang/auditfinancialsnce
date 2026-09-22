@@ -369,10 +369,10 @@ export interface TradePayablesMsmeConfig {
 export interface EntityConfig {
   entityName: string;
   entityType: 'Partnership Firm' | 'Sole Proprietorship' | 'LLP' | 'AOP/BOI';
-  reportingPeriod: string; // e.g. "March 31, 2025"
-  previousReportingPeriod?: string; // e.g. "March 31, 2024"
-  financialYear: string; // "2024-25"
-  previousFinancialYear?: string; // "2023-24"
+  reportingPeriod: string; // e.g. "March 31, 2026"
+  previousReportingPeriod?: string; // e.g. "March 31, 2025"
+  financialYear: string; // "2025-26"
+  previousFinancialYear?: string; // "2024-25"
   natureOfBusiness?: string;
   pan?: string;
   gstin?: string;

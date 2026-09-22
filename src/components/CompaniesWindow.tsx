@@ -63,7 +63,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   // Creation Form State
   const [newEntityName, setNewEntityName] = useState('');
   const [newEntityType, setNewEntityType] = useState<EntityConfig['entityType']>('Partnership Firm');
-  const [newFY, setNewFY] = useState<string>('2024-25');
+  const [newFY, setNewFY] = useState<string>('2025-26');
   const [newStarterType, setNewStarterType] = useState<
     'blank' | 'sample_partnership' | 'sample_proprietorship' | 'clone'
   >('blank');
@@ -129,9 +129,9 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       entityName: finalName,
       entityType: newEntityType,
       financialYear: newFY,
-      reportingPeriod: preset?.cyPeriod || 'March 31, 2025',
-      previousFinancialYear: preset?.pyYear || '2023-24',
-      previousReportingPeriod: preset?.pyPeriod || 'March 31, 2024',
+      reportingPeriod: preset?.cyPeriod || 'March 31, 2026',
+      previousFinancialYear: preset?.pyYear || '2024-25',
+      previousReportingPeriod: preset?.pyPeriod || 'March 31, 2025',
       currencyUnit: 'INR',
       taxRatePercent: 30,
       transferProfitTo: newEntityType === 'LLP' ? 'reserves' : 'partners_capital',
@@ -188,15 +188,15 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
           entityName: sample.name,
           entityType: sample.entityType,
           financialYear: sample.financialYear,
-          reportingPeriod: sample.reportingPeriod || 'March 31, 2025',
-          previousFinancialYear: sample.previousFinancialYear || '2023-24',
-          previousReportingPeriod: sample.previousReportingPeriod || 'March 31, 2024',
+          reportingPeriod: sample.reportingPeriod || 'March 31, 2026',
+          previousFinancialYear: sample.previousFinancialYear || '2024-25',
+          previousReportingPeriod: sample.previousReportingPeriod || 'March 31, 2025',
           taxRatePercent: 30,
           transferProfitTo: 'partners_capital',
           address: 'Plot No. 12, Industrial Area, Phase II, Pune - 411018, Maharashtra',
           registeredAddress: 'Plot No. 12, Industrial Area, Phase II, Pune - 411018, Maharashtra',
           placeOfSigning: 'Pune',
-          dateOfSigning: 'March 31, 2025',
+          dateOfSigning: 'March 31, 2026',
           signingPartnerName: 'Partner R. R. Kulkarni',
           auditorFirmName: 'Kulkarni & Associates',
           auditorName: 'CA Rajesh Kulkarni',
@@ -217,16 +217,16 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
           entityName: sample.name,
           entityType: sample.entityType,
           financialYear: sample.financialYear,
-          reportingPeriod: sample.reportingPeriod || 'March 31, 2025',
-          previousFinancialYear: '2023-24',
-          previousReportingPeriod: 'March 31, 2024',
+          reportingPeriod: sample.reportingPeriod || 'March 31, 2026',
+          previousFinancialYear: '2024-25',
+          previousReportingPeriod: 'March 31, 2025',
           taxRatePercent: 30,
           transferProfitTo: 'proprietor_capital',
           proprietorName: 'Parasharam Patil',
           address: 'Shop No. 4, Steel Market Yard, Kalamboli, Navi Mumbai - 410218, Maharashtra',
           registeredAddress: 'Shop No. 4, Steel Market Yard, Kalamboli, Navi Mumbai - 410218, Maharashtra',
           placeOfSigning: 'Navi Mumbai',
-          dateOfSigning: 'March 31, 2025',
+          dateOfSigning: 'March 31, 2026',
           auditorFirmName: 'S. P. Joshi & Co.',
           auditorName: 'CA Snehal Joshi',
           auditorRole: 'Proprietor',
@@ -673,7 +673,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                   >
                     {POPULAR_INDIAN_FY_PRESETS.map((p) => (
                       <option key={p.cyYear} value={p.cyYear}>
-                        FY {p.cyYear} (AY {p.assessmentYear})
+                        FY {p.cyYear} (AY {p.assessmentYear}){p.isCurrentActive ? ' ★ Active Audit Year' : ''}
                       </option>
                     ))}
                   </select>

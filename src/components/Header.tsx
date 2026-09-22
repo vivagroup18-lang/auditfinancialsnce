@@ -302,7 +302,7 @@ export const Header: React.FC<HeaderProps> = ({
                     FY {config.financialYear}
                   </span>
                   <span className="text-[10px] text-slate-400 hidden xl:inline whitespace-nowrap">
-                    (PY: {config.previousFinancialYear || '2023-24'})
+                    (PY: {config.previousFinancialYear || '2024-25'})
                   </span>
                   <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-slate-200 transition shrink-0" />
                 </button>
@@ -350,10 +350,15 @@ export const Header: React.FC<HeaderProps> = ({
                             }`}
                           >
                             <div>
-                              <div className="flex items-center gap-1.5 font-semibold">
+                              <div className="flex items-center gap-1.5 font-semibold flex-wrap">
                                 <span>FY {p.cyYear} (CY)</span>
                                 <span className="text-slate-400 font-normal">&</span>
                                 <span>FY {p.pyYear} (PY)</span>
+                                {p.isCurrentActive && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-600 text-white">
+                                    Active Audit Year
+                                  </span>
+                                )}
                               </div>
                               <div className="text-[10px] text-slate-500 font-normal">
                                 A.Y. {p.assessmentYear} • As on {p.cyPeriod}

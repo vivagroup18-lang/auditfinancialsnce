@@ -231,7 +231,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
   const [newEntityType, setNewEntityType] = useState<
     'Partnership Firm' | 'Sole Proprietorship' | 'LLP' | 'AOP/BOI'
   >('Partnership Firm');
-  const [newFY, setNewFY] = useState<string>('2024-25');
+  const [newFY, setNewFY] = useState<string>('2025-26');
   const [newStarterType, setNewStarterType] = useState<
     'blank' | 'sample_partnership' | 'sample_proprietorship' | 'clone'
   >('blank');
@@ -319,9 +319,9 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
       entityName: finalName,
       entityType: newEntityType,
       financialYear: newFY,
-      reportingPeriod: preset?.cyPeriod || 'March 31, 2025',
-      previousFinancialYear: preset?.pyYear || '2023-24',
-      previousReportingPeriod: preset?.pyPeriod || 'March 31, 2024',
+      reportingPeriod: preset?.cyPeriod || 'March 31, 2026',
+      previousFinancialYear: preset?.pyYear || '2024-25',
+      previousReportingPeriod: preset?.pyPeriod || 'March 31, 2025',
       currencyUnit: 'INR',
       taxRatePercent: 30,
       transferProfitTo: newEntityType === 'Partnership Firm' ? 'partners_capital' : 'proprietor_capital',
@@ -346,9 +346,9 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
             entityName: sample.name,
             entityType: sample.entityType,
             financialYear: sample.financialYear,
-            reportingPeriod: 'March 31, 2025',
-            previousFinancialYear: '2023-24',
-            previousReportingPeriod: 'March 31, 2024',
+            reportingPeriod: sample.reportingPeriod || 'March 31, 2026',
+            previousFinancialYear: sample.previousFinancialYear || '2024-25',
+            previousReportingPeriod: sample.previousReportingPeriod || 'March 31, 2025',
             taxRatePercent: 30,
             transferProfitTo: 'partners_capital',
           },
@@ -361,9 +361,9 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
             entityName: sample.name,
             entityType: sample.entityType,
             financialYear: sample.financialYear,
-            reportingPeriod: 'March 31, 2025',
-            previousFinancialYear: '2023-24',
-            previousReportingPeriod: 'March 31, 2024',
+            reportingPeriod: sample.reportingPeriod || 'March 31, 2026',
+            previousFinancialYear: sample.previousFinancialYear || '2024-25',
+            previousReportingPeriod: sample.previousReportingPeriod || 'March 31, 2025',
             taxRatePercent: 30,
             transferProfitTo: 'proprietor_capital',
           },
@@ -510,7 +510,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                 </span>
                 <span className="text-slate-500">vs</span>
                 <span>
-                  Comparative: <strong className="text-indigo-300">FY {config.previousFinancialYear || '2023-24'}</strong>
+                  Comparative: <strong className="text-indigo-300">FY {config.previousFinancialYear || '2024-25'}</strong>
                 </span>
                 <button
                   type="button"
@@ -1051,7 +1051,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                             </span>
                           </div>
                           <div className="text-xs text-slate-500">
-                            FY {config.previousFinancialYear || '2023-24'} • As on {config.previousReportingPeriod || 'March 31, 2024'}
+                            FY {config.previousFinancialYear || '2024-25'} • As on {config.previousReportingPeriod || 'March 31, 2025'}
                           </div>
                         </div>
                       </div>
