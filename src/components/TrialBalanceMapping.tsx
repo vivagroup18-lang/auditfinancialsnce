@@ -151,7 +151,7 @@ const EditLedgerModal: React.FC<{
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-medium"
             />
             <p className="text-[10px] text-slate-500 mt-1">
-              This exact text will be displayed across Notes to Accounts, P&amp;L, Balance Sheet, and Excel exports.
+              This exact text will be displayed across Notes to Accounts, P & L, Balance Sheet, and Excel exports.
             </p>
           </div>
 
@@ -210,7 +210,18 @@ const EditLedgerModal: React.FC<{
 
           {/* Statutory Note Assignment */}
           <div>
-            <label className="block font-bold text-slate-800 mb-1">Statutory ICAI Note Schedule</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-bold text-slate-800 text-xs">Statutory ICAI Note Schedule</label>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  noteNumber <= 18
+                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                }`}
+              >
+                {noteNumber <= 18 ? '📋 Balance Sheet Schedule' : '📈 Profit & Loss Schedule'}
+              </span>
+            </div>
             <select
               value={noteNumber}
               onChange={(e) => {
@@ -221,13 +232,30 @@ const EditLedgerModal: React.FC<{
                   setSubCategory(nDef.subCategories[0]);
                 }
               }}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium text-slate-800"
+              className={`w-full px-3 py-2 border rounded-xl font-semibold text-xs transition focus:outline-none focus:ring-2 ${
+                noteNumber <= 18
+                  ? 'bg-amber-50/80 text-amber-950 border-amber-300 focus:ring-amber-400'
+                  : 'bg-emerald-50/80 text-emerald-950 border-emerald-300 focus:ring-emerald-400'
+              }`}
             >
-              {selectableNotes.map((n) => (
-                <option key={n.noteNumber} value={n.noteNumber}>
-                  Note {n.noteNumber}: {n.name} ({n.statement === 'BalanceSheet' ? 'Balance Sheet' : 'P&amp;L'})
-                </option>
-              ))}
+              <optgroup label="📋 Balance Sheet Schedules (Notes 3 to 18)">
+                {selectableNotes
+                  .filter((n) => n.statement === 'BalanceSheet' || n.noteNumber <= 18)
+                  .map((n) => (
+                    <option key={n.noteNumber} value={n.noteNumber}>
+                      Note {n.noteNumber}: {n.name} (Balance Sheet)
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="📈 Profit & Loss Schedules (Notes 19 to 25)">
+                {selectableNotes
+                  .filter((n) => n.statement === 'ProfitAndLoss' || n.noteNumber >= 19)
+                  .map((n) => (
+                    <option key={n.noteNumber} value={n.noteNumber}>
+                      Note {n.noteNumber}: {n.name} (P & L)
+                    </option>
+                  ))}
+              </optgroup>
             </select>
           </div>
 
@@ -610,17 +638,44 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                 <span className="text-xs text-slate-500 font-medium">Ledger Classifications</span>
                 <span className="text-xs font-bold text-slate-900">{stats.totalCount} Ledgers</span>
               </div>
-              <div className="flex items-center gap-2 mt-2 text-xs">
-                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
-                  {stats.bsCount} BS
-                </span>
-                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
-                  {stats.plCount} P&amp;L
-                </span>
+              <div className="flex items-center gap-2 mt-2 text-xs flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setStatementFilter(statementFilter === 'BalanceSheet' ? 'ALL' : 'BalanceSheet')}
+                  className={`px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                    statementFilter === 'BalanceSheet'
+                      ? 'bg-amber-400 text-slate-950 border-amber-500 ring-2 ring-amber-400/30'
+                      : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200/80'
+                  }`}
+                  title="Click to filter by Balance Sheet ledgers"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span>{stats.bsCount} Balance Sheet</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatementFilter(statementFilter === 'ProfitAndLoss' ? 'ALL' : 'ProfitAndLoss')}
+                  className={`px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                    statementFilter === 'ProfitAndLoss'
+                      ? 'bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-400/30'
+                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80'
+                  }`}
+                  title="Click to filter by P & L ledgers"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>{stats.plCount} P & L</span>
+                </button>
+
                 {stats.flaggedCount > 0 && (
                   <button
-                    onClick={() => setFlagFilter('AUDIT_FLAG')}
-                    className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium hover:bg-amber-200 transition"
+                    type="button"
+                    onClick={() => setFlagFilter(flagFilter === 'AUDIT_FLAG' ? 'ALL' : 'AUDIT_FLAG')}
+                    className={`px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer shadow-2xs ${
+                      flagFilter === 'AUDIT_FLAG'
+                        ? 'bg-rose-600 text-white border-rose-500'
+                        : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200'
+                    }`}
                   >
                     {stats.flaggedCount} Flags
                   </button>
@@ -732,34 +787,79 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
               </div>
 
               {/* Statement filter */}
-              <div className="flex rounded-md shadow-2xs border border-slate-200 overflow-hidden">
-                {(['ALL', 'BalanceSheet', 'ProfitAndLoss'] as const).map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => setStatementFilter(st)}
-                    className={`px-2.5 py-1 text-xs font-medium transition ${
-                      statementFilter === st
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {st === 'ALL' ? 'All Statements' : st === 'BalanceSheet' ? 'Balance Sheet' : 'P&amp;L'}
-                  </button>
-                ))}
+              <div className="flex items-center rounded-xl p-0.5 bg-slate-100/90 border border-slate-200 shadow-2xs gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setStatementFilter('ALL')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                    statementFilter === 'ALL'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  All Statements
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatementFilter('BalanceSheet')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer border ${
+                    statementFilter === 'BalanceSheet'
+                      ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-xs ring-1 ring-amber-400/40'
+                      : 'bg-amber-50/80 hover:bg-amber-100 text-amber-900 border-amber-200/90'
+                  }`}
+                  title="Show only Balance Sheet ledgers (Notes 3 to 18)"
+                >
+                  <span className={`w-2 h-2 rounded-full ${statementFilter === 'BalanceSheet' ? 'bg-slate-950' : 'bg-amber-500'}`} />
+                  <span>Balance Sheet</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatementFilter('ProfitAndLoss')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer border ${
+                    statementFilter === 'ProfitAndLoss'
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs ring-1 ring-emerald-400/40'
+                      : 'bg-emerald-50/80 hover:bg-emerald-100 text-emerald-900 border-emerald-200/90'
+                  }`}
+                  title="Show only Profit and Loss ledgers (Notes 19 to 25)"
+                >
+                  <span className={`w-2 h-2 rounded-full ${statementFilter === 'ProfitAndLoss' ? 'bg-white' : 'bg-emerald-500'}`} />
+                  <span>P & L</span>
+                </button>
               </div>
 
               {/* Note Filter Dropdown */}
               <select
                 value={noteFilter}
                 onChange={(e) => setNoteFilter(e.target.value)}
-                className="px-2.5 py-1 rounded-md border border-slate-200 text-xs bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-2xs focus:outline-none focus:ring-2 transition cursor-pointer ${
+                  noteFilter === 'ALL'
+                    ? 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 focus:ring-slate-400'
+                    : Number(noteFilter) <= 18
+                    ? 'bg-amber-50/90 text-amber-950 border-amber-300 focus:ring-amber-400'
+                    : 'bg-emerald-50/90 text-emerald-950 border-emerald-300 focus:ring-emerald-400'
+                }`}
               >
-                <option value="ALL">All Statutory Notes (3-25)</option>
-                {selectableNotes.map((n) => (
-                  <option key={n.noteNumber} value={n.noteNumber}>
-                    Note {n.noteNumber}: {n.name}
-                  </option>
-                ))}
+                <option value="ALL">All Statutory Notes (3–25)</option>
+                <optgroup label="📋 Balance Sheet (Notes 3–18)">
+                  {selectableNotes
+                    .filter((n) => n.statement === 'BalanceSheet' || n.noteNumber <= 18)
+                    .map((n) => (
+                      <option key={n.noteNumber} value={n.noteNumber}>
+                        Note {n.noteNumber}: {n.name} (Balance Sheet)
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="📈 Profit & Loss (Notes 19–25)">
+                  {selectableNotes
+                    .filter((n) => n.statement === 'ProfitAndLoss' || n.noteNumber >= 19)
+                    .map((n) => (
+                      <option key={n.noteNumber} value={n.noteNumber}>
+                        Note {n.noteNumber}: {n.name} (P & L)
+                      </option>
+                    ))}
+                </optgroup>
               </select>
 
               {/* Flag filter */}
@@ -862,8 +962,14 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                                 {ledger.nature}
                               </span>
                               <span className="text-slate-300">•</span>
-                              <span className="text-[10px] text-slate-500">
-                                {ledger.statement === 'BalanceSheet' ? 'Balance Sheet' : 'Profit &amp; Loss'}
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-sm border ${
+                                  ledger.statement === 'BalanceSheet'
+                                    ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                    : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                }`}
+                              >
+                                {ledger.statement === 'BalanceSheet' ? 'Balance Sheet' : 'P & L'}
                               </span>
 
                               {/* Abnormal Sign Badge */}
@@ -919,21 +1025,57 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                           </td>
 
                           {/* Statutory Note Selector (Allows Interactive CA Override) */}
-                          <td className="py-2.5 px-3">
-                            <select
-                              value={ledger.noteNumber}
-                              onChange={(e) => currentUpdateHandler(ledger.id, Number(e.target.value))}
-                              className="w-full text-xs py-1 px-2 rounded-md border border-slate-300 bg-white font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                            >
-                              {selectableNotes.map((n) => (
-                                <option key={n.noteNumber} value={n.noteNumber}>
-                                  Note {n.noteNumber}: {n.name} ({n.statement === 'BalanceSheet' ? 'BS' : 'P&amp;L'})
-                                </option>
-                              ))}
-                            </select>
-                            <div className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[280px]">
-                              {ledger.subCategory || 'General Schedule'}
-                            </div>
+                          <td className="py-2.5 px-3 min-w-[270px] max-w-[340px]">
+                            {(() => {
+                              const isBS = ledger.noteNumber <= 18;
+                              return (
+                                <>
+                                  <select
+                                    value={ledger.noteNumber}
+                                    onChange={(e) => currentUpdateHandler(ledger.id, Number(e.target.value))}
+                                    className={`w-full text-xs py-1.5 px-2.5 rounded-xl border font-semibold transition cursor-pointer shadow-2xs focus:outline-none focus:ring-2 ${
+                                      isBS
+                                        ? 'bg-amber-50/90 hover:bg-amber-50 text-amber-950 border-amber-300/90 hover:border-amber-400 focus:ring-amber-400 focus:border-amber-400'
+                                        : 'bg-emerald-50/90 hover:bg-emerald-50 text-emerald-950 border-emerald-300/90 hover:border-emerald-400 focus:ring-emerald-400 focus:border-emerald-400'
+                                    }`}
+                                  >
+                                    <optgroup label="📋 Balance Sheet Schedules (Notes 3 to 18)" className="bg-amber-50 text-amber-950 font-bold">
+                                      {selectableNotes
+                                        .filter((n) => n.statement === 'BalanceSheet' || n.noteNumber <= 18)
+                                        .map((n) => (
+                                          <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800 py-1">
+                                            Note {n.noteNumber}: {n.name} (Balance Sheet)
+                                          </option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="📈 Profit & Loss Schedules (Notes 19 to 25)" className="bg-emerald-50 text-emerald-950 font-bold">
+                                      {selectableNotes
+                                        .filter((n) => n.statement === 'ProfitAndLoss' || n.noteNumber >= 19)
+                                        .map((n) => (
+                                          <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800 py-1">
+                                            Note {n.noteNumber}: {n.name} (P & L)
+                                          </option>
+                                        ))}
+                                    </optgroup>
+                                  </select>
+                                  <div className="flex items-center justify-between gap-1 text-[10px] mt-1 px-0.5 truncate">
+                                    <div className="flex items-center gap-1.5 truncate text-slate-600">
+                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isBS ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                                      <span className="truncate font-medium">{ledger.subCategory || (isBS ? 'Balance Sheet Schedule' : 'P & L Schedule')}</span>
+                                    </div>
+                                    <span
+                                      className={`shrink-0 font-bold px-1.5 py-0.2 rounded-full text-[9px] border ${
+                                        isBS
+                                          ? 'bg-amber-100/90 text-amber-900 border-amber-300/80'
+                                          : 'bg-emerald-100/90 text-emerald-900 border-emerald-300/80'
+                                      }`}
+                                    >
+                                      {isBS ? 'BS' : 'P & L'}
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </td>
 
                           {/* Confidence */}
@@ -1083,7 +1225,7 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                   <div className="space-y-1.5 text-left flex-1">
                     <h3 className="text-base font-bold text-slate-900">Clear Current Year Trial Balance</h3>
                     <p className="text-xs text-slate-600 leading-relaxed">
-                      Are you sure you want to clear all {mappedLedgers.length} ledgers from the Current Year Trial Balance? This will reset all generated Notes, Balance Sheet, and P&amp;L accounts for this period.
+                      Are you sure you want to clear all {mappedLedgers.length} ledgers from the Current Year Trial Balance? This will reset all generated Notes, Balance Sheet, and P & L accounts for this period.
                     </p>
                   </div>
                 </div>

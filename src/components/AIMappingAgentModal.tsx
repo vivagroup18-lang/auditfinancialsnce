@@ -632,19 +632,23 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
                     </button>
                     <button
                       onClick={() => setFilterType('bs')}
-                      className={`px-2.5 py-1 rounded text-xs transition ${
-                        filterType === 'bs' ? 'bg-white font-semibold text-slate-800 shadow-2xs' : 'text-slate-600'
+                      className={`px-2.5 py-1 rounded text-xs transition font-semibold ${
+                        filterType === 'bs'
+                          ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      BS (Notes 3-18)
+                      Balance Sheet (Notes 3–18)
                     </button>
                     <button
                       onClick={() => setFilterType('pl')}
-                      className={`px-2.5 py-1 rounded text-xs transition ${
-                        filterType === 'pl' ? 'bg-white font-semibold text-slate-800 shadow-2xs' : 'text-slate-600'
+                      className={`px-2.5 py-1 rounded text-xs transition font-semibold ${
+                        filterType === 'pl'
+                          ? 'bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      P&amp;L (Notes 19-25)
+                      P & L (Notes 19–25)
                     </button>
                   </div>
                 </div>
@@ -754,8 +758,14 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
                                   >
                                     Note {item.suggestedNoteNumber}: {item.suggestedNoteName.replace(/^Note \d+:\s*/, '')}
                                   </span>
-                                  <span className="text-[10px] text-slate-400 font-medium">
-                                    ({item.statement === 'BalanceSheet' ? 'BS' : 'P&L'})
+                                  <span
+                                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                                      item.statement === 'BalanceSheet'
+                                        ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                        : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                    }`}
+                                  >
+                                    {item.statement === 'BalanceSheet' ? 'Balance Sheet' : 'P & L'}
                                   </span>
                                 </div>
                               </td>
@@ -794,7 +804,7 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
                                 >
                                   {NCE_NOTE_DEFINITIONS.map((n) => (
                                     <option key={n.noteNumber} value={n.noteNumber}>
-                                      Note {n.noteNumber} ({n.statement === 'BalanceSheet' ? 'BS' : 'PL'})
+                                      Note {n.noteNumber} ({n.statement === 'BalanceSheet' ? 'Balance Sheet' : 'P & L'})
                                     </option>
                                   ))}
                                 </select>

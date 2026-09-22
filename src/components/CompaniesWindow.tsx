@@ -608,7 +608,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                     Partnership Firm
                   </span>
                   <span className="text-[10px] text-slate-500 block">
-                    Sample TB + P&amp;L
+                    Sample TB + P & L
                   </span>
                 </button>
 

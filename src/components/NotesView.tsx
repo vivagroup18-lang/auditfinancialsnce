@@ -171,22 +171,36 @@ export const NotesView: React.FC<NotesViewProps> = ({
               { id: 'ALL', label: 'All Notes (1–25)' },
               { id: 'WITH_BALANCE', label: 'Active with Balances' },
               { id: 'BALANCE_SHEET', label: 'Balance Sheet (Notes 3–18)' },
-              { id: 'PROFIT_LOSS', label: 'Profit & Loss (Notes 19–25)' },
+              { id: 'PROFIT_LOSS', label: 'P & L (Notes 19–25)' },
               { id: 'POLICIES', label: 'Mandatory Policies (Notes 1–2)' },
             ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setCategoryFilter(tab.id)}
-              className={`px-3 py-1 rounded-lg font-medium whitespace-nowrap transition ${
-                categoryFilter === tab.id
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          ).map((tab) => {
+            const isSelected = categoryFilter === tab.id;
+            let btnClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-transparent';
+            if (isSelected) {
+              if (tab.id === 'BALANCE_SHEET') {
+                btnClass = 'bg-amber-400 text-slate-950 font-bold border-amber-500 shadow-xs ring-1 ring-amber-400/40';
+              } else if (tab.id === 'PROFIT_LOSS') {
+                btnClass = 'bg-emerald-600 text-white font-bold border-emerald-500 shadow-xs ring-1 ring-emerald-400/40';
+              } else {
+                btnClass = 'bg-slate-900 text-white shadow-2xs font-bold border-slate-900';
+              }
+            } else if (tab.id === 'BALANCE_SHEET') {
+              btnClass = 'bg-amber-50/80 hover:bg-amber-100 text-amber-900 border-amber-200/80 font-medium';
+            } else if (tab.id === 'PROFIT_LOSS') {
+              btnClass = 'bg-emerald-50/80 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80 font-medium';
+            }
+
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setCategoryFilter(tab.id)}
+                className={`px-3 py-1 rounded-lg border whitespace-nowrap transition cursor-pointer ${btnClass}`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -197,6 +211,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
           const schedule = noteSchedules[def.noteNumber];
           const hasItems = schedule && schedule.items.length > 0;
           const totalAmt = schedule?.totalAmount || 0;
+          const isBS = def.statement === 'BalanceSheet' || def.noteNumber <= 18;
 
           return (
             <div
@@ -204,8 +219,12 @@ export const NotesView: React.FC<NotesViewProps> = ({
               id={`note-anchor-${def.noteNumber}`}
               className={`bg-white rounded-xl border transition-shadow shadow-xs overflow-hidden ${
                 selectedNoteNumber === def.noteNumber
-                  ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-                  : 'border-slate-200 hover:border-slate-300'
+                  ? isBS
+                    ? 'border-amber-400 ring-2 ring-amber-400/30'
+                    : 'border-emerald-500 ring-2 ring-emerald-500/20'
+                  : isBS
+                  ? 'border-slate-200 hover:border-amber-300/80'
+                  : 'border-slate-200 hover:border-emerald-300/80'
               }`}
             >
               {/* Note Header Accordion Toggle */}
@@ -219,17 +238,31 @@ export const NotesView: React.FC<NotesViewProps> = ({
                     toggleNote(def.noteNumber);
                   }
                 }}
-                className="w-full text-left p-4 bg-slate-50/70 hover:bg-slate-50 transition flex items-center justify-between border-b border-slate-200 cursor-pointer"
+                className={`w-full text-left p-4 transition flex items-center justify-between border-b cursor-pointer ${
+                  isBS ? 'bg-amber-50/30 hover:bg-amber-50/60 border-slate-200' : 'bg-emerald-50/30 hover:bg-emerald-50/60 border-slate-200'
+                }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                  <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs shrink-0">
+                  <span
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs border ${
+                      isBS
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                    }`}
+                  >
                     {def.noteNumber}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-bold text-slate-900 text-sm">{def.name}</h3>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-medium whitespace-nowrap">
-                        {def.statement === 'BalanceSheet' ? 'Balance Sheet' : 'Profit & Loss'}
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap border ${
+                          isBS
+                            ? 'bg-amber-100/90 text-amber-900 border-amber-300/80'
+                            : 'bg-emerald-100/90 text-emerald-900 border-emerald-300/80'
+                        }`}
+                      >
+                        {isBS ? 'Balance Sheet' : 'P & L'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{def.description}</p>

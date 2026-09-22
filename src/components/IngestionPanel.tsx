@@ -782,7 +782,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                 3
               </span>
               <div className="truncate">
-                <div className="truncate">Balance Sheet &amp; P&amp;L</div>
+                <div className="truncate">Balance Sheet & P & L</div>
                 <div className="text-[10px] text-slate-500 font-normal truncate">Statutory Drafts</div>
               </div>
             </button>
@@ -1420,7 +1420,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
               <div className="space-y-1.5 text-left flex-1">
                 <h3 className="text-base font-bold text-slate-900">Clear Current Year Trial Balance</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Are you sure you want to clear the Current Year Trial Balance ({tbRowCount} ledgers)? All mapped notes, Balance Sheet items, and P&amp;L accounts for this period will be reset.
+                  Are you sure you want to clear the Current Year Trial Balance ({tbRowCount} ledgers)? All mapped notes, Balance Sheet items, and P & L accounts for this period will be reset.
                 </p>
               </div>
             </div>

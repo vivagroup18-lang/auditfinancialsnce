@@ -1602,13 +1602,13 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                             def.statement === 'BalanceSheet'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              ? 'bg-amber-50 text-amber-900 border border-amber-300'
                               : def.statement === 'ProfitAndLoss'
-                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              ? 'bg-emerald-50 text-emerald-900 border border-emerald-300'
                               : 'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {def.statement === 'BalanceSheet' ? 'BS' : def.statement === 'ProfitAndLoss' ? 'P&L' : 'General'}
+                          {def.statement === 'BalanceSheet' ? 'BS' : def.statement === 'ProfitAndLoss' ? 'P & L' : 'General'}
                         </span>
                       </td>
                       <td className="py-2.5 px-4 text-right font-mono font-medium">{formatINR(cyVal)}</td>
