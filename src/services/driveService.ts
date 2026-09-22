@@ -74,7 +74,7 @@ export function extractDriveActivationUrl(err: any): string {
   return `https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${projId}`;
 }
 
-function handleDriveError(res: Response, errorBody: string, actionDesc: string): never {
+export function handleDriveError(res: Response, errorBody: string, actionDesc: string): never {
   if (
     res.status === 401 ||
     errorBody.includes('UNAUTHENTICATED') ||

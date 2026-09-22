@@ -30,6 +30,8 @@ import {
   CreditCard,
   Gift,
   Coins,
+  Cloud,
+  RefreshCw,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import { EntityConfig, Company, UserProfile } from '../types';
@@ -73,6 +75,10 @@ interface HeaderProps {
   onDashboardViewChange?: (view: 'companies' | 'workspace') => void;
   workspaceStep?: 1 | 2 | 3 | 4 | 5;
   onWorkspaceStepChange?: (step: 1 | 2 | 3 | 4 | 5) => void;
+  driveSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  lastDriveSyncTime?: Date | null;
+  onManualDriveSync?: () => void;
+  onConnectDrive?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -109,6 +115,10 @@ export const Header: React.FC<HeaderProps> = ({
   onDashboardViewChange,
   workspaceStep = 1,
   onWorkspaceStepChange,
+  driveSyncStatus = 'idle',
+  lastDriveSyncTime,
+  onManualDriveSync,
+  onConnectDrive,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
@@ -527,6 +537,47 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Printer className="w-3.5 h-3.5" />
               </button>
+
+              {/* Google Drive Auto-Sync Status & Trigger */}
+              {accessToken ? (
+                <button
+                  type="button"
+                  onClick={onManualDriveSync}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer shrink-0 ${
+                    driveSyncStatus === 'syncing'
+                      ? 'bg-blue-950/60 border-blue-500/50 text-blue-300 shadow-xs'
+                      : driveSyncStatus === 'error'
+                      ? 'bg-rose-950/60 border-rose-500/50 text-rose-300'
+                      : 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60 shadow-xs'
+                  }`}
+                  title={
+                    driveSyncStatus === 'syncing'
+                      ? 'Syncing changes to your Google Drive...'
+                      : driveSyncStatus === 'error'
+                      ? 'Google Drive sync failed. Click to retry.'
+                      : `Google Drive Synced (${user?.email || 'Active'}) • Click to sync now`
+                  }
+                >
+                  {driveSyncStatus === 'syncing' ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
+                  ) : (
+                    <Cloud className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  )}
+                  <span className="hidden xl:inline text-[11px] font-bold">
+                    {driveSyncStatus === 'syncing' ? 'Syncing...' : 'Drive Synced'}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onConnectDrive}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer shrink-0"
+                  title="Connect Google Drive to auto-save and access companies from any computer"
+                >
+                  <Cloud className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="hidden xl:inline text-[11px]">Connect Drive</span>
+                </button>
+              )}
             </div>
 
             <div className="h-4 w-px bg-slate-800 shrink-0" />

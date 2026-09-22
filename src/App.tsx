@@ -68,6 +68,10 @@ import {
 import { NCE_NOTE_DEFINITIONS } from './data/nceTaxonomy';
 import { CheckCircle2, AlertTriangle, Info, X, FileSpreadsheet, ArrowRight } from 'lucide-react';
 import { FinancialYearChangeModal } from './components/FinancialYearChangeModal';
+import {
+  checkAndRestoreFromDrive,
+  saveWorkspaceToDriveSync,
+} from './services/driveSyncService';
 
 export default function App() {
   // Initial synchronous recovery from localStorage to prevent empty-state wipes
@@ -194,6 +198,13 @@ export default function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [gmailInitialTemplateId, setGmailInitialTemplateId] = useState<string>('financial_statements_transmittal');
 
+  // Google Drive Cloud Auto-Sync State
+  const [driveSyncStatus, setDriveSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [lastDriveSyncTime, setLastDriveSyncTime] = useState<Date | null>(null);
+  const isInitialDriveSyncDoneRef = useRef<boolean>(false);
+  const driveSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeDriveFileIdRef = useRef<string | undefined>(undefined);
+
   // Check URL query param for ?ref=... on mount
   useEffect(() => {
     try {
@@ -231,8 +242,11 @@ export default function App() {
     });
   }, []);
 
-  const handleGoogleAuthSuccess = useCallback((authedUser: UserProfile, isNewUser: boolean) => {
+  const handleGoogleAuthSuccess = useCallback((authedUser: UserProfile, isNewUser: boolean, token?: string) => {
     setCurrentUser(authedUser);
+    if (token) {
+      setAccessToken(token);
+    }
     if (isNewUser || !authedUser.mobile) {
       setIsOnboardingModalOpen(true);
     } else {
@@ -251,6 +265,10 @@ export default function App() {
     setCurrentUser(null);
     setUser(null);
     setAccessToken(null);
+    isInitialDriveSyncDoneRef.current = false;
+    activeDriveFileIdRef.current = undefined;
+    setDriveSyncStatus('idle');
+    setLastDriveSyncTime(null);
     setNotification({
       type: 'info',
       message: 'You have been signed out.',
@@ -356,6 +374,173 @@ export default function App() {
       saveActiveCompanyIdToStorage(activeCompanyId);
     }
   }, [activeCompanyId]);
+
+  // Google Drive Cloud Auto-Sync Handlers
+  const handleConnectGoogleDrive = useCallback(async () => {
+    try {
+      setDriveSyncStatus('syncing');
+      const { user: authedUser, accessToken: token } = await googleSignIn();
+      if (token) {
+        setUser(authedUser);
+        setAccessToken(token);
+        setNotification({
+          type: 'success',
+          message: 'Google Drive connected! Synchronizing your workspace...',
+        });
+      } else {
+        setDriveSyncStatus('idle');
+      }
+    } catch (err: any) {
+      console.error('Failed to connect Google Drive:', err);
+      setDriveSyncStatus('error');
+      setNotification({
+        type: 'error',
+        message: `Google Drive connection cancelled or failed: ${err.message || 'Unknown error'}`,
+      });
+    }
+  }, []);
+
+  const handleManualDriveSync = useCallback(async () => {
+    if (!accessToken) {
+      await handleConnectGoogleDrive();
+      return;
+    }
+    try {
+      setDriveSyncStatus('syncing');
+      const userEmail = currentUser?.email || user?.email || undefined;
+      const saveRes = await saveWorkspaceToDriveSync(
+        accessToken,
+        companies,
+        activeCompanyId,
+        userEmail,
+        activeDriveFileIdRef.current
+      );
+      activeDriveFileIdRef.current = saveRes.fileId;
+      setDriveSyncStatus('synced');
+      setLastDriveSyncTime(new Date(saveRes.lastSyncedAt));
+      setNotification({
+        type: 'success',
+        message: `Google Drive workspace synced successfully (${companies.length} company entity/entities backed up).`,
+      });
+    } catch (err: any) {
+      console.error('Manual Drive sync error:', err);
+      setDriveSyncStatus('error');
+      setNotification({
+        type: 'error',
+        message: `Google Drive sync failed: ${err.message || 'Check network or permissions'}`,
+      });
+    }
+  }, [accessToken, companies, activeCompanyId, currentUser, user, handleConnectGoogleDrive]);
+
+  // Initial restore/sync from Google Drive upon sign-in with access token
+  useEffect(() => {
+    if (!accessToken || isInitialDriveSyncDoneRef.current) return;
+
+    let isMounted = true;
+    const doInitialSync = async () => {
+      try {
+        setDriveSyncStatus('syncing');
+        const userEmail = currentUser?.email || user?.email || undefined;
+        const res = await checkAndRestoreFromDrive(accessToken, companies, userEmail);
+        if (!isMounted) return;
+
+        activeDriveFileIdRef.current = res.fileId;
+        isInitialDriveSyncDoneRef.current = true;
+        setDriveSyncStatus('synced');
+        if (res.lastSyncedAt) {
+          setLastDriveSyncTime(new Date(res.lastSyncedAt));
+        } else {
+          setLastDriveSyncTime(new Date());
+        }
+
+        if (res.restored && res.companies && res.companies.length > 0) {
+          setCompanies(res.companies);
+          saveCompaniesToStorage(res.companies);
+
+          const targetId =
+            res.activeCompanyId && res.companies.some((c) => c.id === res.activeCompanyId)
+              ? res.activeCompanyId
+              : res.companies[0].id;
+          const activeComp = res.companies.find((c) => c.id === targetId) || res.companies[0];
+          setActiveCompanyId(activeComp.id);
+          saveActiveCompanyIdToStorage(activeComp.id);
+
+          setConfig({ ...activeComp.config });
+          setRawRows([...(activeComp.rawRows || [])]);
+          setMappedLedgers([...(activeComp.mappedLedgers || [])]);
+          setMappingExceptions([...(activeComp.mappingExceptions || [])]);
+          setPyRawRows([...(activeComp.pyRawRows || [])]);
+          setPyMappedLedgers([...(activeComp.pyMappedLedgers || [])]);
+          setPyMappingExceptions([...(activeComp.pyMappingExceptions || [])]);
+          setTbFileName(activeComp.tbFileName || '');
+          setPyFileName(activeComp.pyFileName || '');
+          setUploadedBalanceSheet(activeComp.uploadedBalanceSheet);
+          setUploadedProfitAndLoss(activeComp.uploadedProfitAndLoss);
+          setUploadedPYBalanceSheet(activeComp.uploadedPYBalanceSheet);
+          setUploadedPYProfitAndLoss(activeComp.uploadedPYProfitAndLoss);
+
+          setNotification({
+            type: 'success',
+            message: res.message,
+          });
+        } else if (res.syncedToCloud) {
+          setNotification({
+            type: 'success',
+            message: res.message,
+          });
+        }
+      } catch (err: any) {
+        if (!isMounted) return;
+        console.error('Initial Google Drive sync failed:', err);
+        setDriveSyncStatus('error');
+        if (err?.message?.includes('Token Expired') || err?.message?.includes('401')) {
+          setAccessToken(null);
+        }
+      }
+    };
+
+    doInitialSync();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessToken, companies, currentUser, user]);
+
+  // Debounced auto-save to Google Drive whenever companies or active company change
+  useEffect(() => {
+    if (!accessToken || !isInitialDriveSyncDoneRef.current) return;
+    if (companies.length === 0) return;
+
+    if (driveSyncDebounceRef.current) {
+      clearTimeout(driveSyncDebounceRef.current);
+    }
+
+    driveSyncDebounceRef.current = setTimeout(async () => {
+      try {
+        setDriveSyncStatus('syncing');
+        const userEmail = currentUser?.email || user?.email || undefined;
+        const saveRes = await saveWorkspaceToDriveSync(
+          accessToken,
+          companies,
+          activeCompanyId,
+          userEmail,
+          activeDriveFileIdRef.current
+        );
+        activeDriveFileIdRef.current = saveRes.fileId;
+        setDriveSyncStatus('synced');
+        setLastDriveSyncTime(new Date(saveRes.lastSyncedAt));
+      } catch (err: any) {
+        console.error('Drive auto-save error:', err);
+        setDriveSyncStatus('error');
+      }
+    }, 3500);
+
+    return () => {
+      if (driveSyncDebounceRef.current) {
+        clearTimeout(driveSyncDebounceRef.current);
+      }
+    };
+  }, [companies, activeCompanyId, accessToken, currentUser, user]);
 
   // Sync active company variables back to main companies array
   useEffect(() => {
@@ -1672,6 +1857,10 @@ export default function App() {
           setWorkspaceStep(s);
           setDashboardView('workspace');
         }}
+        driveSyncStatus={driveSyncStatus}
+        lastDriveSyncTime={lastDriveSyncTime}
+        onManualDriveSync={handleManualDriveSync}
+        onConnectDrive={handleConnectGoogleDrive}
       />
 
       {/* Main Content Area */}
@@ -1722,6 +1911,11 @@ export default function App() {
             onDuplicateCompany={handleDuplicateCompany}
             onOpenWorkingWindows={() => setDashboardView('workspace')}
             onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
+            driveSyncStatus={driveSyncStatus}
+            lastDriveSyncTime={lastDriveSyncTime}
+            userEmail={currentUser?.email || user?.email || undefined}
+            onManualDriveSync={handleManualDriveSync}
+            onConnectDrive={handleConnectGoogleDrive}
           />
         ) : (
           /* VIEW 2: 5-STEP GUIDED WORKSPACE WINDOW */

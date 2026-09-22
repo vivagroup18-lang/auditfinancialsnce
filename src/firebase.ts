@@ -51,8 +51,16 @@ googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
-// In-memory token storage (MANDATORY: do not persist in localStorage/sessionStorage)
-let cachedAccessToken: string | null = null;
+const SESSION_TOKEN_KEY = 'ca_google_drive_token_session';
+
+// In-session token cache (persists during active browser tab, cleared on logout/tab close)
+let cachedAccessToken: string | null = (() => {
+  try {
+    return sessionStorage.getItem(SESSION_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+})();
 let isSigningIn = false;
 
 export const initAuth = (
@@ -61,14 +69,22 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
+      if (!cachedAccessToken) {
+        try {
+          cachedAccessToken = sessionStorage.getItem(SESSION_TOKEN_KEY);
+        } catch {}
+      }
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
-        // User is signed in with Firebase, but memory token is null (e.g. page refresh)
+        // User is signed in with Firebase, but Drive token is not yet connected or expired
         if (onAuthFailure) onAuthFailure();
       }
     } else {
       cachedAccessToken = null;
+      try {
+        sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      } catch {}
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -102,11 +118,13 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     isSigningIn = true;
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Failed to obtain Google access token with Gmail/Drive scopes.');
+    if (credential?.accessToken) {
+      cachedAccessToken = credential.accessToken;
+      try {
+        sessionStorage.setItem(SESSION_TOKEN_KEY, credential.accessToken);
+      } catch {}
     }
-    cachedAccessToken = credential.accessToken;
-    return { user: result.user, accessToken: cachedAccessToken };
+    return { user: result.user, accessToken: cachedAccessToken || '' };
   } catch (error: any) {
     console.error('Google Sign In Error:', error);
     // If user cancelled scope or permissions failed, attempt standard sign-in as seamless fallback
@@ -127,9 +145,19 @@ export const getAccessToken = async (): Promise<string | null> => {
 
 export const setAccessTokenInMemory = (token: string | null) => {
   cachedAccessToken = token;
+  try {
+    if (token) {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+  } catch {}
 };
 
 export const googleLogout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
+  try {
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {}
 };

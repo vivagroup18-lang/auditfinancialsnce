@@ -23,6 +23,8 @@ import {
   Users,
   Percent,
   AlertTriangle,
+  Cloud,
+  RefreshCw,
 } from 'lucide-react';
 import { Company, EntityConfig } from '../types';
 import { POPULAR_INDIAN_FY_PRESETS } from '../utils/financialYearUtils';
@@ -43,6 +45,11 @@ interface CompaniesWindowProps {
   onDuplicateCompany: (companyId: string) => void;
   onOpenWorkingWindows: () => void;
   onOpenBackupRestore?: () => void;
+  driveSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  lastDriveSyncTime?: Date | null;
+  userEmail?: string;
+  onManualDriveSync?: () => void;
+  onConnectDrive?: () => void;
 }
 
 export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
@@ -55,6 +62,11 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   onDuplicateCompany,
   onOpenWorkingWindows,
   onOpenBackupRestore,
+  driveSyncStatus = 'idle',
+  lastDriveSyncTime,
+  userEmail,
+  onManualDriveSync,
+  onConnectDrive,
 }) => {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -341,6 +353,67 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                 </button>
               </div>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Google Drive Automated Cloud Sync Banner */}
+      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-xs border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+            {driveSyncStatus === 'syncing' ? (
+              <RefreshCw className="w-5 h-5 animate-spin text-emerald-300" />
+            ) : (
+              <Cloud className="w-5 h-5 text-emerald-400" />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-sm text-white">
+                {userEmail
+                  ? `Google Drive Auto-Sync Active (${userEmail})`
+                  : 'Google Drive Multi-Device Auto-Sync'}
+              </span>
+              {driveSyncStatus === 'synced' && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                  <Check className="w-2.5 h-2.5" />
+                  <span>Synced</span>
+                </span>
+              )}
+              {driveSyncStatus === 'syncing' && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-400/20 text-blue-300 border border-blue-400/30 animate-pulse">
+                  Syncing...
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {userEmail
+                ? 'Your companies, ledger mappings, and financial statements are automatically backed up in Google Drive and accessible on any computer upon login.'
+                : 'Connect your Gmail ID to automatically back up and access your companies anywhere on any laptop or desktop.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+          {userEmail ? (
+            <button
+              type="button"
+              onClick={onManualDriveSync}
+              disabled={driveSyncStatus === 'syncing'}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${driveSyncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              <span>{driveSyncStatus === 'syncing' ? 'Syncing...' : 'Sync with Drive Now'}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onConnectDrive}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Cloud className="w-3.5 h-3.5" />
+              <span>Connect Google Drive</span>
+            </button>
           )}
         </div>
       </div>

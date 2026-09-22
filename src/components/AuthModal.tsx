@@ -18,13 +18,13 @@ import {
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { authenticateUser, registerUser, authenticateGoogleUser } from '../utils/storageManager';
-import { googleSignInStandard } from '../firebase';
+import { googleSignIn, googleSignInStandard } from '../firebase';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAuthSuccess: (user: UserProfile) => void;
-  onGoogleAuthSuccess?: (user: UserProfile, isNewUser: boolean) => void;
+  onGoogleAuthSuccess?: (user: UserProfile, isNewUser: boolean, accessToken?: string) => void;
   initialTab?: 'signin' | 'register';
 }
 
@@ -137,7 +137,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError(null);
     setLoading(true);
     try {
-      const res = await googleSignInStandard();
+      let res: { user: any; accessToken?: string };
+      try {
+        res = await googleSignIn();
+      } catch (scopeErr) {
+        console.warn('Google Workspace Drive scope sign-in fell back to standard:', scopeErr);
+        res = await googleSignInStandard();
+      }
+
       if (res.user && res.user.email) {
         const authRes = authenticateGoogleUser({
           email: res.user.email,
@@ -147,7 +154,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         if (authRes.success && authRes.user) {
           if (onGoogleAuthSuccess) {
-            onGoogleAuthSuccess(authRes.user, !!authRes.isNewUser);
+            onGoogleAuthSuccess(authRes.user, !!authRes.isNewUser, res.accessToken);
           } else {
             onAuthSuccess(authRes.user);
           }
