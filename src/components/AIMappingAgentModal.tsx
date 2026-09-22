@@ -38,6 +38,7 @@ export interface AIMappingAgentModalProps {
   uploadedPYProfitAndLoss?: UploadedStatementDoc | null;
   entityName?: string;
   financialYear?: string;
+  targetPeriod?: 'CY' | 'PY';
 }
 
 interface AIProposal {
@@ -85,6 +86,7 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
   uploadedPYProfitAndLoss,
   entityName = 'Entity',
   financialYear = 'Current Financial Year',
+  targetPeriod = 'CY',
 }) => {
   const [activeTab, setActiveTab] = useState<'mapping' | 'chat' | 'taxonomy'>('mapping');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -431,6 +433,13 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold tracking-tight">AI Schedule Mapping Agent</h2>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                  targetPeriod === 'PY'
+                    ? 'bg-indigo-500/30 text-indigo-200 border-indigo-400/40'
+                    : 'bg-emerald-500/30 text-emerald-200 border-emerald-400/40'
+                }`}>
+                  {targetPeriod === 'PY' ? 'Previous Year (PY)' : 'Current Year (CY)'}
+                </span>
                 <span className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                   Gemini 3.8 Flash Engine
@@ -1015,10 +1024,10 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
             </button>
             <button
               onClick={handleApplyAllAccepted}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
             >
               <CheckCheck className="w-4 h-4" />
-              <span>Apply AI Schedule Mappings ({proposals.filter((p) => p.accepted).length})</span>
+              <span>Apply Mappings ({proposals.filter((p) => p.accepted).length}) &amp; Enter {targetPeriod === 'PY' ? 'PY' : 'Year-End'} Adjustments &rarr;</span>
             </button>
           </div>
         </div>

@@ -44,8 +44,9 @@ interface Step2PreviousYearProps {
   onUpdateLedgerDetails?: (ledgerId: string, updatedFields: Partial<MappedLedger>, isPY?: boolean) => void;
   onAddLedger?: (newLedger: Partial<MappedLedger>, isPY?: boolean) => void;
   onDeleteLedger?: (ledgerId: string, isPY?: boolean) => void;
-  onTriggerAIMap: () => void;
+  onTriggerAIMap: (target?: 'CY' | 'PY') => void;
   isAIMapping: boolean;
+  onOpenYearEndAdjustments?: (target?: 'CY' | 'PY', onProceed?: () => void) => void;
   pyComputedFinancials?: {
     balanceSheet: Omit<BalanceSheetData, 'previousYear'>;
     profitAndLoss: Omit<ProfitAndLossData, 'previousYear'>;
@@ -75,6 +76,7 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
   onDeleteLedger,
   onTriggerAIMap,
   isAIMapping,
+  onOpenYearEndAdjustments,
   pyComputedFinancials,
   onBackToStep1,
   onProceedToStep3,
@@ -89,6 +91,14 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
 
   const isDataAvailable = pyMappedLedgers && pyMappedLedgers.length > 0;
   const pyYearLabel = config.previousFinancialYear || '2023-24';
+
+  const handleProceedWithPYAdjustmentsCheck = () => {
+    if (isDataAvailable && config.yearEndAdjustments?.closingStockPY === undefined && onOpenYearEndAdjustments) {
+      onOpenYearEndAdjustments('PY', onProceedToStep3);
+    } else {
+      onProceedToStep3();
+    }
+  };
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -157,7 +167,7 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
 
             <button
               type="button"
-              onClick={onProceedToStep3}
+              onClick={handleProceedWithPYAdjustmentsCheck}
               className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer"
             >
               <span>{isDataAvailable ? 'Proceed to Step 3: Comparative Statements' : 'Skip to Step 3 (First Year / No PY)'}</span>
@@ -395,6 +405,7 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
             onDeleteLedger={(id) => onDeleteLedger && onDeleteLedger(id, true)}
             onTriggerAIMap={onTriggerAIMap}
             isAIMapping={isAIMapping}
+            onOpenYearEndAdjustments={onOpenYearEndAdjustments}
             cyYearLabel={pyYearLabel}
           />
         </div>
@@ -512,7 +523,7 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
 
         <button
           type="button"
-          onClick={onProceedToStep3}
+          onClick={handleProceedWithPYAdjustmentsCheck}
           className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer"
         >
           <span>Proceed to Step 3: Comparative Statements</span>

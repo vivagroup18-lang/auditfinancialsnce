@@ -33,9 +33,9 @@ interface TrialBalanceMappingProps {
   onUpdateLedgerDetails?: (ledgerId: string, updatedFields: Partial<MappedLedger>, isPY?: boolean) => void;
   onAddLedger?: (newLedger: Partial<MappedLedger>, isPY?: boolean) => void;
   onDeleteLedger?: (ledgerId: string, isPY?: boolean) => void;
-  onTriggerAIMap: () => void;
+  onTriggerAIMap: (target?: 'CY' | 'PY') => void;
   isAIMapping: boolean;
-  onOpenYearEndAdjustments?: () => void;
+  onOpenYearEndAdjustments?: (target?: 'CY' | 'PY') => void;
 
   // Previous Year comparative support
   pyMappedLedgers?: MappedLedger[];
@@ -451,12 +451,16 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
           {onOpenYearEndAdjustments && (
             <button
               type="button"
-              onClick={onOpenYearEndAdjustments}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-xs transition"
+              onClick={() => onOpenYearEndAdjustments(isViewingCY ? 'CY' : 'PY')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-bold text-xs transition cursor-pointer ${
+                isViewingCY
+                  ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-900'
+                  : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-300 text-indigo-900'
+              }`}
               title="Enter Closing Stock valuation and missing year-end adjustment items"
             >
-              <Box className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Closing Stock &amp; Adjustments</span>
+              <Box className="w-3.5 h-3.5" />
+              <span>Closing Stock &amp; Adjustments ({isViewingCY ? 'CY' : 'PY'})</span>
             </button>
           )}
 
@@ -704,12 +708,12 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                 </div>
               </div>
               <button
-                onClick={onTriggerAIMap}
+                onClick={() => onTriggerAIMap(isViewingCY ? 'CY' : 'PY')}
                 disabled={isAIMapping}
                 className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition whitespace-nowrap cursor-pointer disabled:opacity-50"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Launch AI Mapping Agent</span>
+                <span>Launch AI Mapping Agent ({isViewingCY ? 'CY' : 'PY'})</span>
               </button>
             </div>
           )}
@@ -743,17 +747,15 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                   </button>
                 )}
 
-                {isViewingCY && (
-                  <button
-                    onClick={onTriggerAIMap}
-                    disabled={isAIMapping}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition disabled:opacity-50 cursor-pointer"
-                    title="Run Gemini AI to verify or classify ambiguous ledgers"
-                  >
-                    <Sparkles className={`w-3.5 h-3.5 ${isAIMapping ? 'animate-spin' : ''}`} />
-                    <span>AI Mapping Agent</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => onTriggerAIMap(isViewingCY ? 'CY' : 'PY')}
+                  disabled={isAIMapping}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition disabled:opacity-50 cursor-pointer"
+                  title={`Run Gemini AI to verify or classify ambiguous ${isViewingCY ? 'Current Year' : 'Previous Year'} ledgers`}
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isAIMapping ? 'animate-spin' : ''}`} />
+                  <span>AI Mapping Agent ({isViewingCY ? 'CY' : 'PY'})</span>
+                </button>
 
                 {/* Upload or Replace button */}
                 <input
@@ -1140,6 +1142,48 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Mapping Completion & Enter Adjustments Action Banner */}
+          {onOpenYearEndAdjustments && currentActiveLedgers.length > 0 && (
+            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs transition ${
+              isViewingCY
+                ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-amber-50/60 border-emerald-300/80'
+                : 'bg-gradient-to-r from-indigo-50 via-blue-50 to-emerald-50/60 border-indigo-300/80'
+            }`}>
+              <div className="flex items-center gap-3.5">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs ${
+                  isViewingCY ? 'bg-emerald-700' : 'bg-indigo-700'
+                }`}>
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">
+                    {isViewingCY ? `Current Year Mapping Complete (${mappedLedgers.length} Ledgers)` : `Previous Year Mapping Complete (${pyMappedLedgers.length} Ledgers)`}
+                  </h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    {isViewingCY
+                      ? 'Statutory schedule classification reviewed. Next, enter Closing Stock valuation and year-end audit provisions.'
+                      : 'Prior period accounts classified. Next, enter Previous Year Closing Stock valuation for comparative statements.'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onOpenYearEndAdjustments(isViewingCY ? 'CY' : 'PY')}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 shrink-0 cursor-pointer text-white ${
+                  isViewingCY
+                    ? 'bg-emerald-700 hover:bg-emerald-800'
+                    : 'bg-indigo-700 hover:bg-indigo-800'
+                }`}
+              >
+                <Box className="w-4 h-4" />
+                <span>
+                  {isViewingCY ? 'Enter Year-End Adjustments & Closing Stock →' : 'Enter Previous Year Adjustments & Stock →'}
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Edit Existing Ledger Modal */}
           <EditLedgerModal

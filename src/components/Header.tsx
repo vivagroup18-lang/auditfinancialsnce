@@ -58,7 +58,7 @@ interface HeaderProps {
   onOpenCompanyManager: (tab?: 'list' | 'add' | 'edit') => void;
   onOpenYearModal?: () => void;
   onUpdateConfig?: (updated: EntityConfig) => void;
-  onOpenYearEndAdjustments?: () => void;
+  onOpenYearEndAdjustments?: (target?: 'CY' | 'PY') => void;
   onOpenBackupRestore?: () => void;
   user?: User | null;
   accessToken?: string | null;
@@ -897,7 +897,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="h-4 w-px bg-slate-800 mx-0.5 shrink-0" />
                 <button
                   type="button"
-                  onClick={onOpenYearEndAdjustments}
+                  onClick={() => onOpenYearEndAdjustments()}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-750 text-slate-100 hover:text-white text-xs font-bold border border-slate-600/80 hover:border-emerald-400/80 transition shadow-xs whitespace-nowrap cursor-pointer group"
                   title="Closing stock valuation and year-end audit adjustments"
                 >

@@ -151,9 +151,12 @@ export default function App() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isYearModalOpen, setIsYearModalOpen] = useState(false);
   const [isYearEndAdjustmentsOpen, setIsYearEndAdjustmentsOpen] = useState(false);
+  const [adjustmentsFocusPeriod, setAdjustmentsFocusPeriod] = useState<'CY' | 'PY'>('CY');
+  const [postAdjustmentCallback, setPostAdjustmentCallback] = useState<(() => void) | null>(null);
   const [isCompanyManagerOpen, setIsCompanyManagerOpen] = useState(false);
   const [isBackupRestoreOpen, setIsBackupRestoreOpen] = useState(false);
   const [isAIMappingModalOpen, setIsAIMappingModalOpen] = useState(false);
+  const [aiMappingTarget, setAiMappingTarget] = useState<'CY' | 'PY'>('CY');
   const [companyManagerInitialTab, setCompanyManagerInitialTab] = useState<'list' | 'add' | 'edit'>('list');
 
   // File metadata & status
@@ -1477,10 +1480,16 @@ export default function App() {
     }
   };
 
-  // Handle Trigger AI Semantic Mapping via AI Agent Modal
-  const handleTriggerAIMap = () => {
-    if (mappedLedgers.length === 0) {
-      setNotification({ type: 'info', message: 'Please upload a Trial Balance first before launching the AI Mapping Agent.' });
+  // Handle Trigger AI Semantic Mapping via AI Agent Modal (supports CY and PY)
+  const handleTriggerAIMap = (target?: 'CY' | 'PY') => {
+    const effectiveTarget = target || (workspaceStep === 2 ? 'PY' : 'CY');
+    const targetLedgers = effectiveTarget === 'PY' ? pyMappedLedgers : mappedLedgers;
+
+    if (targetLedgers.length === 0) {
+      setNotification({
+        type: 'info',
+        message: `Please upload or load a ${effectiveTarget === 'PY' ? 'Previous Year' : 'Current Year'} Trial Balance first before launching the AI Mapping Agent.`,
+      });
       return;
     }
 
@@ -1498,20 +1507,36 @@ export default function App() {
       return;
     }
 
+    setAiMappingTarget(effectiveTarget);
     setIsAIMappingModalOpen(true);
   };
 
-  // Handle applying AI Schedule Mapping changes to the Master State
+  // Handle applying AI Schedule Mapping changes to the Master State & Prompting Adjustments
   const handleApplyAIMappings = (updatedLedgers: MappedLedger[]) => {
-    setMappedLedgers(updatedLedgers);
-    if (activeCompanyId) {
-      setCompanies((prev) =>
-        prev.map((c) =>
-          c.id === activeCompanyId
-            ? { ...c, mappedLedgers: updatedLedgers, updatedAt: new Date().toISOString() }
-            : c
-        )
-      );
+    const isPY = aiMappingTarget === 'PY';
+
+    if (isPY) {
+      setPyMappedLedgers(updatedLedgers);
+      if (activeCompanyId) {
+        setCompanies((prev) =>
+          prev.map((c) =>
+            c.id === activeCompanyId
+              ? { ...c, pyMappedLedgers: updatedLedgers, updatedAt: new Date().toISOString() }
+              : c
+          )
+        );
+      }
+    } else {
+      setMappedLedgers(updatedLedgers);
+      if (activeCompanyId) {
+        setCompanies((prev) =>
+          prev.map((c) =>
+            c.id === activeCompanyId
+              ? { ...c, mappedLedgers: updatedLedgers, updatedAt: new Date().toISOString() }
+              : c
+          )
+        );
+      }
     }
 
     // Deduct credits and record AI mapping usage
@@ -1520,7 +1545,7 @@ export default function App() {
       deductCredits(
         activeUser.id,
         CREDIT_COSTS.AI_MAPPING,
-        `AI Schedule Mapping applied (${updatedLedgers.length} ledgers)`,
+        `AI Schedule Mapping applied (${updatedLedgers.length} ${isPY ? 'PY' : 'CY'} ledgers)`,
         'AI_MAPPING'
       );
       recordUserUsage(activeUser.id, 'aiMappings', 1);
@@ -1530,8 +1555,13 @@ export default function App() {
 
     setNotification({
       type: 'success',
-      message: `AI Schedule Mapping applied! Deducted ${CREDIT_COSTS.AI_MAPPING} credits (Remaining: ${(activeUser?.credits || 5) - CREDIT_COSTS.AI_MAPPING}).`,
+      message: `${isPY ? 'Previous Year' : 'Current Year'} AI Schedule Mapping applied (${updatedLedgers.length} ledgers)! Enter adjustment details below.`,
     });
+
+    // Close AI modal and AUTOMATICALLY OPEN Year-End Adjustments Modal!
+    setIsAIMappingModalOpen(false);
+    setAdjustmentsFocusPeriod(isPY ? 'PY' : 'CY');
+    setIsYearEndAdjustmentsOpen(true);
   };
 
   // Handle Export Excel with credit check
@@ -1615,7 +1645,10 @@ export default function App() {
         onOpenCompanyManager={handleOpenCompanyManager}
         onOpenYearModal={() => setIsYearModalOpen(true)}
         onUpdateConfig={(newCfg) => handleUpdateCompanyConfig(activeCompanyId, newCfg)}
-        onOpenYearEndAdjustments={() => setIsYearEndAdjustmentsOpen(true)}
+        onOpenYearEndAdjustments={(target) => {
+          setAdjustmentsFocusPeriod(target || (workspaceStep === 2 ? 'PY' : 'CY'));
+          setIsYearEndAdjustmentsOpen(true);
+        }}
         onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
         user={user}
         accessToken={accessToken}
@@ -1712,7 +1745,11 @@ export default function App() {
             onDeleteLedger={handleDeleteLedger}
             onTriggerAIMap={handleTriggerAIMap}
             isAIMapping={isAIMapping}
-            onOpenYearEndAdjustments={() => setIsYearEndAdjustmentsOpen(true)}
+            onOpenYearEndAdjustments={(target, onProceed) => {
+              setAdjustmentsFocusPeriod(target || (workspaceStep === 2 ? 'PY' : 'CY'));
+              if (onProceed) setPostAdjustmentCallback(() => onProceed);
+              setIsYearEndAdjustmentsOpen(true);
+            }}
             onOpenConfig={() => setIsConfigModalOpen(true)}
             onOpenYearModal={() => setIsYearModalOpen(true)}
             pyMappedLedgers={pyMappedLedgers}
@@ -1833,9 +1870,14 @@ export default function App() {
       {/* Year-End Adjustments & Closing Stock Entry Modal */}
       <YearEndAdjustmentsModal
         isOpen={isYearEndAdjustmentsOpen}
-        onClose={() => setIsYearEndAdjustmentsOpen(false)}
+        onClose={() => {
+          setIsYearEndAdjustmentsOpen(false);
+          setPostAdjustmentCallback(null);
+        }}
         adjustments={config.yearEndAdjustments || {}}
         config={config}
+        focusPeriod={adjustmentsFocusPeriod}
+        onProceedNext={postAdjustmentCallback || undefined}
         onSave={(updatedAdjustments) => {
           const updatedConfig = { ...config, yearEndAdjustments: updatedAdjustments };
           setConfig(updatedConfig);
@@ -1848,8 +1890,12 @@ export default function App() {
           );
           setNotification({
             type: 'success',
-            message: 'Year-End Adjustments & Closing Stock saved! Financial Statements updated.',
+            message: `${adjustmentsFocusPeriod === 'PY' ? 'Previous Year' : 'Current Year'} Adjustments & Closing Stock saved! Statements updated.`,
           });
+          if (postAdjustmentCallback) {
+            postAdjustmentCallback();
+            setPostAdjustmentCallback(null);
+          }
         }}
       />
 
@@ -1857,15 +1903,22 @@ export default function App() {
       <AIMappingAgentModal
         isOpen={isAIMappingModalOpen}
         onClose={() => setIsAIMappingModalOpen(false)}
-        mappedLedgers={mappedLedgers}
+        mappedLedgers={aiMappingTarget === 'PY' ? pyMappedLedgers : mappedLedgers}
+        targetPeriod={aiMappingTarget}
         onApplyMappings={handleApplyAIMappings}
-        onUpdateSingleLedgerNote={(id, note) => handleUpdateLedgerNote(id, note)}
+        onUpdateSingleLedgerNote={(id, note) => {
+          if (aiMappingTarget === 'PY') {
+            handleUpdatePyLedgerNote(id, note);
+          } else {
+            handleUpdateLedgerNote(id, note);
+          }
+        }}
         uploadedBalanceSheet={uploadedBalanceSheet}
         uploadedProfitAndLoss={uploadedProfitAndLoss}
         uploadedPYBalanceSheet={uploadedPYBalanceSheet}
         uploadedPYProfitAndLoss={uploadedPYProfitAndLoss}
         entityName={config.entityName}
-        financialYear={config.financialYear}
+        financialYear={aiMappingTarget === 'PY' ? (config.previousFinancialYear || '2023-24') : config.financialYear}
       />
 
       {/* User Authentication Modal */}

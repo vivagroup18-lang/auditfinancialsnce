@@ -48,9 +48,9 @@ interface StepByStepWorkspaceProps {
   onUpdateLedgerDetails?: (ledgerId: string, updatedFields: Partial<MappedLedger>, isPY?: boolean) => void;
   onAddLedger?: (newLedger: Partial<MappedLedger>, isPY?: boolean) => void;
   onDeleteLedger?: (ledgerId: string, isPY?: boolean) => void;
-  onTriggerAIMap: () => void;
+  onTriggerAIMap: (target?: 'CY' | 'PY') => void;
   isAIMapping: boolean;
-  onOpenYearEndAdjustments: () => void;
+  onOpenYearEndAdjustments: (target?: 'CY' | 'PY', onProceed?: () => void) => void;
   onOpenConfig: () => void;
   onOpenYearModal?: () => void;
 
@@ -385,6 +385,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onDeleteLedger={onDeleteLedger}
           onTriggerAIMap={onTriggerAIMap}
           isAIMapping={isAIMapping}
+          onOpenYearEndAdjustments={onOpenYearEndAdjustments}
           pyComputedFinancials={pyComputedFinancials}
           onBackToStep1={() => handleStepChange(1)}
           onProceedToStep3={() => handleStepChange(3)}

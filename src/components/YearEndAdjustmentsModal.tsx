@@ -10,6 +10,8 @@ interface YearEndAdjustmentsModalProps {
   onSave: (updated: YearEndAdjustments) => void;
   config: EntityConfig;
   currentOpeningStock?: number;
+  focusPeriod?: 'CY' | 'PY';
+  onProceedNext?: () => void;
 }
 
 export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = ({
@@ -19,6 +21,8 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
   onSave,
   config,
   currentOpeningStock = 0,
+  focusPeriod = 'CY',
+  onProceedNext,
 }) => {
   const [closingStockCY, setClosingStockCY] = useState<string>(
     adjustments.closingStockCY !== undefined ? String(adjustments.closingStockCY) : ''
@@ -40,7 +44,10 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
     adjustments.customAdjustments || []
   );
 
-  // Sync state when modal opens
+  const cyInputRef = React.useRef<HTMLInputElement>(null);
+  const pyInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Sync state when modal opens and auto-focus target input
   useEffect(() => {
     if (isOpen) {
       setClosingStockCY(adjustments.closingStockCY !== undefined ? String(adjustments.closingStockCY) : '');
@@ -49,8 +56,19 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
       setDepreciationCY(adjustments.depreciationCY !== undefined ? String(adjustments.depreciationCY) : '');
       setPartnerRemunerationCY(adjustments.partnerRemunerationCY !== undefined ? String(adjustments.partnerRemunerationCY) : '');
       setCustomAdjustments(adjustments.customAdjustments || []);
+
+      const timer = setTimeout(() => {
+        if (focusPeriod === 'PY' && pyInputRef.current) {
+          pyInputRef.current.focus();
+          pyInputRef.current.select();
+        } else if (cyInputRef.current) {
+          cyInputRef.current.focus();
+          cyInputRef.current.select();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, adjustments]);
+  }, [isOpen, adjustments, focusPeriod]);
 
   if (!isOpen) return null;
 
@@ -103,9 +121,13 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
     };
     onSave(updated);
     onClose();
+    if (onProceedNext) {
+      onProceedNext();
+    }
   };
 
   const stockValCY = parseNum(closingStockCY) || 0;
+  const stockValPY = parseNum(closingStockPY) || 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
@@ -118,9 +140,20 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
               <Box className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold">Year-End Adjustments & Closing Stock Entry</h2>
-              <p className="text-xs text-slate-300">
-                Enter Closing Stock valuation & missing year-end adjustment items for FY {config.financialYear}
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold">Year-End Adjustments & Closing Stock Entry</h2>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  focusPeriod === 'PY'
+                    ? 'bg-indigo-500/30 text-indigo-200 border-indigo-400/40'
+                    : 'bg-emerald-500/30 text-emerald-200 border-emerald-400/40'
+                }`}>
+                  {focusPeriod === 'PY' ? 'Previous Year (PY)' : 'Current Year (CY)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {focusPeriod === 'PY'
+                  ? `Enter Closing Stock valuation & comparative adjustment items for Previous Year (FY ${config.previousFinancialYear || '2023-24'})`
+                  : `Enter Closing Stock valuation & missing year-end adjustment items for FY ${config.financialYear}`}
               </p>
             </div>
           </div>
@@ -136,66 +169,114 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
 
           {/* 1. Closing Stock Valuation Section */}
-          <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-4 space-y-3">
+          <div className={`border rounded-xl p-4 space-y-3 transition ${
+            focusPeriod === 'PY'
+              ? 'bg-indigo-50/40 border-indigo-200'
+              : 'bg-emerald-50/50 border-emerald-200'
+          }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Box className="w-4 h-4 text-emerald-700" />
+                <Box className={`w-4 h-4 ${focusPeriod === 'PY' ? 'text-indigo-700' : 'text-emerald-700'}`} />
                 <h3 className="text-sm font-bold text-slate-900">Closing Stock Valuation (Physical Count / Valued as per AS-2)</h3>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                focusPeriod === 'PY'
+                  ? 'bg-indigo-100 text-indigo-800 border-indigo-200'
+                  : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+              }`}>
                 Affects Note 15 & Note 21
               </span>
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Trial Balances exported before year-end stock audit often do not include Closing Stock. Enter the valued Closing Stock below to update Balance Sheet Note 15 (Inventories) and credit P&L Note 21 (COGS).
+              Trial Balances exported before year-end stock audit often do not include Closing Stock. Enter the valued Closing Stock below to update Balance Sheet Note 15 (Inventories) and credit P & L Note 21 (COGS).
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Current Year Closing Stock (FY {config.financialYear})
-                </label>
+              <div className={`p-2.5 rounded-xl transition ${focusPeriod === 'CY' ? 'bg-white shadow-2xs border border-emerald-300 ring-2 ring-emerald-400/25' : 'bg-transparent'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Current Year Closing Stock (FY {config.financialYear})
+                  </label>
+                  {focusPeriod === 'CY' && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+                      Active Mapping
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <input
+                    ref={cyInputRef}
                     type="text"
                     placeholder="e.g. 19,78,250"
                     value={closingStockCY}
                     onChange={(e) => setClosingStockCY(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono font-bold text-slate-900 bg-white"
+                    className={`w-full px-3 py-2 text-xs rounded-lg border font-mono font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 ${
+                      focusPeriod === 'CY' ? 'border-emerald-400 focus:ring-emerald-500' : 'border-slate-300 focus:ring-emerald-500'
+                    }`}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Previous Year Closing Stock (FY {config.previousFinancialYear || '2023-24'})
-                </label>
+              <div className={`p-2.5 rounded-xl transition ${focusPeriod === 'PY' ? 'bg-white shadow-2xs border border-indigo-300 ring-2 ring-indigo-400/25' : 'bg-transparent'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Previous Year Closing Stock (FY {config.previousFinancialYear || '2023-24'})
+                  </label>
+                  {focusPeriod === 'PY' && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 font-bold border border-indigo-300">
+                      Active Mapping
+                    </span>
+                  )}
+                </div>
                 <input
+                  ref={pyInputRef}
                   type="text"
                   placeholder="e.g. 16,84,200"
                   value={closingStockPY}
                   onChange={(e) => setClosingStockPY(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-slate-700 bg-white"
+                  className={`w-full px-3 py-2 text-xs rounded-lg border font-mono font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 ${
+                    focusPeriod === 'PY' ? 'border-indigo-400 focus:ring-indigo-500' : 'border-slate-300 focus:ring-indigo-500 text-slate-700'
+                  }`}
                 />
               </div>
             </div>
 
-            {/* Live Financial Effect Preview */}
+            {/* Live Financial Effect Preview - CY */}
             {stockValCY > 0 && (
               <div className="bg-white rounded-lg p-3 border border-emerald-200 text-xs space-y-1 mt-2">
                 <p className="font-bold text-emerald-800 flex items-center gap-1">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                  Automatic Statement Adjustments for Closing Stock ({stockValCY.toLocaleString('en-IN', { minimumFractionDigits: 2 })}):
+                  Automatic Statement Adjustments for Current Year Closing Stock (₹{stockValCY.toLocaleString('en-IN', { minimumFractionDigits: 2 })}):
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1">
                   <div className="p-2 rounded bg-emerald-50 border border-emerald-100">
                     <span className="font-bold text-emerald-900 block">🏛️ Balance Sheet (Note 15):</span>
-                    <span>Adds Current Asset of <strong>{stockValCY.toLocaleString('en-IN')}</strong> under Inventories.</span>
+                    <span>Adds Current Asset of <strong>₹{stockValCY.toLocaleString('en-IN')}</strong> under Inventories.</span>
                   </div>
                   <div className="p-2 rounded bg-blue-50 border border-blue-100">
-                    <span className="font-bold text-blue-900 block">📈 Profit & Loss (Note 21):</span>
-                    <span>Deducts <strong>-{stockValCY.toLocaleString('en-IN')}</strong> from COGS (increases Net Profit).</span>
+                    <span className="font-bold text-blue-900 block">📈 Profit &amp; Loss (Note 21):</span>
+                    <span>Deducts <strong>-₹{stockValCY.toLocaleString('en-IN')}</strong> from COGS (increases Net Profit).</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Live Financial Effect Preview - PY */}
+            {stockValPY > 0 && (
+              <div className="bg-white rounded-lg p-3 border border-indigo-200 text-xs space-y-1 mt-2">
+                <p className="font-bold text-indigo-900 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  Automatic Statement Adjustments for Previous Year Closing Stock (₹{stockValPY.toLocaleString('en-IN', { minimumFractionDigits: 2 })}):
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1">
+                  <div className="p-2 rounded bg-indigo-50 border border-indigo-100">
+                    <span className="font-bold text-indigo-900 block">🏛️ PY Balance Sheet (Note 15):</span>
+                    <span>Adds Prior Period Asset of <strong>₹{stockValPY.toLocaleString('en-IN')}</strong> under Inventories.</span>
+                  </div>
+                  <div className="p-2 rounded bg-blue-50 border border-blue-100">
+                    <span className="font-bold text-blue-900 block">📈 PY Profit &amp; Loss (Note 21):</span>
+                    <span>Deducts <strong>-₹{stockValPY.toLocaleString('en-IN')}</strong> from Prior Period COGS.</span>
                   </div>
                 </div>
               </div>
@@ -328,20 +409,34 @@ export const YearEndAdjustmentsModal: React.FC<YearEndAdjustmentsModalProps> = (
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition"
-          >
-            Cancel
-          </button>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            {onProceedNext && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onProceedNext();
+                }}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition cursor-pointer"
+              >
+                Skip &amp; Proceed →
+              </button>
+            )}
+          </div>
 
           <button
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm"
+            className="flex items-center gap-2 px-6 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
           >
             <Check className="w-4 h-4" />
-            Apply Adjustments & Update Statements
+            <span>Apply Adjustments &amp; Update Statements</span>
           </button>
         </div>
 

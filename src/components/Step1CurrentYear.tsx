@@ -44,9 +44,9 @@ interface Step1CurrentYearProps {
   onUpdateLedgerDetails?: (ledgerId: string, updatedFields: Partial<MappedLedger>, isPY?: boolean) => void;
   onAddLedger?: (newLedger: Partial<MappedLedger>, isPY?: boolean) => void;
   onDeleteLedger?: (ledgerId: string, isPY?: boolean) => void;
-  onTriggerAIMap: () => void;
+  onTriggerAIMap: (target?: 'CY' | 'PY') => void;
   isAIMapping: boolean;
-  onOpenYearEndAdjustments: () => void;
+  onOpenYearEndAdjustments: (target?: 'CY' | 'PY', onProceed?: () => void) => void;
   computedFinancials?: {
     balanceSheet: BalanceSheetData;
     profitAndLoss: ProfitAndLossData;
@@ -61,7 +61,6 @@ interface Step1CurrentYearProps {
 
 export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
   config,
-  onUpdateConfig,
   mappedLedgers,
   totalDebit,
   totalCredit,
@@ -81,7 +80,8 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
   computedFinancials,
   onProceedToStep2,
   onSelectNote = () => {},
-  onOpenTradePayables,
+  onOpenTradePayables = () => {},
+  onUpdateConfig,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'upload' | 'mapping' | 'statements'>(() => {
     return mappedLedgers && mappedLedgers.length > 0 ? 'mapping' : 'upload';
@@ -91,6 +91,14 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isDataAvailable = mappedLedgers && mappedLedgers.length > 0;
+
+  const handleProceedWithAdjustmentsCheck = () => {
+    if (isDataAvailable && config.yearEndAdjustments?.closingStockCY === undefined && onOpenYearEndAdjustments) {
+      onOpenYearEndAdjustments('CY', onProceedToStep2);
+    } else {
+      onProceedToStep2();
+    }
+  };
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -144,7 +152,7 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
             {isDataAvailable && (
               <button
                 type="button"
-                onClick={onProceedToStep2}
+                onClick={handleProceedWithAdjustmentsCheck}
                 className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer"
               >
                 <span>Proceed to Step 2: Previous Year</span>
@@ -493,7 +501,7 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
         </div>
         <button
           type="button"
-          onClick={onProceedToStep2}
+          onClick={handleProceedWithAdjustmentsCheck}
           className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer"
         >
           <span>Proceed to Step 2: Previous Year Trial Balance & Statements</span>
