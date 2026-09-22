@@ -64,6 +64,7 @@ import {
   logoutActiveUser,
   recordUserUsage,
   deductCredits,
+  exportTotalLocalBackup,
 } from './utils/storageManager';
 import { NCE_NOTE_DEFINITIONS } from './data/nceTaxonomy';
 import { CheckCircle2, AlertTriangle, Info, X, FileSpreadsheet, ArrowRight } from 'lucide-react';
@@ -431,6 +432,30 @@ export default function App() {
       });
     }
   }, [accessToken, companies, activeCompanyId, currentUser, user, handleConnectGoogleDrive]);
+
+  // Total Local Backup of all companies
+  const handleDownloadTotalLocalBackup = useCallback(() => {
+    try {
+      if (!companies || companies.length === 0) {
+        setNotification({
+          type: 'info',
+          message: 'No client companies found to back up. Please create a company first.',
+        });
+        return;
+      }
+      const res = exportTotalLocalBackup(companies, activeCompanyId, currentUser || undefined);
+      setNotification({
+        type: 'success',
+        message: `Total Local Backup complete! Downloaded "${res.fileName}" with all ${res.totalCompanies} companies.`,
+      });
+    } catch (err: any) {
+      console.error('Local backup export error:', err);
+      setNotification({
+        type: 'error',
+        message: `Failed to download local backup: ${err.message || 'Unknown error'}`,
+      });
+    }
+  }, [companies, activeCompanyId, currentUser]);
 
   // Initial restore/sync from Google Drive upon sign-in with access token
   useEffect(() => {
@@ -1861,6 +1886,7 @@ export default function App() {
         lastDriveSyncTime={lastDriveSyncTime}
         onManualDriveSync={handleManualDriveSync}
         onConnectDrive={handleConnectGoogleDrive}
+        onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
       />
 
       {/* Main Content Area */}
@@ -1916,6 +1942,7 @@ export default function App() {
             userEmail={currentUser?.email || user?.email || undefined}
             onManualDriveSync={handleManualDriveSync}
             onConnectDrive={handleConnectGoogleDrive}
+            onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
           />
         ) : (
           /* VIEW 2: 5-STEP GUIDED WORKSPACE WINDOW */

@@ -25,11 +25,14 @@ import {
   AlertTriangle,
   Cloud,
   RefreshCw,
+  Download,
+  HardDrive,
 } from 'lucide-react';
 import { Company, EntityConfig } from '../types';
 import { POPULAR_INDIAN_FY_PRESETS } from '../utils/financialYearUtils';
 import { SAMPLE_DATASETS } from '../data/sampleTrialBalances';
 import { PartnerConfigForm, PartnerConfigItem } from './PartnerConfigForm';
+import { exportTotalLocalBackup } from '../utils/storageManager';
 
 interface CompaniesWindowProps {
   companies: Company[];
@@ -50,6 +53,7 @@ interface CompaniesWindowProps {
   userEmail?: string;
   onManualDriveSync?: () => void;
   onConnectDrive?: () => void;
+  onExportTotalLocalBackup?: () => void;
 }
 
 export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
@@ -67,6 +71,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   userEmail,
   onManualDriveSync,
   onConnectDrive,
+  onExportTotalLocalBackup,
 }) => {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -294,6 +299,18 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
     setEditConfig(null);
   };
 
+  const handleTriggerTotalLocalBackup = () => {
+    if (onExportTotalLocalBackup) {
+      onExportTotalLocalBackup();
+    } else {
+      try {
+        exportTotalLocalBackup(companies, activeCompanyId);
+      } catch (e: any) {
+        alert(e.message || 'Failed to generate local backup');
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Window Header */}
@@ -332,6 +349,16 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleTriggerTotalLocalBackup}
+                  className="px-3 py-2 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white border border-emerald-700 text-xs font-bold transition flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
+                  title={`Download total offline backup .json file containing all ${companies.length} client companies`}
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-300" />
+                  <span className="hidden sm:inline">Total Local Backup ({companies.length})</span>
+                  <span className="sm:hidden">Backup ({companies.length})</span>
+                </button>
                 {onOpenBackupRestore && (
                   <button
                     type="button"
@@ -394,7 +421,17 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+        <div className="flex items-center gap-2 self-start sm:self-center shrink-0 flex-wrap">
+          <button
+            type="button"
+            onClick={handleTriggerTotalLocalBackup}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 font-bold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title={`Download complete offline .json backup containing all ${companies.length} client entities`}
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden md:inline">Total Local Backup ({companies.length})</span>
+            <span className="md:hidden">Local Backup</span>
+          </button>
           {userEmail ? (
             <button
               type="button"
@@ -427,11 +464,22 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5">
             {/* Search & Filter Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-emerald-700" />
-                <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                  Saved Client Companies ({filteredCompanies.length})
-                </h2>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-emerald-700" />
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                    Saved Client Companies ({filteredCompanies.length})
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTriggerTotalLocalBackup}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  title={`Download total offline backup .json of all ${companies.length} companies`}
+                >
+                  <Download className="w-3 h-3 text-emerald-600" />
+                  <span>Backup All ({companies.length})</span>
+                </button>
               </div>
 
               {/* Filter Pills */}

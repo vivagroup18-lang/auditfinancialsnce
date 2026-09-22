@@ -79,6 +79,7 @@ interface HeaderProps {
   lastDriveSyncTime?: Date | null;
   onManualDriveSync?: () => void;
   onConnectDrive?: () => void;
+  onExportTotalLocalBackup?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -119,6 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
   lastDriveSyncTime,
   onManualDriveSync,
   onConnectDrive,
+  onExportTotalLocalBackup,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
@@ -286,10 +288,25 @@ export const Header: React.FC<HeaderProps> = ({
                             setIsDropdownOpen(false);
                             onOpenBackupRestore();
                           }}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-emerald-50 text-emerald-800 text-left transition font-semibold"
+                          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 text-left transition font-medium"
                         >
-                          <Database className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Backup & Restore (Cloud & Local)</span>
+                          <Database className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Backup &amp; Restore Hub</span>
+                        </button>
+                      )}
+
+                      {onExportTotalLocalBackup && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            onExportTotalLocalBackup();
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-emerald-50 text-emerald-900 text-left transition font-semibold"
+                          title={`Download complete local offline backup of all ${companies.length} companies`}
+                        >
+                          <Download className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Total Local Backup (All {companies.length} Entities)</span>
                         </button>
                       )}
                     </div>
@@ -525,6 +542,18 @@ export const Header: React.FC<HeaderProps> = ({
                   title="Backup & Restore (Cloud & Local JSON/Excel)"
                 >
                   <Database className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Total Local Backup (.json) Direct Download */}
+              {onExportTotalLocalBackup && (
+                <button
+                  type="button"
+                  onClick={onExportTotalLocalBackup}
+                  className="p-1.5 rounded-lg text-xs text-emerald-400 hover:text-emerald-200 hover:bg-emerald-950/50 hover:border hover:border-emerald-600/40 transition cursor-pointer"
+                  title={`Total Local Backup (.json) - Download offline backup of all ${companies.length} companies`}
+                >
+                  <Download className="w-3.5 h-3.5" />
                 </button>
               )}
 

@@ -864,29 +864,54 @@ export function loadActiveCompanyIdFromStorage(): string | null {
 export function generateWorkspaceBackupData(companies: Company[], activeCompanyId: string, currentUser?: UserProfile) {
   return {
     appName: 'CA Financial Statement Automation Agent',
+    backupType: 'TOTAL_LOCAL_WORKSPACE_BACKUP',
     version: '2.0.0',
     exportedAt: new Date().toISOString(),
     user: currentUser || DEFAULT_USER_PROFILE,
     activeCompanyId,
     totalCompanies: companies.length,
+    companySummary: companies.map((c) => ({
+      id: c.id,
+      name: c.config.entityName || 'Unnamed Entity',
+      entityType: c.config.entityType,
+      financialYear: c.config.financialYear,
+      cyLedgerCount: c.mappedLedgers?.length || c.rawRows?.length || 0,
+      pyLedgerCount: c.pyMappedLedgers?.length || c.pyRawRows?.length || 0,
+    })),
     companies,
   };
 }
 
 /**
- * Exports complete application workspace as JSON Backup file
+ * Exports complete application workspace as Total Local JSON Backup file containing all companies
  */
-export function exportWorkspaceBackup(companies: Company[], activeCompanyId: string, currentUser?: UserProfile): void {
-  const backupData = generateWorkspaceBackupData(companies, activeCompanyId, currentUser);
+export function exportTotalLocalBackup(
+  companies: Company[],
+  activeCompanyId?: string,
+  currentUser?: UserProfile
+): { success: boolean; fileName: string; totalCompanies: number } {
+  if (!companies || companies.length === 0) {
+    throw new Error('No company entities found to back up. Please create or load a company first.');
+  }
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const targetActiveId = activeCompanyId || companies[0]?.id || '';
+  const backupData = generateWorkspaceBackupData(companies, targetActiveId, currentUser);
 
   const jsonString = JSON.stringify(backupData, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const activeComp = companies.find((c) => c.id === activeCompanyId);
-  const compName = (activeComp?.config.entityName || 'CA_Financials').replace(/[^a-zA-Z0-9_-]/g, '_');
-  const fileName = `${compName}_Full_Backup_${dateStr}.json`;
+  const activeComp = companies.find((c) => c.id === targetActiveId);
+  const activeName = (activeComp?.config.entityName || 'Entity').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  const fileName =
+    companies.length === 1
+      ? `CA_Audit_TOTAL_LOCAL_BACKUP_${activeName}_${dateStr}.json`
+      : `CA_Audit_TOTAL_LOCAL_BACKUP_All_${companies.length}_Companies_${dateStr}_${timeStr}.json`;
 
   const link = document.createElement('a');
   link.href = url;
@@ -895,6 +920,19 @@ export function exportWorkspaceBackup(companies: Company[], activeCompanyId: str
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+
+  return {
+    success: true,
+    fileName,
+    totalCompanies: companies.length,
+  };
+}
+
+/**
+ * Exports complete application workspace as JSON Backup file
+ */
+export function exportWorkspaceBackup(companies: Company[], activeCompanyId: string, currentUser?: UserProfile): void {
+  exportTotalLocalBackup(companies, activeCompanyId, currentUser);
 }
 
 /**
