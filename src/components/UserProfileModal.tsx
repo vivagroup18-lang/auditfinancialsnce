@@ -19,6 +19,7 @@ import {
   Copy,
   Check,
   Coins,
+  Scale,
 } from 'lucide-react';
 import { UserProfile, UserInvoice } from '../types';
 import { SUBSCRIPTION_PLANS, formatCurrencyINR } from '../data/subscriptionPlans';
@@ -31,6 +32,7 @@ interface UserProfileModalProps {
   onProfileUpdated: (updatedUser: UserProfile) => void;
   onOpenSubscriptionModal: () => void;
   onOpenReferralModal?: () => void;
+  onOpenTermsModal?: () => void;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -40,6 +42,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onProfileUpdated,
   onOpenSubscriptionModal,
   onOpenReferralModal,
+  onOpenTermsModal,
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'credits' | 'billing'>('profile');
 
@@ -327,6 +330,25 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 >
                   Save Profile Changes
                 </button>
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Compliance with ICAI Non-Corporate Entity Guidelines</span>
+                </div>
+                {onOpenTermsModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenTermsModal();
+                    }}
+                    className="text-emerald-700 hover:text-emerald-900 font-semibold underline cursor-pointer text-left sm:text-right"
+                  >
+                    View Terms of Service &amp; Disclaimer
+                  </button>
+                )}
               </div>
             </form>
           )}

@@ -991,3 +991,51 @@ export function importWorkspaceBackup(fileContent: string): {
     return { success: false, error: `Failed to parse backup file: ${error.message}` };
   }
 }
+
+// =========================================================================
+// Terms & Conditions Acceptance Tracking
+// =========================================================================
+export const CURRENT_TERMS_VERSION = '2026.1';
+const STORAGE_KEY_TERMS_ACCEPTED_VERSION = 'ca_audit_terms_accepted_version';
+const STORAGE_KEY_TERMS_ACCEPTED_AT = 'ca_audit_terms_accepted_at';
+
+/**
+ * Checks if user has accepted the current version of the Terms & Conditions
+ */
+export function hasAcceptedTerms(): boolean {
+  try {
+    const version = localStorage.getItem(STORAGE_KEY_TERMS_ACCEPTED_VERSION);
+    return version === CURRENT_TERMS_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Records that user accepted the Terms & Conditions
+ */
+export function recordTermsAccepted(version: string = CURRENT_TERMS_VERSION): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_TERMS_ACCEPTED_VERSION, version);
+    localStorage.setItem(STORAGE_KEY_TERMS_ACCEPTED_AT, new Date().toISOString());
+  } catch (e) {
+    console.warn('Failed to record terms acceptance:', e);
+  }
+}
+
+/**
+ * Retrieves details on terms acceptance
+ */
+export function getTermsAcceptedInfo(): { accepted: boolean; version?: string; acceptedAt?: string } {
+  try {
+    const version = localStorage.getItem(STORAGE_KEY_TERMS_ACCEPTED_VERSION);
+    const acceptedAt = localStorage.getItem(STORAGE_KEY_TERMS_ACCEPTED_AT);
+    return {
+      accepted: version === CURRENT_TERMS_VERSION,
+      version: version || undefined,
+      acceptedAt: acceptedAt || undefined,
+    };
+  } catch {
+    return { accepted: false };
+  }
+}

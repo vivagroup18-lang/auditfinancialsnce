@@ -32,6 +32,7 @@ import {
   Coins,
   Cloud,
   RefreshCw,
+  Scale,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import { EntityConfig, Company, UserProfile } from '../types';
@@ -80,6 +81,7 @@ interface HeaderProps {
   onManualDriveSync?: () => void;
   onConnectDrive?: () => void;
   onExportTotalLocalBackup?: () => void;
+  onOpenTermsModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -121,6 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
   onManualDriveSync,
   onConnectDrive,
   onExportTotalLocalBackup,
+  onOpenTermsModal,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
@@ -307,6 +310,20 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <Download className="w-3.5 h-3.5 text-emerald-600" />
                           <span>Total Local Backup (All {companies.length} Entities)</span>
+                        </button>
+                      )}
+
+                      {onOpenTermsModal && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            onOpenTermsModal();
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 text-left transition font-medium"
+                        >
+                          <Scale className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Terms &amp; Professional Disclaimer</span>
                         </button>
                       )}
                     </div>
@@ -795,6 +812,20 @@ export const Header: React.FC<HeaderProps> = ({
                         <Building2 className="w-3.5 h-3.5 text-slate-500" />
                         <span>Manage Companies</span>
                       </button>
+
+                      {onOpenTermsModal && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            onOpenTermsModal();
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-medium flex items-center gap-2 transition cursor-pointer"
+                        >
+                          <Scale className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Terms &amp; Professional Disclaimer</span>
+                        </button>
+                      )}
 
                       {onLogout && (
                         <div className="pt-1 border-t border-slate-100">

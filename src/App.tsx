@@ -19,6 +19,7 @@ import { SubscriptionModal } from './components/SubscriptionModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { ReferralModal } from './components/ReferralModal';
+import { TermsAndConditionsModal } from './components/TermsAndConditionsModal';
 import { CompaniesWindow } from './components/CompaniesWindow';
 import { StepByStepWorkspace } from './components/StepByStepWorkspace';
 import { initAuth, googleSignIn, googleLogout } from './firebase';
@@ -65,6 +66,8 @@ import {
   recordUserUsage,
   deductCredits,
   exportTotalLocalBackup,
+  hasAcceptedTerms,
+  recordTermsAccepted,
 } from './utils/storageManager';
 import { NCE_NOTE_DEFINITIONS } from './data/nceTaxonomy';
 import { CheckCircle2, AlertTriangle, Info, X, FileSpreadsheet, ArrowRight } from 'lucide-react';
@@ -193,6 +196,26 @@ export default function App() {
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [subscriptionUpgradeReason, setSubscriptionUpgradeReason] = useState<string | undefined>(undefined);
+
+  // Terms & Conditions Acceptance State (mandatory before accessing workspace)
+  const [hasAcceptedTermsState, setHasAcceptedTermsState] = useState<boolean>(() => {
+    try {
+      return hasAcceptedTerms();
+    } catch {
+      return false;
+    }
+  });
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(() => !hasAcceptedTerms());
+
+  const handleAcceptTerms = useCallback(() => {
+    recordTermsAccepted();
+    setHasAcceptedTermsState(true);
+    setIsTermsModalOpen(false);
+    setNotification({
+      type: 'success',
+      message: 'Terms of Service & Professional Accounting Disclaimer accepted. Welcome!',
+    });
+  }, []);
 
   // Gmail & Google Workspace Auth State (tokens cached in-memory only per security standards)
   const [user, setUser] = useState<User | null>(null);
@@ -1887,6 +1910,7 @@ export default function App() {
         onManualDriveSync={handleManualDriveSync}
         onConnectDrive={handleConnectGoogleDrive}
         onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
+        onOpenTermsModal={() => setIsTermsModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -2008,6 +2032,31 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Footer / Professional Compliance Bar */}
+      <footer className="w-full bg-white border-t border-slate-200 py-3.5 px-4 sm:px-6 lg:px-8 text-xs text-slate-500 mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-800">AuditFinancials</span>
+            <span className="text-slate-300">•</span>
+            <span className="text-slate-600">ICAI Non-Corporate Entity (NCE) Audit Reporting Platform</span>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap justify-center text-xs">
+            <button
+              type="button"
+              onClick={() => setIsTermsModalOpen(true)}
+              className="text-emerald-700 hover:text-emerald-900 font-bold underline transition cursor-pointer"
+            >
+              Terms of Service &amp; Professional Disclaimer
+            </button>
+            <span className="text-slate-300">•</span>
+            <span>FY 2025-26 (AY 2026-27)</span>
+            <span className="text-slate-300">•</span>
+            <span className="text-[11px] text-slate-400">100% Client-Side Private Computation</span>
+          </div>
+        </div>
+      </footer>
 
       {/* Entity Config Modal */}
       <EntityConfigModal
@@ -2181,6 +2230,7 @@ export default function App() {
           setIsUserProfileModalOpen(false);
           setIsReferralModalOpen(true);
         }}
+        onOpenTermsModal={() => setIsTermsModalOpen(true)}
       />
 
       {/* Onboarding / Profile Setup Modal for New Users */}
@@ -2207,6 +2257,18 @@ export default function App() {
           currentUser={currentUser}
         />
       )}
+
+      {/* Statutory Terms of Service & Professional Accounting Disclaimer Modal */}
+      <TermsAndConditionsModal
+        isOpen={isTermsModalOpen}
+        onAccept={handleAcceptTerms}
+        onClose={() => {
+          if (hasAcceptedTermsState) {
+            setIsTermsModalOpen(false);
+          }
+        }}
+        isMandatory={!hasAcceptedTermsState}
+      />
     </div>
   );
 }
