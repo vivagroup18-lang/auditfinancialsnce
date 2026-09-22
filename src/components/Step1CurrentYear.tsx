@@ -489,6 +489,9 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
               onOpenTradePayables={onOpenTradePayables}
               onUpdateConfig={onUpdateConfig}
               profitAndLoss={computedFinancials?.profitAndLoss}
+              onUpdateLedgerDetails={onUpdateLedgerDetails}
+              onUpdateLedgerNote={onUpdateLedgerNote}
+              mappedLedgers={mappedLedgers}
             />
           )}
         </div>

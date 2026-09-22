@@ -419,6 +419,11 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onOpenTradePayables={handleOpenTradePayables}
           onBackToStep3={() => handleStepChange(3)}
           onProceedToStep5={() => handleStepChange(5)}
+          onUpdateLedgerDetails={onUpdateLedgerDetails}
+          onUpdateLedgerNote={onUpdateLedgerNote}
+          onUpdatePyLedgerNote={onUpdatePyLedgerNote}
+          mappedLedgers={mappedLedgers}
+          pyMappedLedgers={pyMappedLedgers}
         />
       )}
 

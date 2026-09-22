@@ -501,6 +501,9 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
               }}
               onUpdateConfig={onUpdateConfig}
               profitAndLoss={pyComputedFinancials.profitAndLoss}
+              onUpdateLedgerDetails={onUpdateLedgerDetails}
+              onUpdatePyLedgerNote={onUpdatePyLedgerNote}
+              pyMappedLedgers={pyMappedLedgers}
             />
           )}
         </div>

@@ -15,13 +15,392 @@ import {
   Sliders,
   AlertTriangle,
   Users,
+  Edit3,
+  Save,
+  X,
+  ArrowRight,
 } from 'lucide-react';
-import { NoteScheduleData, EntityConfig, ProfitAndLossData } from '../types';
+import { NoteScheduleData, EntityConfig, ProfitAndLossData, MappedLedger } from '../types';
 import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
 import { isPartnersRemunerationItem, formatINR } from '../utils/financialCalculations';
 import { PartnerCapitalModal } from './PartnerCapitalModal';
 import { TradePayablesMsmeModal } from './TradePayablesMsmeModal';
 import { downloadPartnerCapitalTemplate } from '../utils/fileParsers';
+
+interface EditNoteMappingModalProps {
+  isOpen: boolean;
+  ledger: MappedLedger | null;
+  onClose: () => void;
+  onSave: (
+    updates: {
+      accountName: string;
+      accountCode: string;
+      noteNumber: number;
+      subCategory: string;
+    },
+    scope: 'CY' | 'PY' | 'BOTH'
+  ) => void;
+  config: EntityConfig;
+  hasCY: boolean;
+  hasPY: boolean;
+  cyAmount?: number;
+  pyAmount?: number;
+}
+
+const EditNoteMappingModal: React.FC<EditNoteMappingModalProps> = ({
+  isOpen,
+  ledger,
+  onClose,
+  onSave,
+  config,
+  hasCY,
+  hasPY,
+  cyAmount,
+  pyAmount,
+}) => {
+  const [accountName, setAccountName] = useState('');
+  const [accountCode, setAccountCode] = useState('');
+  const [noteNumber, setNoteNumber] = useState<number>(20);
+  const [subCategory, setSubCategory] = useState<string>('');
+  const [scope, setScope] = useState<'CY' | 'PY' | 'BOTH'>('BOTH');
+  const [customSubCategory, setCustomSubCategory] = useState('');
+  const [isCustomSubCat, setIsCustomSubCat] = useState(false);
+
+  useEffect(() => {
+    if (ledger) {
+      setAccountName(ledger.accountName || '');
+      setAccountCode(ledger.accountCode || '');
+      const noteNum = ledger.noteNumber || 20;
+      setNoteNumber(noteNum);
+
+      const nDef = NCE_NOTE_DEFINITIONS.find((n) => n.noteNumber === noteNum);
+      const subCats = nDef?.subCategories || ['General Schedule'];
+      if (ledger.subCategory && subCats.includes(ledger.subCategory)) {
+        setSubCategory(ledger.subCategory);
+        setIsCustomSubCat(false);
+        setCustomSubCategory('');
+      } else if (ledger.subCategory) {
+        setSubCategory('__custom__');
+        setIsCustomSubCat(true);
+        setCustomSubCategory(ledger.subCategory);
+      } else {
+        setSubCategory(subCats[0] || 'General Schedule');
+        setIsCustomSubCat(false);
+        setCustomSubCategory('');
+      }
+
+      if (hasCY && hasPY) {
+        setScope('BOTH');
+      } else if (hasPY && !hasCY) {
+        setScope('PY');
+      } else {
+        setScope('CY');
+      }
+    }
+  }, [ledger, isOpen, hasCY, hasPY]);
+
+  if (!isOpen || !ledger) return null;
+
+  const currentDef = NCE_NOTE_DEFINITIONS.find((n) => n.noteNumber === noteNumber);
+  const availableSubCats = currentDef?.subCategories || ['General Schedule'];
+  const isBalanceSheet = noteNumber <= 18;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accountName.trim()) return;
+
+    const finalSubCategory = isCustomSubCat ? customSubCategory.trim() || availableSubCats[0] : subCategory;
+
+    onSave(
+      {
+        accountName: accountName.trim(),
+        accountCode: accountCode.trim(),
+        noteNumber,
+        subCategory: finalSubCategory,
+      },
+      scope
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+        {/* Header */}
+        <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-base border border-emerald-500/30">
+              ✏️
+            </div>
+            <div>
+              <h3 className="text-sm font-bold tracking-tight">Edit Statutory Note Mapping &amp; Classification</h3>
+              <p className="text-[11px] text-slate-300">
+                Reclassify schedule assignment and ledger particulars for statutory financial statements
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto text-xs flex-1">
+          {/* Summary Banner */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Selected Ledger Account
+              </span>
+              <span className="text-[11px] font-semibold text-slate-700">
+                Original Note: <span className="font-bold text-slate-900">Note {ledger.noteNumber} ({ledger.noteName})</span>
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 text-slate-700">
+              <div>
+                <span className="text-[10px] text-slate-500 block">Current Period ({config.reportingPeriod || 'CY'}):</span>
+                <span className="font-mono font-bold text-emerald-900 text-xs">
+                  ₹{formatINR(cyAmount ?? (ledger.displayBalance ?? ledger.netBalance))}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block">Previous Period ({config.previousReportingPeriod || 'PY'}):</span>
+                <span className="font-mono font-bold text-slate-700 text-xs">
+                  ₹{formatINR(pyAmount ?? (ledger.previousYearBalance ?? 0))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Account Name */}
+          <div>
+            <label className="block font-bold text-slate-800 mb-1">
+              Trial Balance Ledger Account Text / Name <span className="text-rose-600">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              placeholder="e.g. Bonus Paid, Salary Account, Office Electricity"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 font-semibold"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">
+              This exact name will be printed across Statutory Notes, Statements, and Audit Schedules.
+            </p>
+          </div>
+
+          {/* Account Code */}
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Account Code / Ledger Reference (Optional)
+            </label>
+            <input
+              type="text"
+              value={accountCode}
+              onChange={(e) => setAccountCode(e.target.value)}
+              placeholder="e.g. 1001, EXP-220"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono text-slate-800"
+            />
+          </div>
+
+          {/* Statutory ICAI Note Schedule Dropdown with Color Coding */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="font-bold text-slate-800">
+                Statutory ICAI Note Schedule <span className="text-rose-600">*</span>
+              </label>
+              <span
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  isBalanceSheet
+                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                }`}
+              >
+                {isBalanceSheet ? '📋 Balance Sheet Schedule' : '📈 P & L Schedule'}
+              </span>
+            </div>
+
+            <select
+              value={noteNumber}
+              onChange={(e) => {
+                const num = Number(e.target.value);
+                setNoteNumber(num);
+                const nDef = NCE_NOTE_DEFINITIONS.find((n) => n.noteNumber === num);
+                const firstSub = nDef?.subCategories?.[0] || 'General Schedule';
+                setSubCategory(firstSub);
+                setIsCustomSubCat(false);
+              }}
+              className={`w-full px-3 py-2.5 border rounded-xl font-bold text-xs transition focus:outline-none focus:ring-2 ${
+                isBalanceSheet
+                  ? 'bg-amber-50/80 text-amber-950 border-amber-300 focus:ring-amber-400'
+                  : 'bg-emerald-50/80 text-emerald-950 border-emerald-300 focus:ring-emerald-400'
+              }`}
+            >
+              <optgroup label="📋 Balance Sheet Schedules (Notes 3 to 18)">
+                {NCE_NOTE_DEFINITIONS.filter((n) => n.noteNumber >= 3 && n.noteNumber <= 18).map((n) => (
+                  <option key={n.noteNumber} value={n.noteNumber}>
+                    Note {n.noteNumber}: {n.name} (Balance Sheet)
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="📈 Profit and Loss Schedules (Notes 19 to 25)">
+                {NCE_NOTE_DEFINITIONS.filter((n) => n.noteNumber >= 19 && n.noteNumber <= 25).map((n) => (
+                  <option key={n.noteNumber} value={n.noteNumber}>
+                    Note {n.noteNumber}: {n.name} (P &amp; L)
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
+          {/* Sub-Schedule Classification */}
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1.5">
+              Sub-Schedule Classification / Grouping
+            </label>
+            <select
+              value={isCustomSubCat ? '__custom__' : subCategory}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') {
+                  setIsCustomSubCat(true);
+                  setCustomSubCategory(subCategory !== '__custom__' ? subCategory : '');
+                } else {
+                  setIsCustomSubCat(false);
+                  setSubCategory(e.target.value);
+                }
+              }}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-semibold text-slate-800"
+            >
+              {availableSubCats.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+              <option value="__custom__">+ Enter Custom Sub-Category...</option>
+            </select>
+
+            {isCustomSubCat && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  required
+                  placeholder="Type custom sub-schedule heading..."
+                  value={customSubCategory}
+                  onChange={(e) => setCustomSubCategory(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 text-slate-900 font-medium"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Scope Selector: CY / PY / Both */}
+          {hasCY && hasPY ? (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <span className="font-bold text-slate-800 block text-[11px]">
+                Apply Reclassification To:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <label
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition ${
+                    scope === 'BOTH'
+                      ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-bold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="BOTH"
+                    checked={scope === 'BOTH'}
+                    onChange={() => setScope('BOTH')}
+                    className="text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className="block text-[11px]">Both Years</span>
+                    <span className="text-[9px] text-slate-500 block font-normal">(Recommended)</span>
+                  </div>
+                </label>
+
+                <label
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition ${
+                    scope === 'CY'
+                      ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-bold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="CY"
+                    checked={scope === 'CY'}
+                    onChange={() => setScope('CY')}
+                    className="text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className="block text-[11px]">Current Year Only</span>
+                    <span className="text-[9px] text-slate-500 block font-normal">({config.reportingPeriod || 'CY'})</span>
+                  </div>
+                </label>
+
+                <label
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition ${
+                    scope === 'PY'
+                      ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-bold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="PY"
+                    checked={scope === 'PY'}
+                    onChange={() => setScope('PY')}
+                    className="text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className="block text-[11px]">Previous Year Only</span>
+                    <span className="text-[9px] text-slate-500 block font-normal">({config.previousReportingPeriod || 'PY'})</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          ) : (
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 flex items-center gap-2">
+              <span className="text-[11px] font-medium">
+                Scope: Mapping updates will be applied to{' '}
+                <span className="font-bold text-slate-900">
+                  {hasPY ? `Previous Year (${config.previousReportingPeriod || 'PY'})` : `Current Year (${config.reportingPeriod || 'CY'})`}
+                </span>
+              </span>
+            </div>
+          )}
+
+          {/* Modal Footer Buttons */}
+          <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save Mapping Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 interface NotesViewProps {
   noteSchedules: Record<number, NoteScheduleData>;
@@ -31,6 +410,11 @@ interface NotesViewProps {
   onOpenTradePayables?: () => void;
   onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
   profitAndLoss?: Omit<ProfitAndLossData, 'previousYear'>;
+  onUpdateLedgerDetails?: (ledgerId: string, updatedFields: Partial<MappedLedger>, isPY?: boolean) => void;
+  onUpdateLedgerNote?: (ledgerId: string, newNoteNumber: number) => void;
+  onUpdatePyLedgerNote?: (ledgerId: string, newNoteNumber: number) => void;
+  mappedLedgers?: MappedLedger[];
+  pyMappedLedgers?: MappedLedger[];
 }
 
 export const NotesView: React.FC<NotesViewProps> = ({
@@ -41,12 +425,127 @@ export const NotesView: React.FC<NotesViewProps> = ({
   onOpenTradePayables,
   onUpdateConfig,
   profitAndLoss,
+  onUpdateLedgerDetails,
+  onUpdateLedgerNote,
+  onUpdatePyLedgerNote,
+  mappedLedgers,
+  pyMappedLedgers,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
   const [isTradePayablesModalOpen, setIsTradePayablesModalOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'WITH_BALANCE' | 'BALANCE_SHEET' | 'PROFIT_LOSS' | 'POLICIES'>('ALL');
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
+  const [editingLedger, setEditingLedger] = useState<MappedLedger | null>(null);
+
+  const canEdit = Boolean(onUpdateLedgerDetails || onUpdateLedgerNote);
+
+  const editingModalInfo = useMemo(() => {
+    if (!editingLedger) return { hasCY: false, hasPY: false, cyAmt: 0, pyAmt: 0 };
+
+    const rawId = editingLedger.id || '';
+    const isPyOnly = rawId.startsWith('py-nil-cy-');
+
+    let hasCY = false;
+    let hasPY = false;
+
+    if (isPyOnly) {
+      hasPY = true;
+      const cyMatch = mappedLedgers?.some(
+        (l) => l.accountName.toLowerCase().trim() === editingLedger.accountName.toLowerCase().trim()
+      );
+      hasCY = !!cyMatch;
+    } else {
+      if (mappedLedgers) {
+        hasCY = mappedLedgers.some(
+          (l) => l.id === rawId || l.accountName.toLowerCase().trim() === editingLedger.accountName.toLowerCase().trim()
+        );
+      } else {
+        hasCY =
+          (editingLedger.displayBalance ?? editingLedger.netBalance) !== 0 ||
+          editingLedger.originalDebit > 0 ||
+          editingLedger.originalCredit > 0;
+      }
+
+      if (pyMappedLedgers) {
+        hasPY = pyMappedLedgers.some(
+          (l) => l.id === rawId || l.accountName.toLowerCase().trim() === editingLedger.accountName.toLowerCase().trim()
+        );
+      } else {
+        hasPY = (editingLedger.previousYearBalance ?? 0) !== 0;
+      }
+    }
+
+    const cyAmt = editingLedger.displayBalance !== undefined ? editingLedger.displayBalance : editingLedger.netBalance;
+    const pyAmt = editingLedger.previousYearBalance !== undefined ? editingLedger.previousYearBalance : 0;
+
+    return { hasCY, hasPY, cyAmt, pyAmt };
+  }, [editingLedger, mappedLedgers, pyMappedLedgers]);
+
+  const handleSaveMapping = (
+    updates: {
+      accountName: string;
+      accountCode: string;
+      noteNumber: number;
+      subCategory: string;
+    },
+    scope: 'CY' | 'PY' | 'BOTH'
+  ) => {
+    if (!editingLedger) return;
+
+    let cyId: string | undefined;
+    let pyId: string | undefined;
+
+    const rawId = editingLedger.id || '';
+    const isPyOnly = rawId.startsWith('py-nil-cy-');
+
+    if (isPyOnly) {
+      pyId = rawId.replace('py-nil-cy-', '');
+      const cyMatch = mappedLedgers?.find(
+        (l) => l.accountName.toLowerCase().trim() === editingLedger.accountName.toLowerCase().trim()
+      );
+      if (cyMatch) cyId = cyMatch.id;
+    } else {
+      cyId = rawId;
+      const pyMatch = pyMappedLedgers?.find(
+        (l) =>
+          l.id === rawId ||
+          l.accountName.toLowerCase().trim() === editingLedger.accountName.toLowerCase().trim()
+      );
+      if (pyMatch) pyId = pyMatch.id;
+    }
+
+    const noteDef = NCE_NOTE_DEFINITIONS.find((n) => n.noteNumber === updates.noteNumber);
+    const updatedFields: Partial<MappedLedger> = {
+      accountName: updates.accountName,
+      accountCode: updates.accountCode,
+      noteNumber: updates.noteNumber,
+      noteName: noteDef?.name || `Note ${updates.noteNumber}`,
+      statement: noteDef?.statement || 'BalanceSheet',
+      nature: noteDef?.nature,
+      subCategory: updates.subCategory,
+      isUserOverridden: true,
+      mappingMethod: 'manual',
+    };
+
+    if (onUpdateLedgerDetails) {
+      if ((scope === 'CY' || scope === 'BOTH') && cyId) {
+        onUpdateLedgerDetails(cyId, updatedFields, false);
+      }
+      if ((scope === 'PY' || scope === 'BOTH') && pyId) {
+        onUpdateLedgerDetails(pyId, updatedFields, true);
+      }
+    } else if (onUpdateLedgerNote) {
+      if ((scope === 'CY' || scope === 'BOTH') && cyId) {
+        onUpdateLedgerNote(cyId, updates.noteNumber);
+      }
+      if ((scope === 'PY' || scope === 'BOTH') && pyId && onUpdatePyLedgerNote) {
+        onUpdatePyLedgerNote(pyId, updates.noteNumber);
+      }
+    }
+
+    setEditingLedger(null);
+  };
 
   const handleOpenTradePayables = () => {
     if (onOpenTradePayables) {
@@ -962,12 +1461,20 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                 <th className="py-2.5 px-3 text-right font-bold text-slate-800 bg-slate-100/70 border-l border-slate-200">
                                   Previous Period ({config.previousReportingPeriod || 'PY'}) (₹)
                                 </th>
+                                {canEdit && (
+                                  <th className="py-2.5 px-3 text-center w-28 border-l border-slate-200">
+                                    Action
+                                  </th>
+                                )}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700">
                               {schedule.items.map((item, itemIdx) => {
                                 const cyAmt = item.displayBalance !== undefined ? item.displayBalance : item.netBalance;
                                 const pyAmt = item.previousYearBalance !== undefined ? item.previousYearBalance : 0;
+                                const isProfitLossTransfer = item.accountCode === 'VIRT-PROFIT-LOSS';
+                                const isStockAdjustment = item.accountCode?.startsWith('VIRT-CS-');
+                                const isOtherAdjustment = item.accountCode?.startsWith('VIRT-') && !isStockAdjustment && !isProfitLossTransfer;
 
                                 return (
                                   <tr key={item.id ? `${item.id}-${itemIdx}` : `note-item-${def.noteNumber}-${itemIdx}-${item.accountName}`} className="hover:bg-slate-50/80 transition">
@@ -993,6 +1500,41 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                     <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700 bg-slate-50/40 border-l border-slate-200">
                                       {formatINR(pyAmt)}
                                     </td>
+                                    {canEdit && (
+                                      <td className="py-2 px-3 text-center border-l border-slate-200">
+                                        {isProfitLossTransfer ? (
+                                          <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium text-slate-500 bg-slate-100 rounded-md border border-slate-200" title="Calculated automatically from Statement of Profit and Loss">
+                                            Auto (P &amp; L)
+                                          </span>
+                                        ) : isStockAdjustment ? (
+                                          onOpenYearEndAdjustments ? (
+                                            <button
+                                              type="button"
+                                              onClick={onOpenYearEndAdjustments}
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition cursor-pointer"
+                                              title="Edit Closing Stock in Year-End Adjustments"
+                                            >
+                                              <Sliders className="w-3 h-3 text-emerald-600" />
+                                              <span>Stock Adj</span>
+                                            </button>
+                                          ) : (
+                                            <span className="text-[10px] text-slate-400 italic">Stock Adj</span>
+                                          )
+                                        ) : isOtherAdjustment ? (
+                                          <span className="text-[10px] text-slate-400 italic">Adjustment</span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditingLedger(item)}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-950 border border-emerald-300 rounded-lg shadow-2xs transition cursor-pointer group"
+                                            title={`Change Note Schedule & Sub-Category for "${item.accountName}"`}
+                                          >
+                                            <Edit3 className="w-3 h-3 text-emerald-600 group-hover:scale-110 transition-transform" />
+                                            <span>Edit Mapping</span>
+                                          </button>
+                                        )}
+                                      </td>
+                                    )}
                                   </tr>
                                 );
                               })}
@@ -1008,6 +1550,9 @@ export const NotesView: React.FC<NotesViewProps> = ({
                                 <td className="py-3 px-3 text-right font-mono text-xs text-slate-700 bg-slate-200/60 border-l border-slate-300">
                                   PY Total: ₹{formatINR(schedule?.previousYearAmount || 0)}
                                 </td>
+                                {canEdit && (
+                                  <td className="bg-slate-100 border-l border-slate-300"></td>
+                                )}
                               </tr>
                             </tfoot>
                           </table>
@@ -1134,6 +1679,19 @@ export const NotesView: React.FC<NotesViewProps> = ({
         config={config}
         onUpdateConfig={onUpdateConfig || (() => {})}
         noteSchedule={noteSchedules[9]}
+      />
+
+      {/* Edit Statutory Note Mapping & Classification Modal */}
+      <EditNoteMappingModal
+        isOpen={editingLedger !== null}
+        ledger={editingLedger}
+        onClose={() => setEditingLedger(null)}
+        onSave={handleSaveMapping}
+        config={config}
+        hasCY={editingModalInfo.hasCY}
+        hasPY={editingModalInfo.hasPY}
+        cyAmount={editingModalInfo.cyAmt}
+        pyAmount={editingModalInfo.pyAmt}
       />
     </div>
   );

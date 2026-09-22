@@ -18,6 +18,7 @@ import {
   AuditException,
   BalanceSheetData,
   ProfitAndLossData,
+  MappedLedger,
 } from '../types';
 import { NotesView } from './NotesView';
 import { AuditReportView } from './AuditReportView';
@@ -35,6 +36,11 @@ interface Step4NotesAndAuditProps {
   onOpenTradePayables?: () => void;
   onBackToStep3: () => void;
   onProceedToStep5: () => void;
+  onUpdateLedgerDetails?: (ledgerId: string, updatedFields: Partial<MappedLedger>, isPY?: boolean) => void;
+  onUpdateLedgerNote?: (ledgerId: string, newNoteNumber: number) => void;
+  onUpdatePyLedgerNote?: (ledgerId: string, newNoteNumber: number) => void;
+  mappedLedgers?: MappedLedger[];
+  pyMappedLedgers?: MappedLedger[];
 }
 
 export const Step4NotesAndAudit: React.FC<Step4NotesAndAuditProps> = ({
@@ -50,6 +56,11 @@ export const Step4NotesAndAudit: React.FC<Step4NotesAndAuditProps> = ({
   onOpenTradePayables,
   onBackToStep3,
   onProceedToStep5,
+  onUpdateLedgerDetails,
+  onUpdateLedgerNote,
+  onUpdatePyLedgerNote,
+  mappedLedgers,
+  pyMappedLedgers,
 }) => {
   const [activeTab, setActiveTab] = useState<'notes' | 'audit_exceptions'>('notes');
 
@@ -178,6 +189,11 @@ export const Step4NotesAndAudit: React.FC<Step4NotesAndAuditProps> = ({
           onOpenTradePayables={onOpenTradePayables}
           onUpdateConfig={onUpdateConfig}
           profitAndLoss={profitAndLoss}
+          onUpdateLedgerDetails={onUpdateLedgerDetails}
+          onUpdateLedgerNote={onUpdateLedgerNote}
+          onUpdatePyLedgerNote={onUpdatePyLedgerNote}
+          mappedLedgers={mappedLedgers}
+          pyMappedLedgers={pyMappedLedgers}
         />
       )}
 
