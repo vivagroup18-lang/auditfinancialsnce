@@ -214,9 +214,9 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
   return (
     <div className="space-y-6">
       {/* ========================================================================= */}
-      {/* 1. TOP STEPPER & ACTIVE COMPANY BAR                                      */}
+      {/* 1. TOP STEPPER & ACTIVE COMPANY BAR (STICKY)                              */}
       {/* ========================================================================= */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 sm:p-5 space-y-4">
+      <div className="sticky top-[104px] z-20 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 sm:p-5 space-y-4">
         {/* Company Ribbon */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
           <div className="flex items-center gap-3">

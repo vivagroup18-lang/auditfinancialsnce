@@ -14,12 +14,7 @@ import {
   Settings,
   Check,
   Calendar,
-  FastForward,
-  Rewind,
-  ArrowRightLeft,
-  ChevronRight,
   Box,
-  LayoutDashboard,
   Mail,
   HardDrive,
   Database,
@@ -879,7 +874,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between py-2 border-t border-slate-800/80 text-xs gap-3">
           {/* Stepper Navigation */}
           <nav className="flex items-center space-x-1 sm:space-x-1.5 overflow-x-auto scrollbar-none min-w-0">
-            {/* Saved Companies Tab */}
+          {/* Saved Companies Tab */}
             <button
               type="button"
               onClick={() => {
@@ -904,57 +899,6 @@ export const Header: React.FC<HeaderProps> = ({
                 {companies.length}
               </span>
             </button>
-
-            <div className="h-4 w-px bg-slate-800 mx-1 shrink-0" />
-
-            {/* 5 Stepper Buttons with Chevron Connectors */}
-            {[
-              { step: 1, id: 'step1', label: '1. Current Year (CY)', icon: LayoutDashboard },
-              { step: 2, id: 'step2', label: '2. Previous Year (PY)', icon: FileSpreadsheet },
-              { step: 3, id: 'step3', label: '3. Comparative Statements', icon: Building2 },
-              { step: 4, id: 'step4', label: '4. Notes & Audit', icon: AlertTriangle, badge: exceptionCount },
-              { step: 5, id: 'step5', label: '5. Generate Report', icon: Download },
-            ].map((tab, idx) => {
-              const isActive = dashboardView === 'workspace' && workspaceStep === tab.step;
-              return (
-                <React.Fragment key={tab.id}>
-                  {idx > 0 && (
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 hidden sm:block" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onDashboardViewChange) onDashboardViewChange('workspace');
-                      if (onWorkspaceStepChange) onWorkspaceStepChange(tab.step as any);
-                      setActiveTab(tab.id);
-                    }}
-                    className={`group flex items-center gap-2 px-3.5 py-1.5 rounded-xl whitespace-nowrap transition cursor-pointer border shadow-xs ${
-                      isActive
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold border-emerald-400/90 shadow-md shadow-emerald-950/40 ring-2 ring-emerald-400/30'
-                        : 'bg-slate-800/85 hover:bg-slate-750 text-slate-200 hover:text-white border-slate-700/80 hover:border-slate-500/90 font-medium'
-                    }`}
-                  >
-                    <span
-                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black transition shrink-0 ${
-                        isActive
-                          ? 'bg-white text-emerald-900 shadow-xs'
-                          : 'bg-slate-700 text-slate-200 group-hover:bg-slate-600 group-hover:text-white border border-slate-600/60'
-                      }`}
-                    >
-                      {tab.step}
-                    </span>
-                    <span className={isActive ? 'text-white font-bold' : 'text-slate-200 group-hover:text-white font-medium'}>
-                      {tab.label}
-                    </span>
-                    {tab.badge !== undefined && tab.badge > 0 && (
-                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 shadow-xs shrink-0">
-                        {tab.badge}
-                      </span>
-                    )}
-                  </button>
-                </React.Fragment>
-              );
-            })}
           </nav>
 
           {/* Right: Live Audit Health Indicator & Adjustments */}
