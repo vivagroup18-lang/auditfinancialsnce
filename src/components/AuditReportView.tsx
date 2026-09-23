@@ -344,7 +344,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
                 type="text"
                 value={config.auditorFirmName || ''}
                 onChange={(e) => onUpdateConfig({ auditorFirmName: e.target.value })}
-                placeholder="e.g. M/s Sutar & Associates, Chartered Accountants"
+                placeholder="e.g. M/s Viva & Associates, Chartered Accountants"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -355,7 +355,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
                 type="text"
                 value={config.auditorName || ''}
                 onChange={(e) => onUpdateConfig({ auditorName: e.target.value })}
-                placeholder="e.g. CA. Rajesh Sharma"
+                placeholder="e.g. CA. Balaji Rao"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
               />
             </div>

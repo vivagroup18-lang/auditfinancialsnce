@@ -174,7 +174,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 required
                 value={userIdInput}
                 onChange={(e) => setUserIdInput(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                placeholder="ca_rajesh"
+                placeholder="ca_balaji"
                 className="w-full pl-8 pr-3 py-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
@@ -218,7 +218,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 type="text"
                 value={firmNameInput}
                 onChange={(e) => setFirmNameInput(e.target.value)}
-                placeholder="e.g. Sharma & Associates, Chartered Accountants"
+                placeholder="e.g. Viva & Associates, Chartered Accountants"
                 className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
@@ -257,7 +257,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   type="text"
                   value={referralCodeInput}
                   onChange={(e) => setReferralCodeInput(e.target.value)}
-                  placeholder="e.g. REF-RAJESH100, @ca_rajesh, or rajesh@gmail.com"
+                  placeholder="e.g. REF-BALAJI100, @ca_balaji, or balaji@gmail.com"
                   className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                 />
                 <p className="text-[11px] text-emerald-700 font-medium">

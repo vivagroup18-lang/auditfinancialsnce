@@ -1015,7 +1015,7 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                         onClick={() => onLoadSample('rrk_manufacturing')}
                         className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition"
                       >
-                        Load RRK &amp; Co. Sample
+                        Load Apex &amp; Co. Sample
                       </button>
                     )}
                   </div>

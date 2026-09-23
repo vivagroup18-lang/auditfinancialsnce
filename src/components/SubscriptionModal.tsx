@@ -604,7 +604,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                       required
                       value={firmBillingName}
                       onChange={(e) => setFirmBillingName(e.target.value)}
-                      placeholder="M/s Rajesh Sharma & Co."
+                      placeholder="M/s Balaji Rao & Co."
                       className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>

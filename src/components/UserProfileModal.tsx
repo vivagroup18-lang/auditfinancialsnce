@@ -287,7 +287,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       type="text"
                       value={firmName}
                       onChange={(e) => setFirmName(e.target.value)}
-                      placeholder="e.g. M/s Sharma & Associates"
+                      placeholder="e.g. M/s Viva & Associates"
                       className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>

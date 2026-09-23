@@ -728,7 +728,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                       type="text"
                       value={newConfig.auditorFirmName || ''}
                       onChange={(e) => setNewConfig({ ...newConfig, auditorFirmName: e.target.value })}
-                      placeholder="e.g. M/s Sutar & Associates, Chartered Accountants"
+                      placeholder="e.g. M/s Viva & Associates, Chartered Accountants"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -739,7 +739,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                       type="text"
                       value={newConfig.auditorName || ''}
                       onChange={(e) => setNewConfig({ ...newConfig, auditorName: e.target.value })}
-                      placeholder="e.g. CA. Vishal Sutar"
+                      placeholder="e.g. CA. Balaji Rao"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -1064,7 +1064,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                       onChange={(e) =>
                         setEditFormData({ ...editFormData, auditorFirmName: e.target.value })
                       }
-                      placeholder="e.g. M/s Sutar & Associates, Chartered Accountants"
+                      placeholder="e.g. M/s Viva & Associates, Chartered Accountants"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -1077,7 +1077,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
                       onChange={(e) =>
                         setEditFormData({ ...editFormData, auditorName: e.target.value })
                       }
-                      placeholder="e.g. CA. Vishal Sutar"
+                      placeholder="e.g. CA. Balaji Rao"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>

@@ -371,7 +371,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="ca_rajesh, 9876543210, or email@firm.com"
+                    placeholder="ca_balaji, 9876543210, or email@firm.com"
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                   />
                 </div>
@@ -416,7 +416,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="CA. Rajesh Sharma"
+                    placeholder="CA. Balaji Rao"
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -434,7 +434,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       required
                       value={userIdHandle}
                       onChange={(e) => setUserIdHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                      placeholder="ca_sharma"
+                      placeholder="ca_balaji"
                       className="w-full pl-7 pr-2 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
@@ -470,7 +470,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="rajesh@sharma-ca.com"
+                    placeholder="balaji@viva-ca.com"
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -504,7 +504,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       type="text"
                       value={firmName}
                       onChange={(e) => setFirmName(e.target.value)}
-                      placeholder="Sharma & Co."
+                      placeholder="Viva & Co."
                       className="w-full pl-8 pr-2 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
@@ -544,7 +544,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       type="text"
                       value={referralCodeInput}
                       onChange={(e) => setReferralCodeInput(e.target.value)}
-                      placeholder="e.g. REF-RAJESH100, @ca_rajesh, or rajesh@gmail.com"
+                      placeholder="e.g. REF-BALAJI100, @ca_balaji, or balaji@gmail.com"
                       className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                     />
                     <p className="text-[10px] text-emerald-700">

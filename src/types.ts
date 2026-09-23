@@ -515,7 +515,7 @@ export interface PromoCode {
 
 export interface UserProfile {
   id: string; // unique internal ID
-  userId: string; // unique public User ID / handle, e.g. "ca_rajesh" or "audit_pro_01"
+  userId: string; // unique public User ID / handle, e.g. "ca_balaji" or "audit_pro_01"
   fullName: string;
   email: string;
   mobile: string;
@@ -530,7 +530,7 @@ export interface UserProfile {
   subscriptionExpiresAt: string; // ISO date string
   billingCycle: BillingCycle;
   credits: number; // Current available credit balance (Claude-style)
-  referralCode: string; // Unique shareable referral code, e.g. "REF-RAJESH24"
+  referralCode: string; // Unique shareable referral code, e.g. "REF-BALAJI24"
   referredBy?: string; // Referral code of person who referred this user
   referralsCount: number; // Total colleagues invited
   totalReferralCredits: number; // Total credits earned from referrals (500 * count)

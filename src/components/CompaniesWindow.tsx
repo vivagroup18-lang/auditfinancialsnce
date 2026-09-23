@@ -199,7 +199,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   // 1-Click Sample Handlers
   const handleCreateSample = (type: 'sample_partnership' | 'sample_proprietorship') => {
     if (type === 'sample_partnership') {
-      const sample = SAMPLE_DATASETS[1]; // RRK & CO. (Partnership Firm)
+      const sample = SAMPLE_DATASETS[1]; // Viva Group & Co. (Partnership Firm)
       onCreateCompany(
         {
           entityName: sample.name,
@@ -214,15 +214,15 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
           registeredAddress: 'Plot No. 12, Industrial Area, Phase II, Pune - 411018, Maharashtra',
           placeOfSigning: 'Pune',
           dateOfSigning: 'March 31, 2026',
-          signingPartnerName: 'Partner R. R. Kulkarni',
-          auditorFirmName: 'Kulkarni & Associates',
-          auditorName: 'CA Rajesh Kulkarni',
+          signingPartnerName: 'Partner Balaji Rao',
+          auditorFirmName: 'Viva & Associates',
+          auditorName: 'CA Balaji Rao',
           auditorRole: 'Partner',
           auditorMembershipNo: '123456',
           firmRegistrationNo: '112233W',
           partners: [
-            { name: 'Partner R. R. Kulkarni', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, isSigningPartner: true, openingBalance: 5000000, openingNature: 'Cr' },
-            { name: 'Partner R. K. Kulkarni', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, isSigningPartner: false, openingBalance: 5000000, openingNature: 'Cr' },
+            { name: 'Partner Balaji Rao', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, isSigningPartner: true, openingBalance: 5000000, openingNature: 'Cr' },
+            { name: 'Partner Suresh Rao', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, isSigningPartner: false, openingBalance: 5000000, openingNature: 'Cr' },
           ],
         },
         'sample_partnership'
@@ -977,7 +977,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                           <label className="text-[11px] font-semibold text-slate-600 block">CA / Audit Firm Name</label>
                           <input
                             type="text"
-                            placeholder="e.g. M/s Sutar & Associates"
+                            placeholder="e.g. M/s Viva & Associates"
                             value={newAuditorFirmName}
                             onChange={(e) => setNewAuditorFirmName(e.target.value)}
                             className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
@@ -987,7 +987,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                           <label className="text-[11px] font-semibold text-slate-600 block">Chartered Accountant Name</label>
                           <input
                             type="text"
-                            placeholder="e.g. CA Vishal Sutar"
+                            placeholder="e.g. CA Balaji Rao"
                             value={newAuditorName}
                             onChange={(e) => setNewAuditorName(e.target.value)}
                             className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
@@ -1226,7 +1226,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                     <label className="font-semibold text-slate-700 block">CA / Audit Firm Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. M/s Sutar & Associates"
+                      placeholder="e.g. M/s Viva & Associates"
                       value={editConfig.auditorFirmName || ''}
                       onChange={(e) => setEditConfig({ ...editConfig, auditorFirmName: e.target.value })}
                       className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
@@ -1236,7 +1236,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                     <label className="font-semibold text-slate-700 block">Chartered Accountant Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. CA Vishal Sutar"
+                      placeholder="e.g. CA Balaji Rao"
                       value={editConfig.auditorName || ''}
                       onChange={(e) => setEditConfig({ ...editConfig, auditorName: e.target.value })}
                       className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
