@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Phone,
@@ -11,7 +11,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { updateUserProfile, applyReferralReward, loadUsersFromStorage } from '../utils/storageManager';
+import { updateUserProfile, applyReferralRewardAsync, loadUsersFromStorage } from '../utils/storageManager';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -34,9 +34,25 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Check for pending referral code from URL or sessionStorage on mount
+  useEffect(() => {
+    if (isOpen && !currentUser.referredBy) {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlRef = params.get('ref');
+        const sessionRef = sessionStorage.getItem('ca_pending_referral_code');
+        const found = (urlRef || sessionRef || '').trim();
+        if (found) {
+          setReferralCodeInput(found);
+          setShowReferralField(true);
+        }
+      } catch {}
+    }
+  }, [isOpen, currentUser.referredBy]);
+
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -75,12 +91,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
       // Apply referral code if provided
       if (referralCodeInput.trim()) {
-        const refRes = applyReferralReward(currentUser.id, referralCodeInput.trim());
+        const refRes = await applyReferralRewardAsync(currentUser.id, referralCodeInput.trim());
         if (!refRes.success) {
-          setError(refRes.error || 'Invalid referral code entered.');
+          setError(refRes.error || 'Invalid referral code or user ID entered.');
           setLoading(false);
           return;
         }
+        try {
+          sessionStorage.removeItem('ca_pending_referral_code');
+        } catch {}
       }
 
       // Reload fresh profile from storage if referral updated it, else update directly
@@ -214,14 +233,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 transition hover:underline cursor-pointer"
               >
                 <Gift className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Have a colleague's referral code? Claim +500 free credits</span>
+                <span>Have a colleague's referral code or User ID? Claim +500 free credits</span>
               </button>
             ) : (
               <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 space-y-2 animate-in fade-in">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
                     <Gift className="w-4 h-4 text-emerald-600" />
-                    <span>Referral Code Reward (+500 Credits)</span>
+                    <span>Referral Code, User ID (@handle), or Email (+500 Credits)</span>
                   </div>
                   <button
                     type="button"
@@ -237,12 +256,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <input
                   type="text"
                   value={referralCodeInput}
-                  onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
-                  placeholder="Enter Referral Code (e.g. REF-AMIT24)"
-                  className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
+                  onChange={(e) => setReferralCodeInput(e.target.value)}
+                  placeholder="e.g. REF-RAJESH100, @ca_rajesh, or rajesh@gmail.com"
+                  className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                 />
                 <p className="text-[11px] text-emerald-700 font-medium">
-                  Both you and your colleague will immediately receive 500 bonus credits!
+                  Both you and your colleague will receive 500 bonus credits!
                 </p>
               </div>
             )}

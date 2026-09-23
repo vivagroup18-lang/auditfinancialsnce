@@ -10,6 +10,11 @@ import {
   REFERRAL_CREDIT_BONUS,
   NEW_USER_SIGNUP_CREDITS,
 } from '../data/subscriptionPlans';
+import {
+  lookupReferrerInCloud,
+  recordReferralRewardEvent,
+  syncUserReferralToCloud,
+} from '../services/referralCloudService';
 
 const defaultExpiry = new Date();
 defaultExpiry.setDate(defaultExpiry.getDate() + 14);
@@ -420,79 +425,264 @@ export function addCredits(
 }
 
 /**
- * Applies a referral code for a user, awarding 500 CREDITS to BOTH the inviter and the new user!
+ * Normalizes a referral input string (code, user handle with/without @, or email)
+ */
+export function sanitizeReferralInput(input: string): {
+  raw: string;
+  cleanNoPrefix: string;
+  code: string;
+  handle: string;
+  email: string;
+} {
+  const raw = (input || '').trim();
+  const cleanNoPrefix = raw.replace(/^[@#]/, '').trim();
+  return {
+    raw,
+    cleanNoPrefix,
+    code: cleanNoPrefix.toUpperCase(),
+    handle: cleanNoPrefix.toLowerCase(),
+    email: cleanNoPrefix.toLowerCase(),
+  };
+}
+
+/**
+ * Applies a referral code/ID for a user, awarding 500 CREDITS to BOTH the inviter and the new user!
+ * Supports matching by Referral Code (REF-...), User ID Handle (@ca_rajesh or ca_rajesh), or Email.
+ * Synchronous version with immediate local update and background cloud event dispatch.
  */
 export function applyReferralReward(
   newUserId: string,
   referralCodeInput: string
 ): { success: boolean; bonusGranted: number; inviterName?: string; error?: string } {
-  const cleanCode = referralCodeInput.trim().toUpperCase();
-  if (!cleanCode) return { success: false, bonusGranted: 0, error: 'Referral code cannot be empty.' };
+  const { raw, cleanNoPrefix, code, handle, email } = sanitizeReferralInput(referralCodeInput);
+  if (!cleanNoPrefix) return { success: false, bonusGranted: 0, error: 'Referral identifier cannot be empty.' };
 
   const users = loadUsersFromStorage();
   const newUser = users.find((u) => u.id === newUserId || u.userId === newUserId);
   if (!newUser) {
-    return { success: false, bonusGranted: 0, error: 'User not found' };
+    return { success: false, bonusGranted: 0, error: 'User account not found.' };
   }
 
   if (newUser.referredBy) {
     return { success: false, bonusGranted: 0, error: 'A referral code has already been claimed on this account.' };
   }
 
-  // Find inviter by matching referralCode
-  const inviter = users.find(
-    (u) => u.referralCode && u.referralCode.toUpperCase() === cleanCode
-  );
+  // 1. Check local users first (handles same-device testing or pre-synced users)
+  const localInviter = users.find((u) => {
+    const uCode = (u.referralCode || '').trim().toUpperCase();
+    const uHandle = (u.userId || '').trim().toLowerCase().replace(/^@/, '');
+    const uEmail = (u.email || '').trim().toLowerCase();
 
-  if (!inviter) {
-    return {
-      success: false,
-      bonusGranted: 0,
-      error: `Invalid referral code "${cleanCode}". Please verify with the person who invited you.`,
-    };
-  }
-
-  if (inviter.id === newUser.id || inviter.userId === newUser.userId) {
-    return {
-      success: false,
-      bonusGranted: 0,
-      error: 'You cannot use your own referral code.',
-    };
-  }
-
-  // 1. Award Inviter 500 Credits
-  inviter.credits = (typeof inviter.credits === 'number' ? inviter.credits : 0) + REFERRAL_CREDIT_BONUS;
-  inviter.referralsCount = (inviter.referralsCount || 0) + 1;
-  inviter.totalReferralCredits = (inviter.totalReferralCredits || 0) + REFERRAL_CREDIT_BONUS;
-  if (!Array.isArray(inviter.creditTransactions)) inviter.creditTransactions = [];
-  inviter.creditTransactions.unshift({
-    id: 'tx_ref_inv_' + Math.random().toString(36).substring(2, 9),
-    date: new Date().toISOString(),
-    amount: REFERRAL_CREDIT_BONUS,
-    type: 'REFERRAL_REWARD',
-    description: `+500 Credits! Successfully referred ${newUser.fullName} (${newUser.userId})`,
-    balanceAfter: inviter.credits,
+    return (
+      (uCode && uCode === code) ||
+      (uHandle && uHandle === handle) ||
+      (uEmail && uEmail === email)
+    );
   });
 
-  // 2. Award New User 500 Credits
+  if (localInviter) {
+    if (localInviter.id === newUser.id || localInviter.userId === newUser.userId) {
+      return {
+        success: false,
+        bonusGranted: 0,
+        error: 'You cannot use your own referral code or ID.',
+      };
+    }
+
+    // Award Inviter 500 Credits
+    localInviter.credits = (typeof localInviter.credits === 'number' ? localInviter.credits : 0) + REFERRAL_CREDIT_BONUS;
+    localInviter.referralsCount = (localInviter.referralsCount || 0) + 1;
+    localInviter.totalReferralCredits = (localInviter.totalReferralCredits || 0) + REFERRAL_CREDIT_BONUS;
+    if (!Array.isArray(localInviter.creditTransactions)) localInviter.creditTransactions = [];
+    localInviter.creditTransactions.unshift({
+      id: 'tx_ref_inv_' + Math.random().toString(36).substring(2, 9),
+      date: new Date().toISOString(),
+      amount: REFERRAL_CREDIT_BONUS,
+      type: 'REFERRAL_REWARD',
+      description: `+500 Credits! Successfully referred ${newUser.fullName || newUser.userId} (${newUser.userId || newUser.email})`,
+      balanceAfter: localInviter.credits,
+    });
+
+    // Award New User 500 Credits
+    newUser.credits = (typeof newUser.credits === 'number' ? newUser.credits : 0) + REFERRAL_CREDIT_BONUS;
+    newUser.referredBy = localInviter.referralCode || code;
+    if (!Array.isArray(newUser.creditTransactions)) newUser.creditTransactions = [];
+    newUser.creditTransactions.unshift({
+      id: 'tx_ref_new_' + Math.random().toString(36).substring(2, 9),
+      date: new Date().toISOString(),
+      amount: REFERRAL_CREDIT_BONUS,
+      type: 'REFERRED_WELCOME_BONUS',
+      description: `+500 Referral Welcome Bonus using code/ID ${raw} from ${localInviter.fullName || localInviter.userId}`,
+      balanceAfter: newUser.credits,
+    });
+
+    saveUsersToStorage(users);
+
+    // Queue cloud event for cross-device synchronization
+    recordReferralRewardEvent(
+      {
+        referralCode: localInviter.referralCode,
+        userId: localInviter.userId,
+        email: localInviter.email,
+        fullName: localInviter.fullName,
+      },
+      {
+        userId: newUser.userId || newUser.id,
+        email: newUser.email || '',
+        fullName: newUser.fullName,
+      }
+    ).catch(() => {});
+
+    syncUserReferralToCloud(localInviter).catch(() => {});
+    syncUserReferralToCloud(newUser).catch(() => {});
+
+    return {
+      success: true,
+      bonusGranted: REFERRAL_CREDIT_BONUS,
+      inviterName: localInviter.fullName,
+    };
+  }
+
+  // 2. Cross-Device Fallback (Inviter is on another computer / cloud):
+  // Grant New User 500 credits immediately so their onboarding is never blocked!
+  // And dispatch cloud referral resolution & event in the background.
   newUser.credits = (typeof newUser.credits === 'number' ? newUser.credits : 0) + REFERRAL_CREDIT_BONUS;
-  newUser.referredBy = inviter.referralCode;
+  newUser.referredBy = code.startsWith('REF-') ? code : `REF-${code}`;
   if (!Array.isArray(newUser.creditTransactions)) newUser.creditTransactions = [];
   newUser.creditTransactions.unshift({
     id: 'tx_ref_new_' + Math.random().toString(36).substring(2, 9),
     date: new Date().toISOString(),
     amount: REFERRAL_CREDIT_BONUS,
     type: 'REFERRED_WELCOME_BONUS',
-    description: `+500 Referral Welcome Bonus using code ${cleanCode} from ${inviter.fullName}`,
+    description: `+500 Referral Welcome Bonus using referral ${raw}`,
     balanceAfter: newUser.credits,
   });
 
   saveUsersToStorage(users);
 
+  // Background cloud resolution & event recording for User A
+  lookupReferrerInCloud(raw)
+    .then((cloudInviter) => {
+      const targetInviter = cloudInviter || {
+        referralCode: code,
+        userId: handle,
+        email: email.includes('@') ? email : undefined,
+        fullName: 'Colleague',
+      };
+      return recordReferralRewardEvent(targetInviter, {
+        userId: newUser.userId || newUser.id,
+        email: newUser.email || '',
+        fullName: newUser.fullName,
+      });
+    })
+    .catch((err) => {
+      console.warn('Background cloud referral resolution error:', err);
+      recordReferralRewardEvent(
+        { referralCode: code, userId: handle },
+        {
+          userId: newUser.userId || newUser.id,
+          email: newUser.email || '',
+          fullName: newUser.fullName,
+        }
+      ).catch(() => {});
+    });
+
+  syncUserReferralToCloud(newUser).catch(() => {});
+
   return {
     success: true,
     bonusGranted: REFERRAL_CREDIT_BONUS,
-    inviterName: inviter.fullName,
+    inviterName: 'Colleague',
+  };
+}
+
+/**
+ * Asynchronous referral application with immediate Cloud verification.
+ */
+export async function applyReferralRewardAsync(
+  newUserId: string,
+  referralCodeInput: string
+): Promise<{ success: boolean; bonusGranted: number; inviterName?: string; error?: string }> {
+  const { raw, cleanNoPrefix, code, handle, email } = sanitizeReferralInput(referralCodeInput);
+  if (!cleanNoPrefix) return { success: false, bonusGranted: 0, error: 'Referral identifier cannot be empty.' };
+
+  const users = loadUsersFromStorage();
+  const newUser = users.find((u) => u.id === newUserId || u.userId === newUserId);
+  if (!newUser) {
+    return { success: false, bonusGranted: 0, error: 'User account not found.' };
+  }
+
+  if (newUser.referredBy) {
+    return { success: false, bonusGranted: 0, error: 'A referral code has already been claimed on this account.' };
+  }
+
+  // 1. Try local match first
+  const localInviter = users.find((u) => {
+    const uCode = (u.referralCode || '').trim().toUpperCase();
+    const uHandle = (u.userId || '').trim().toLowerCase().replace(/^@/, '');
+    const uEmail = (u.email || '').trim().toLowerCase();
+    return (uCode && uCode === code) || (uHandle && uHandle === handle) || (uEmail && uEmail === email);
+  });
+
+  if (localInviter) {
+    return applyReferralReward(newUserId, referralCodeInput);
+  }
+
+  // 2. Query Firestore referral_directory
+  let cloudInviter = null;
+  try {
+    cloudInviter = await lookupReferrerInCloud(raw);
+  } catch (err) {
+    console.warn('Cloud referrer lookup encountered error:', err);
+  }
+
+  const effectiveInviterName = cloudInviter?.fullName || 'Colleague';
+  const effectiveInviterCode = cloudInviter?.referralCode || code;
+
+  if (cloudInviter && (cloudInviter.userProfileId === newUser.id || cloudInviter.userId === newUser.userId)) {
+    return {
+      success: false,
+      bonusGranted: 0,
+      error: 'You cannot use your own referral code or ID.',
+    };
+  }
+
+  // Award New User 500 Credits
+  newUser.credits = (typeof newUser.credits === 'number' ? newUser.credits : 0) + REFERRAL_CREDIT_BONUS;
+  newUser.referredBy = effectiveInviterCode;
+  if (!Array.isArray(newUser.creditTransactions)) newUser.creditTransactions = [];
+  newUser.creditTransactions.unshift({
+    id: 'tx_ref_new_' + Math.random().toString(36).substring(2, 9),
+    date: new Date().toISOString(),
+    amount: REFERRAL_CREDIT_BONUS,
+    type: 'REFERRED_WELCOME_BONUS',
+    description: `+500 Referral Welcome Bonus using code/ID ${raw} from ${effectiveInviterName}`,
+    balanceAfter: newUser.credits,
+  });
+
+  saveUsersToStorage(users);
+
+  // Record cloud event for Inviter
+  await recordReferralRewardEvent(
+    cloudInviter || {
+      referralCode: effectiveInviterCode,
+      userId: handle,
+      email: email.includes('@') ? email : undefined,
+      fullName: effectiveInviterName,
+    },
+    {
+      userId: newUser.userId || newUser.id,
+      email: newUser.email || '',
+      fullName: newUser.fullName,
+    }
+  );
+
+  syncUserReferralToCloud(newUser).catch(() => {});
+
+  return {
+    success: true,
+    bonusGranted: REFERRAL_CREDIT_BONUS,
+    inviterName: effectiveInviterName,
   };
 }
 
@@ -534,16 +724,19 @@ export function authenticateUser(
   matched.lastLoginAt = new Date().toISOString();
   saveUsersToStorage(users);
   saveActiveUserIdToStorage(matched.id);
+  syncUserReferralToCloud(matched).catch(() => {});
   return { success: true, user: matched };
 }
 
 /**
  * Google Sign-In helper: Authenticates or creates account via Google email.
+ * Applies pending referral code/ID if user is new or hasn't claimed referral yet.
  */
 export function authenticateGoogleUser(googleData: {
   email: string;
   name?: string;
   picture?: string;
+  referralCode?: string;
 }): { success: boolean; user?: UserProfile; isNewUser?: boolean; error?: string } {
   const users = loadUsersFromStorage();
   const cleanEmail = googleData.email.trim().toLowerCase();
@@ -596,7 +789,29 @@ export function authenticateGoogleUser(googleData: {
     saveUsersToStorage(users);
   }
 
+  // Check if a referral code is available to claim for this user
+  if (!matched.referredBy) {
+    const pendingReferral = googleData.referralCode?.trim() || (() => {
+      try {
+        return sessionStorage.getItem('ca_pending_referral_code') || '';
+      } catch {
+        return '';
+      }
+    })();
+
+    if (pendingReferral) {
+      applyReferralReward(matched.id, pendingReferral);
+      try {
+        sessionStorage.removeItem('ca_pending_referral_code');
+      } catch {}
+      const reloaded = loadUsersFromStorage().find((u) => u.id === matched.id);
+      if (reloaded) matched = reloaded;
+    }
+  }
+
   saveActiveUserIdToStorage(matched.id);
+  syncUserReferralToCloud(matched).catch(() => {});
+
   return { success: true, user: matched, isNewUser: isNew || !matched.mobile };
 }
 
@@ -680,13 +895,28 @@ export function registerUser(
   saveActiveUserIdToStorage(userProfile.id);
 
   // If user entered a referral code, apply reward (+500 credits to both!)
-  if (newUser.referralCodeInput && newUser.referralCodeInput.trim()) {
-    applyReferralReward(userProfile.id, newUser.referralCodeInput.trim());
+  const refCodeToUse = newUser.referralCodeInput?.trim() || (() => {
+    try {
+      return sessionStorage.getItem('ca_pending_referral_code') || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  if (refCodeToUse) {
+    applyReferralReward(userProfile.id, refCodeToUse);
+    try {
+      sessionStorage.removeItem('ca_pending_referral_code');
+    } catch {}
     // reload updated profile with credits
     const reloaded = loadUsersFromStorage().find((u) => u.id === userProfile.id);
-    if (reloaded) return { success: true, user: reloaded };
+    if (reloaded) {
+      syncUserReferralToCloud(reloaded).catch(() => {});
+      return { success: true, user: reloaded };
+    }
   }
 
+  syncUserReferralToCloud(userProfile).catch(() => {});
   return { success: true, user: userProfile };
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Lock,
@@ -54,6 +54,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [referralCodeInput, setReferralCodeInput] = useState('');
   const [showReferralInput, setShowReferralInput] = useState(false);
 
+  // Check for pending referral code from URL param (?ref=...) or sessionStorage on modal open
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlRef = params.get('ref');
+        const sessionRef = sessionStorage.getItem('ca_pending_referral_code');
+        const found = (urlRef || sessionRef || '').trim();
+        if (found) {
+          setReferralCodeInput(found);
+          setShowReferralInput(true);
+          // If a referral code is present, default to the register tab
+          if (initialTab !== 'signin') {
+            setTab('register');
+          }
+        }
+      } catch {}
+    }
+  }, [isOpen, initialTab]);
+
   if (!isOpen) return null;
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -108,6 +128,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setLoading(true);
     try {
+      const effectiveReferral = referralCodeInput.trim() || (() => {
+        try {
+          return sessionStorage.getItem('ca_pending_referral_code') || undefined;
+        } catch {
+          return undefined;
+        }
+      })();
+
       const res = registerUser({
         id: 'USER_' + cleanUserHandle.toUpperCase(),
         userId: cleanUserHandle,
@@ -117,10 +145,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         firmName: firmName.trim() || 'Chartered Accountant Practice',
         membershipNo: membershipNo.trim(),
         password: regPassword,
-        referralCodeInput: referralCodeInput.trim() || undefined,
+        referralCodeInput: effectiveReferral,
       });
 
       if (res.success && res.user) {
+        try {
+          sessionStorage.removeItem('ca_pending_referral_code');
+        } catch {}
         onAuthSuccess(res.user);
         onClose();
       } else {
@@ -146,13 +177,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
 
       if (res.user && res.user.email) {
+        const effectiveReferral = referralCodeInput.trim() || (() => {
+          try {
+            return sessionStorage.getItem('ca_pending_referral_code') || undefined;
+          } catch {
+            return undefined;
+          }
+        })();
+
         const authRes = authenticateGoogleUser({
           email: res.user.email,
           name: res.user.displayName || undefined,
           picture: res.user.photoURL || undefined,
+          referralCode: effectiveReferral,
         });
 
         if (authRes.success && authRes.user) {
+          try {
+            sessionStorage.removeItem('ca_pending_referral_code');
+          } catch {}
           if (onGoogleAuthSuccess) {
             onGoogleAuthSuccess(authRes.user, !!authRes.isNewUser, res.accessToken);
           } else {
@@ -477,19 +520,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     className="text-[11px] text-emerald-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Gift className="w-3 h-3 text-emerald-600" />
-                    <span>Have a referral code? (+500 Free Credits)</span>
+                    <span>Have a referral code or colleague ID? (+500 Free Credits)</span>
                   </button>
                 ) : (
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1 animate-in fade-in">
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 animate-in fade-in">
                     <div className="flex items-center justify-between text-[11px] font-bold text-emerald-900">
-                      <span>Enter Colleague's Referral Code</span>
+                      <span className="flex items-center gap-1">
+                        <Gift className="w-3 h-3 text-emerald-600" />
+                        Referral Code, User ID (@handle), or Email
+                      </span>
                       <button
                         type="button"
                         onClick={() => {
                           setShowReferralInput(false);
                           setReferralCodeInput('');
                         }}
-                        className="text-slate-400 hover:text-slate-600"
+                        className="text-slate-400 hover:text-slate-600 text-[10px]"
                       >
                         Cancel
                       </button>
@@ -497,10 +543,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <input
                       type="text"
                       value={referralCodeInput}
-                      onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
-                      placeholder="e.g. REF-AMIT24"
-                      className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-bold uppercase tracking-wider text-slate-800 focus:ring-2 focus:ring-emerald-500"
+                      onChange={(e) => setReferralCodeInput(e.target.value)}
+                      placeholder="e.g. REF-RAJESH100, @ca_rajesh, or rajesh@gmail.com"
+                      className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                     />
+                    <p className="text-[10px] text-emerald-700">
+                      🎁 Both you and your colleague receive +500 free credits upon signup.
+                    </p>
                   </div>
                 )}
               </div>

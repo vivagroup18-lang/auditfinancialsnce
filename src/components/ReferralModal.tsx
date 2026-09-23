@@ -47,7 +47,8 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const shareText = `Join me on CA Financial Statement Agent for automated ICAI Non-Corporate Entity statutory audits and financial statements! Use my referral code ${referralCode} to get 500 FREE credits: ${referralUrl}`;
+  const userHandle = currentUser.userId ? `@${currentUser.userId.replace(/^@/, '')}` : referralCode;
+  const shareText = `Join me on CA Financial Statement Agent for automated ICAI Non-Corporate Entity statutory audits and financial statements! Use my referral code ${referralCode} (or User ID ${userHandle}) to get 500 FREE credits: ${referralUrl}`;
 
   const handleShareWhatsApp = () => {
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
@@ -198,6 +199,13 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({
                 <Mail className="w-4 h-4" />
                 <span>Share via Email</span>
               </button>
+            </div>
+
+            <div className="p-3 bg-white/90 rounded-xl border border-emerald-200/90 text-[11px] text-emerald-950 flex items-start gap-2 shadow-2xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Flexible Colleague Referral:</strong> Your colleague can sign up using your Referral Code (<strong>{referralCode}</strong>), your User ID handle (<strong>{userHandle}</strong>), or your email. Both parties instantly receive +500 credits!
+              </span>
             </div>
           </div>
 

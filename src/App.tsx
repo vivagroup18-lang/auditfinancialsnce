@@ -81,6 +81,10 @@ import {
   checkAndRestoreFromDrive,
   saveWorkspaceToDriveSync,
 } from './services/driveSyncService';
+import {
+  claimPendingReferralRewards,
+  syncUserReferralToCloud,
+} from './services/referralCloudService';
 
 export default function App() {
   // Authenticated User & SaaS Subscription State
@@ -240,23 +244,55 @@ export default function App() {
   const driveSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeDriveFileIdRef = useRef<string | undefined>(undefined);
 
-  // Check URL query param for ?ref=... on mount
+  // Check URL query param for ?ref=... on mount and persist in session
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const refParam = params.get('ref');
-      if (refParam && !currentUser) {
-        setAuthModalTab('register');
-        setIsAuthModalOpen(true);
-        setNotification({
-          type: 'info',
-          message: `Referral code "${refParam}" applied! Complete signup to receive 500 bonus credits!`,
-        });
+      if (refParam && refParam.trim()) {
+        const cleanRef = refParam.trim();
+        sessionStorage.setItem('ca_pending_referral_code', cleanRef);
+
+        const isGuestOrLoggedOut = !currentUser || currentUser.id.startsWith('guest_ca');
+        if (isGuestOrLoggedOut) {
+          setAuthModalTab('register');
+          setIsAuthModalOpen(true);
+          setNotification({
+            type: 'info',
+            message: `🎉 Referral code "${cleanRef}" detected! Complete registration or Google Sign-In to receive +500 free credits!`,
+          });
+        }
       }
     } catch (e) {
       // ignore
     }
   }, []);
+
+  // Sync user referral identity to cloud & claim any offline pending rewards
+  useEffect(() => {
+    if (currentUser && !currentUser.id.startsWith('guest_ca')) {
+      // Keep cloud directory up to date
+      syncUserReferralToCloud(currentUser).catch(() => {});
+
+      // Claim pending referral rewards earned from colleagues who registered using this user's code/ID
+      claimPendingReferralRewards(currentUser)
+        .then((claimRes) => {
+          if (claimRes && claimRes.claimedCount > 0) {
+            if (claimRes.updatedUser) {
+              setCurrentUser(claimRes.updatedUser);
+            }
+            const names = claimRes.refereeNames.slice(0, 3).join(', ');
+            setNotification({
+              type: 'success',
+              message: `🎁 Referral Bonus! You received +${claimRes.totalAwarded} Credits! Colleague(s) (${names}) joined using your referral.`,
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn('Pending referral processing error:', err);
+        });
+    }
+  }, [currentUser?.id]);
 
   // Sync active company count with current user profile usage
   useEffect(() => {
