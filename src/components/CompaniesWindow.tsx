@@ -462,6 +462,27 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
         {/* ========================================================================= */}
         <div className="lg:col-span-7 space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5">
+            {/* Account Workspace Context Badge */}
+            <div className="mb-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${userEmail ? 'bg-emerald-500' : 'bg-amber-500'} shrink-0`} />
+                <span className="text-slate-600 font-medium text-[11px] sm:text-xs">
+                  {userEmail ? (
+                    <>
+                      Workspace Account: <strong className="text-slate-900 font-bold">{userEmail}</strong> <span className="text-emerald-700 font-semibold hidden md:inline">• Private User Workspace</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong className="text-slate-800 font-semibold">Offline Guest Workspace</strong> • Sign in with Google to auto-sync &amp; isolate cloud companies
+                    </>
+                  )}
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-mono">
+                {companies.length} {companies.length === 1 ? 'entity' : 'entities'}
+              </span>
+            </div>
+
             {/* Search & Filter Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5 flex-wrap">
@@ -528,11 +549,17 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                 <div className="text-center py-10 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
                   <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                   <h3 className="text-sm font-semibold text-slate-700">
-                    {searchQuery ? 'No matching companies found' : 'No client companies created yet'}
+                    {searchQuery
+                      ? 'No matching companies found'
+                      : userEmail
+                      ? `No client companies created yet for ${userEmail}`
+                      : 'No client companies created yet'}
                   </h3>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
                     {searchQuery
                       ? 'Try adjusting your search keywords or filter.'
+                      : userEmail
+                      ? 'Create your first entity using the form on the right, or click Quick Sample to start drafting.'
                       : 'Use the registration form on the right to add your first client entity, or click one of the quick starter samples.'}
                   </p>
                   {!searchQuery && (

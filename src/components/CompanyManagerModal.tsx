@@ -36,6 +36,7 @@ interface CompanyManagerModalProps {
   initialTab?: 'list' | 'add' | 'edit';
   initialEditingCompanyId?: string;
   onOpenBackupRestore?: () => void;
+  userEmail?: string;
 }
 
 export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
@@ -51,6 +52,7 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
   initialTab = 'list',
   initialEditingCompanyId,
   onOpenBackupRestore,
+  userEmail,
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'add' | 'edit'>(initialTab);
   const [editingCompanyId, setEditingCompanyId] = useState<string>(
@@ -160,9 +162,18 @@ export const CompanyManagerModal: React.FC<CompanyManagerModalProps> = ({
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm">Company & Entity Manager</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm">Company & Entity Manager</h3>
+                {userEmail && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700 font-mono font-semibold">
+                    {userEmail}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-400">
-                Manage multiple client entities, audit parameters, and financial years
+                {userEmail
+                  ? `Private workspace for ${userEmail} • Multi-entity audit records`
+                  : 'Manage multiple client entities, audit parameters, and financial years'}
               </p>
             </div>
           </div>

@@ -155,6 +155,13 @@ export async function checkAndRestoreFromDrive(
   userEmail?: string
 ): Promise<DriveSyncResult> {
   try {
+    const cleanEmail = userEmail ? userEmail.trim().toLowerCase() : undefined;
+
+    // Filter incoming local companies so only records belonging to this user are considered
+    const safeLocalCompanies = cleanEmail
+      ? localCompanies.filter((c) => !c.userEmail || c.userEmail.trim().toLowerCase() === cleanEmail)
+      : localCompanies;
+
     // 1. Get or create root sync folder
     const folder = await findOrCreateSyncFolder(accessToken);
 
@@ -166,35 +173,52 @@ export async function checkAndRestoreFromDrive(
       const cloudPayload = await fetchDriveSyncContent(accessToken, syncFile.id);
 
       if (cloudPayload && cloudPayload.companies && cloudPayload.companies.length > 0) {
-        const cloudCount = cloudPayload.companies.length;
-        const localCount = localCompanies.length;
+        // Exclude any cross-contaminated companies belonging to a different email
+        const cloudCompanies = cloudPayload.companies
+          .filter((c) => {
+            if (!c?.id) return false;
+            if (cleanEmail && c.userEmail && c.userEmail.trim().toLowerCase() !== cleanEmail) {
+              return false;
+            }
+            return true;
+          })
+          .map((c) => ({
+            ...c,
+            userEmail: cleanEmail || c.userEmail,
+          }));
 
-        // Scenario A: Local is empty (brand new system, or cache cleared) -> Full Restore from Drive
-        if (localCount === 0) {
+        const cloudCount = cloudCompanies.length;
+        const localCount = safeLocalCompanies.length;
+
+        // Scenario A: Local is empty for this user -> Full Restore from Drive
+        if (localCount === 0 && cloudCount > 0) {
           return {
             restored: true,
             syncedToCloud: false,
-            companies: cloudPayload.companies,
+            companies: cloudCompanies,
             activeCompanyId: cloudPayload.activeCompanyId,
-            message: `Restored ${cloudCount} company entity/entities from your Google Drive (${userEmail || 'cloud'}).`,
+            message: `Restored ${cloudCount} company entity/entities from your Google Drive (${cleanEmail || 'cloud'}).`,
             lastSyncedAt: cloudPayload.exportedAt || syncFile.modifiedTime,
             fileId: syncFile.id,
           };
         }
 
-        // Scenario B: Both have companies -> Merge by company ID (favoring cloud unless local has newer edits)
+        // Scenario B: Both have companies -> Merge by company ID (scoped strictly to this user)
         const mergedMap = new Map<string, Company>();
 
         // Put cloud companies in first
-        cloudPayload.companies.forEach((c) => {
+        cloudCompanies.forEach((c) => {
           if (c?.id) mergedMap.set(c.id, c);
         });
 
         // Add any local companies that don't exist in the cloud
         let hasNewLocal = false;
-        localCompanies.forEach((localComp) => {
+        safeLocalCompanies.forEach((localComp) => {
           if (localComp?.id && !mergedMap.has(localComp.id)) {
-            mergedMap.set(localComp.id, localComp);
+            mergedMap.set(localComp.id, {
+              ...localComp,
+              userEmail: cleanEmail || localComp.userEmail,
+            });
             hasNewLocal = true;
           }
         });
@@ -219,11 +243,11 @@ export async function checkAndRestoreFromDrive(
     }
 
     // Scenario C: No cloud file in Google Drive yet, but local has companies -> Upload local to Drive
-    if (localCompanies.length > 0) {
-      const activeId = localCompanies[0]?.id || '';
+    if (safeLocalCompanies.length > 0) {
+      const activeId = safeLocalCompanies[0]?.id || '';
       const saveRes = await saveWorkspaceToDriveSync(
         accessToken,
-        localCompanies,
+        safeLocalCompanies,
         activeId,
         userEmail,
         undefined,
@@ -233,9 +257,9 @@ export async function checkAndRestoreFromDrive(
       return {
         restored: false,
         syncedToCloud: true,
-        companies: localCompanies,
+        companies: safeLocalCompanies,
         activeCompanyId: activeId,
-        message: `Backed up ${localCompanies.length} existing local companies to your Google Drive!`,
+        message: `Backed up ${safeLocalCompanies.length} existing local companies to your Google Drive!`,
         lastSyncedAt: saveRes.lastSyncedAt,
         fileId: saveRes.fileId,
       };
@@ -277,16 +301,24 @@ export async function saveWorkspaceToDriveSync(
       if (found) targetFileId = found.id;
     }
 
-    // 3. Prepare payload
+    // 3. Prepare payload strictly filtered to this user's companies
     const now = new Date().toISOString();
+    const cleanEmail = userEmail ? userEmail.trim().toLowerCase() : undefined;
+    const safeCompanies = companies
+      .filter((c) => !cleanEmail || !c.userEmail || c.userEmail.trim().toLowerCase() === cleanEmail)
+      .map((c) => ({
+        ...c,
+        userEmail: cleanEmail || c.userEmail || 'ca-user',
+      }));
+
     const payload: DriveSyncPayload = {
       version: 2,
       appName: 'AuditFinancials',
       schemaVersion: '2.0.0',
       exportedAt: now,
-      userEmail: userEmail || 'ca-user',
-      activeCompanyId: activeCompanyId || (companies[0]?.id ?? ''),
-      companies,
+      userEmail: cleanEmail || 'ca-user',
+      activeCompanyId: activeCompanyId || (safeCompanies[0]?.id ?? ''),
+      companies: safeCompanies,
     };
 
     const jsonString = JSON.stringify(payload, null, 2);

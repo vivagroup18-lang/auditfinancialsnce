@@ -692,170 +692,244 @@ export function registerUser(
 
 
 /**
- * Loads saved companies strictly for a specific User ID
+ * Resolves a normalized, unique storage partition key based on the user's email or ID.
+ * - Authenticated Google / email user: 'user_' + sanitized_email (e.g. 'user_ca_rajesh_gmail_com')
+ * - Fallback to user ID if no email: 'user_' + sanitized_id
+ * - Guest / unauthenticated: 'guest'
  */
-export function loadCompaniesForUser(userId: string): Company[] {
-  if (!userId) return [];
+export function getUserStorageKey(user?: UserProfile | { email?: string; id?: string } | null): string {
+  if (!user) return 'guest';
+  if (user.email && user.email.trim()) {
+    const cleanEmail = user.email.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    if (cleanEmail && cleanEmail !== 'guest_ca_auditfinancials_local') {
+      return `user_${cleanEmail}`;
+    }
+  }
+  if (user.id && user.id.trim()) {
+    const cleanId = user.id.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    if (!cleanId.startsWith('guest_ca')) {
+      return `user_${cleanId}`;
+    }
+  }
+  return 'guest';
+}
+
+/**
+ * Loads companies strictly belonging to the currently active user session.
+ * Ensures:
+ * 1. An authenticated user ONLY gets companies created by or belonging to their email.
+ * 2. Another user logging in on the same browser CANNOT see other users' companies.
+ * 3. Guest workspace is isolated from authenticated accounts.
+ * 4. Safe migration for existing single-user companies without data loss.
+ */
+export function loadCompaniesForUserSession(user?: UserProfile | { email?: string; id?: string } | null): Company[] {
+  const sessionKey = getUserStorageKey(user);
+  const userStorageKey = `ca_companies_${sessionKey}_v2`;
+  const currentUserEmail = user?.email?.trim().toLowerCase();
+
   try {
-    const userKey = `ca_user_${userId}_companies_v2`;
-    const raw = localStorage.getItem(userKey);
+    // 1. Primary Check: User-partitioned storage key
+    const raw = localStorage.getItem(userStorageKey);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Defensive security filter: ensure no records belonging to another email leaked in
+        if (currentUserEmail && sessionKey !== 'guest') {
+          return parsed.filter((c: Company) => {
+            if (!c?.id) return false;
+            if (c.userEmail) {
+              return c.userEmail.trim().toLowerCase() === currentUserEmail;
+            }
+            // Untagged company in this user's storage: automatically claim and keep
+            c.userEmail = currentUserEmail;
+            if (user?.id) c.userId = user.id;
+            return true;
+          });
+        }
+        // Guest session: only return guest or unowned companies
+        return parsed.filter((c: Company) => !c.userEmail || c.userEmail === 'guest');
       }
     }
+
+    // 2. Safe Migration Fallback:
+    // If this user has no partitioned records yet, check if there are legacy companies in global storage.
+    // We only migrate companies that DO NOT belong to a different registered user!
+    const legacyRaw = localStorage.getItem(STORAGE_KEY_COMPANIES);
+    if (legacyRaw) {
+      const legacyParsed = JSON.parse(legacyRaw);
+      if (Array.isArray(legacyParsed) && legacyParsed.length > 0) {
+        let eligibleToMigrate: Company[] = [];
+
+        if (currentUserEmail && sessionKey !== 'guest') {
+          // For authenticated user: find companies explicitly matching their email OR untagged
+          eligibleToMigrate = legacyParsed
+            .filter((c: Company) => {
+              if (!c?.id) return false;
+              if (c.userEmail) {
+                return c.userEmail.trim().toLowerCase() === currentUserEmail;
+              }
+              // If untagged, migrate to this initial user
+              return true;
+            })
+            .map((c: Company) => ({
+              ...c,
+              userEmail: currentUserEmail,
+              userId: user?.id || c.userId,
+            }));
+        } else {
+          // For guest: only untagged or guest companies
+          eligibleToMigrate = legacyParsed.filter(
+            (c: Company) => !c.userEmail || c.userEmail === 'guest'
+          );
+        }
+
+        if (eligibleToMigrate.length > 0) {
+          // Save into this user's isolated partition
+          saveCompaniesForUserSession(eligibleToMigrate, user as any);
+          return eligibleToMigrate;
+        }
+      }
+    }
+
     return [];
   } catch (error) {
-    console.error(`Failed to load companies for user "${userId}":`, error);
+    console.error(`Failed to load companies for user session "${sessionKey}":`, error);
     return [];
   }
 }
 
 /**
- * Saves companies array strictly for a specific User ID
+ * Saves companies array strictly partitioned for the active user session.
+ * Stamps each company with the current user's email and user ID.
  */
-export function saveCompaniesForUser(userId: string, companies: Company[]): boolean {
-  if (!userId) return false;
-  try {
-    const userKey = `ca_user_${userId}_companies_v2`;
-    localStorage.setItem(userKey, JSON.stringify(companies));
-    return true;
-  } catch (error) {
-    console.error(`Failed to save companies for user "${userId}":`, error);
-    return false;
-  }
-}
+export function saveCompaniesForUserSession(
+  companies: Company[],
+  user?: UserProfile | { email?: string; id?: string } | null
+): boolean {
+  if (!Array.isArray(companies)) return false;
+  const sessionKey = getUserStorageKey(user);
+  const userStorageKey = `ca_companies_${sessionKey}_v2`;
+  const currentUserEmail = user?.email?.trim().toLowerCase();
+  const currentUserId = user?.id;
 
-/**
- * Saves all companies array to browser LocalStorage with automatic redundancy
- * and quota protection so created companies are never lost.
- */
-export function saveCompaniesToStorage(companies: Company[]): boolean {
   try {
-    if (!Array.isArray(companies)) return false;
+    // Stamp all companies with user ownership
+    const stamped = companies.map((c) => ({
+      ...c,
+      userEmail: currentUserEmail && sessionKey !== 'guest' ? currentUserEmail : (c.userEmail || 'guest'),
+      userId: currentUserId || c.userId,
+    }));
 
-    // 1. Primary Save: Complete serialized array
-    const serialized = JSON.stringify(companies);
+    // Primary partitioned save
+    const serialized = JSON.stringify(stamped);
     try {
-      localStorage.setItem(STORAGE_KEY_COMPANIES, serialized);
+      localStorage.setItem(userStorageKey, serialized);
     } catch (quotaError) {
-      console.warn('Primary company storage hit quota limits, attempting compact save:', quotaError);
-      // Compact fallback: trim redundant large fields while preserving all configs, mappings, and totals
-      const compacted = companies.map((c) => ({
+      console.warn(`Storage quota exceeded for partition "${sessionKey}", compacting...`, quotaError);
+      const compacted = stamped.map((c) => ({
         ...c,
         rawRows: (c.rawRows || []).slice(0, 500),
         pyRawRows: (c.pyRawRows || []).slice(0, 500),
       }));
-      localStorage.setItem(STORAGE_KEY_COMPANIES, JSON.stringify(compacted));
+      localStorage.setItem(userStorageKey, JSON.stringify(compacted));
     }
 
-    // 2. Secondary Redundant Save: Individual company records for fail-safe recovery
-    companies.forEach((comp) => {
+    // Secondary redundant fail-safe records (scoped by user partition)
+    stamped.forEach((comp) => {
       if (comp?.id) {
         try {
-          localStorage.setItem(`ca_comp_entry_${comp.id}`, JSON.stringify(comp));
-        } catch (e) {
-          // ignore individual item quota warnings
-        }
+          localStorage.setItem(`ca_comp_entry_${sessionKey}_${comp.id}`, JSON.stringify(comp));
+        } catch {}
       }
     });
 
     return true;
   } catch (error) {
-    console.error('Critical failure in saveCompaniesToStorage:', error);
+    console.error(`Failed to save companies for user session "${sessionKey}":`, error);
     return false;
   }
 }
 
 /**
- * Loads all saved companies from browser LocalStorage.
- * Includes multiple fail-safe fallback recovery layers so created companies are never lost.
+ * Saves current active company ID for the user session
  */
-export function loadCompaniesFromStorage(): Company[] {
+export function saveActiveCompanyIdForUserSession(
+  id: string,
+  user?: UserProfile | { email?: string; id?: string } | null
+): void {
+  const sessionKey = getUserStorageKey(user);
   try {
-    // Attempt 1: Standard primary storage key
-    const raw = localStorage.getItem(STORAGE_KEY_COMPANIES);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-
-    // Attempt 2: Recover from individual company backup entries (ca_comp_entry_*)
-    const recovered: Company[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('ca_comp_entry_')) {
-        const itemRaw = localStorage.getItem(key);
-        if (itemRaw) {
-          try {
-            const comp = JSON.parse(itemRaw);
-            if (comp && comp.id && comp.config && !recovered.some((r) => r.id === comp.id)) {
-              recovered.push(comp);
-            }
-          } catch (e) {
-            // ignore corrupted item
-          }
-        }
-      }
-    }
-
-    if (recovered.length > 0) {
-      console.info(`Recovered ${recovered.length} companies from individual storage records.`);
-      // Resave to primary storage key for consistency
-      saveCompaniesToStorage(recovered);
-      return recovered;
-    }
-
-    // Attempt 3: User-scoped legacy keys
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('ca_user_') && key.endsWith('_companies_v2')) {
-        const userRaw = localStorage.getItem(key);
-        if (userRaw) {
-          try {
-            const parsed = JSON.parse(userRaw);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              saveCompaniesToStorage(parsed);
-              return parsed;
-            }
-          } catch (e) {
-            // ignore
-          }
-        }
-      }
-    }
-
-    return [];
+    localStorage.setItem(`ca_active_comp_id_${sessionKey}`, id);
   } catch (error) {
-    console.error('Failed to load companies from LocalStorage:', error);
-    return [];
+    console.error(`Failed to save active company ID for "${sessionKey}":`, error);
   }
+}
+
+/**
+ * Loads current active company ID for the user session
+ */
+export function loadActiveCompanyIdForUserSession(
+  user?: UserProfile | { email?: string; id?: string } | null,
+  companies?: Company[]
+): string {
+  const sessionKey = getUserStorageKey(user);
+  try {
+    const stored = localStorage.getItem(`ca_active_comp_id_${sessionKey}`);
+    if (stored && companies && companies.some((c) => c.id === stored)) {
+      return stored;
+    }
+    return companies && companies.length > 0 ? companies[0].id : '';
+  } catch (error) {
+    console.error(`Failed to load active company ID for "${sessionKey}":`, error);
+    return companies && companies.length > 0 ? companies[0].id : '';
+  }
+}
+
+/**
+ * Loads saved companies strictly for a specific User ID (legacy support)
+ */
+export function loadCompaniesForUser(userId: string): Company[] {
+  return loadCompaniesForUserSession({ id: userId });
+}
+
+/**
+ * Saves companies array strictly for a specific User ID (legacy support)
+ */
+export function saveCompaniesForUser(userId: string, companies: Company[]): boolean {
+  return saveCompaniesForUserSession(companies, { id: userId });
+}
+
+/**
+ * Saves all companies array for active user session (with fallback)
+ */
+export function saveCompaniesToStorage(companies: Company[], user?: UserProfile | null): boolean {
+  const activeUser = user || loadActiveUserFromStorage();
+  return saveCompaniesForUserSession(companies, activeUser);
+}
+
+/**
+ * Loads all saved companies for active user session (with fallback)
+ */
+export function loadCompaniesFromStorage(user?: UserProfile | null): Company[] {
+  const activeUser = user || loadActiveUserFromStorage();
+  return loadCompaniesForUserSession(activeUser);
 }
 
 /**
  * Saves current active company ID to LocalStorage
  */
-export function saveActiveCompanyIdToStorage(id: string): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_ACTIVE_ID, id);
-  } catch (error) {
-    console.error('Failed to save active company ID to LocalStorage:', error);
-  }
+export function saveActiveCompanyIdToStorage(id: string, user?: UserProfile | null): void {
+  const activeUser = user || loadActiveUserFromStorage();
+  saveActiveCompanyIdForUserSession(id, activeUser);
 }
 
 /**
  * Loads current active company ID from LocalStorage
  */
-export function loadActiveCompanyIdFromStorage(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
-  } catch (error) {
-    console.error('Failed to load active company ID from LocalStorage:', error);
-    return null;
-  }
+export function loadActiveCompanyIdFromStorage(user?: UserProfile | null, companies?: Company[]): string | null {
+  const activeUser = user || loadActiveUserFromStorage();
+  const id = loadActiveCompanyIdForUserSession(activeUser, companies);
+  return id || null;
 }
 
 /**

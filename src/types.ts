@@ -438,6 +438,8 @@ export interface Company {
   yearEndAdjustments?: YearEndAdjustments;
   createdAt?: string;
   updatedAt?: string;
+  userEmail?: string; // Owning CA/user email (e.g. "ca.user@gmail.com")
+  userId?: string;    // Owning user profile ID
 }
 
 export type SubscriptionTier = 'free_trial' | 'professional' | 'enterprise';

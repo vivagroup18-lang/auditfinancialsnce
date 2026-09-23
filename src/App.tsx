@@ -61,6 +61,11 @@ import {
   saveCompaniesToStorage,
   saveActiveCompanyIdToStorage,
   loadActiveCompanyIdFromStorage,
+  loadCompaniesForUserSession,
+  saveCompaniesForUserSession,
+  loadActiveCompanyIdForUserSession,
+  saveActiveCompanyIdForUserSession,
+  getUserStorageKey,
   loadActiveUserFromStorage,
   logoutActiveUser,
   recordUserUsage,
@@ -78,10 +83,20 @@ import {
 } from './services/driveSyncService';
 
 export default function App() {
-  // Initial synchronous recovery from localStorage to prevent empty-state wipes
+  // Authenticated User & SaaS Subscription State
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    try {
+      return loadActiveUserFromStorage();
+    } catch {
+      return null;
+    }
+  });
+
+  // Initial synchronous recovery partitioned by active user session
   const [companies, setCompanies] = useState<Company[]>(() => {
     try {
-      const saved = loadCompaniesFromStorage();
+      const activeUser = loadActiveUserFromStorage();
+      const saved = loadCompaniesForUserSession(activeUser);
       return Array.isArray(saved) ? saved : [];
     } catch {
       return [];
@@ -90,8 +105,9 @@ export default function App() {
 
   const [activeCompanyId, setActiveCompanyId] = useState<string>(() => {
     try {
-      const saved = loadCompaniesFromStorage();
-      const storedId = loadActiveCompanyIdFromStorage();
+      const activeUser = loadActiveUserFromStorage();
+      const saved = loadCompaniesForUserSession(activeUser);
+      const storedId = loadActiveCompanyIdForUserSession(activeUser, saved);
       if (storedId && saved.some((c) => c.id === storedId)) {
         return storedId;
       }
@@ -109,8 +125,9 @@ export default function App() {
 
   // Derive initial active company if available
   const initialCompany = useMemo(() => {
-    const saved = loadCompaniesFromStorage();
-    const storedId = loadActiveCompanyIdFromStorage();
+    const activeUser = loadActiveUserFromStorage();
+    const saved = loadCompaniesForUserSession(activeUser);
+    const storedId = loadActiveCompanyIdForUserSession(activeUser, saved);
     if (storedId && saved.some((c) => c.id === storedId)) {
       return saved.find((c) => c.id === storedId) || saved[0];
     }
@@ -151,7 +168,8 @@ export default function App() {
   // Navigation & Modals
   const [activeTab, setActiveTab] = useState<string>('ingestion');
   const [dashboardView, setDashboardView] = useState<'companies' | 'workspace'>(() => {
-    const saved = loadCompaniesFromStorage();
+    const activeUser = loadActiveUserFromStorage();
+    const saved = loadCompaniesForUserSession(activeUser);
     return saved && saved.length > 0 ? 'workspace' : 'companies';
   });
   const [workspaceStep, setWorkspaceStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -181,14 +199,7 @@ export default function App() {
   const [isAIMapping, setIsAIMapping] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
-  // Authenticated User & SaaS Subscription State
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    try {
-      return loadActiveUserFromStorage();
-    } catch {
-      return null;
-    }
-  });
+  // Authenticated User Modal & Subscription State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<'signin' | 'register'>('signin');
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
@@ -258,16 +269,78 @@ export default function App() {
     }
   }, [companies.length]);
 
+  // Helper: Switch active workspace cleanly to a specific user (or guest)
+  const switchSessionToUser = useCallback((targetUser: UserProfile | null) => {
+    isSwitchingCompanyRef.current = true;
+    const userCompanies = loadCompaniesForUserSession(targetUser);
+    const targetActiveId = loadActiveCompanyIdForUserSession(targetUser, userCompanies);
+
+    setCompanies(userCompanies);
+    setActiveCompanyId(targetActiveId);
+
+    if (userCompanies.length > 0) {
+      const activeComp = userCompanies.find((c) => c.id === targetActiveId) || userCompanies[0];
+      setConfig({ ...activeComp.config });
+      setRawRows([...(activeComp.rawRows || [])]);
+      setMappedLedgers([...(activeComp.mappedLedgers || [])]);
+      setMappingExceptions([...(activeComp.mappingExceptions || [])]);
+      setPyRawRows([...(activeComp.pyRawRows || [])]);
+      setPyMappedLedgers([...(activeComp.pyMappedLedgers || [])]);
+      setPyMappingExceptions([...(activeComp.pyMappingExceptions || [])]);
+      setTbFileName(activeComp.tbFileName || '');
+      setPyFileName(activeComp.pyFileName || '');
+      setUploadedBalanceSheet(activeComp.uploadedBalanceSheet);
+      setUploadedProfitAndLoss(activeComp.uploadedProfitAndLoss);
+      setUploadedPYBalanceSheet(activeComp.uploadedPYBalanceSheet);
+      setUploadedPYProfitAndLoss(activeComp.uploadedPYProfitAndLoss);
+      setDashboardView('workspace');
+    } else {
+      setConfig({
+        entityName: '',
+        entityType: 'Partnership Firm',
+        financialYear: '2025-26',
+        reportingPeriod: 'March 31, 2026',
+        previousFinancialYear: '2024-25',
+        previousReportingPeriod: 'March 31, 2025',
+        taxRatePercent: 30,
+        transferProfitTo: 'partners_capital',
+      });
+      setRawRows([]);
+      setMappedLedgers([]);
+      setMappingExceptions([]);
+      setPyRawRows([]);
+      setPyMappedLedgers([]);
+      setPyMappingExceptions([]);
+      setTbFileName('');
+      setPyFileName('');
+      setUploadedBalanceSheet(undefined);
+      setUploadedProfitAndLoss(undefined);
+      setUploadedPYBalanceSheet(undefined);
+      setUploadedPYProfitAndLoss(undefined);
+      setDashboardView('companies');
+    }
+
+    setTimeout(() => {
+      isSwitchingCompanyRef.current = false;
+    }, 150);
+  }, []);
+
   const handleAuthSuccess = useCallback((authedUser: UserProfile) => {
     setCurrentUser(authedUser);
+    switchSessionToUser(authedUser);
+    isInitialDriveSyncDoneRef.current = false;
+    activeDriveFileIdRef.current = undefined;
     setNotification({
       type: 'success',
-      message: `Signed in as ${authedUser.fullName} (⚡ ${authedUser.credits.toLocaleString()} Credits Available)`,
+      message: `Signed in as ${authedUser.fullName} (${authedUser.email})`,
     });
-  }, []);
+  }, [switchSessionToUser]);
 
   const handleGoogleAuthSuccess = useCallback((authedUser: UserProfile, isNewUser: boolean, token?: string) => {
     setCurrentUser(authedUser);
+    switchSessionToUser(authedUser);
+    isInitialDriveSyncDoneRef.current = false;
+    activeDriveFileIdRef.current = undefined;
     if (token) {
       setAccessToken(token);
     }
@@ -276,10 +349,10 @@ export default function App() {
     } else {
       setNotification({
         type: 'success',
-        message: `Welcome back, ${authedUser.fullName}! (⚡ ${authedUser.credits.toLocaleString()} Credits)`,
+        message: `Welcome back, ${authedUser.fullName}! (${authedUser.email})`,
       });
     }
-  }, []);
+  }, [switchSessionToUser]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -293,11 +366,13 @@ export default function App() {
     activeDriveFileIdRef.current = undefined;
     setDriveSyncStatus('idle');
     setLastDriveSyncTime(null);
+    switchSessionToUser(null);
+    setDashboardView('companies');
     setNotification({
       type: 'info',
-      message: 'You have been signed out.',
+      message: 'Signed out. Switched to offline guest workspace.',
     });
-  }, []);
+  }, [switchSessionToUser]);
 
   const handleSubscriptionUpdated = useCallback((updatedUser: UserProfile) => {
     setCurrentUser(updatedUser);
@@ -335,32 +410,10 @@ export default function App() {
     };
   }, [notification]);
 
-  // Load saved companies on initial mount
+  // Load saved companies on initial mount for current active user session
   useEffect(() => {
-    let savedCompanies = loadCompaniesFromStorage();
-    // Fallback migration: check any previously saved user companies in localStorage
-    if (!savedCompanies || savedCompanies.length === 0) {
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('ca_user_') && key.endsWith('_companies_v2')) {
-            const raw = localStorage.getItem(key);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                savedCompanies = parsed;
-                saveCompaniesToStorage(savedCompanies);
-                break;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Failed checking previous user companies:', e);
-      }
-    }
-
-    const storedActiveId = loadActiveCompanyIdFromStorage();
+    const savedCompanies = loadCompaniesForUserSession(currentUser);
+    const storedActiveId = loadActiveCompanyIdForUserSession(currentUser, savedCompanies);
 
     if (savedCompanies && savedCompanies.length > 0) {
       setCompanies(savedCompanies);
@@ -386,18 +439,16 @@ export default function App() {
     }
   }, []);
 
-  // Persist companies whenever companies state changes
+  // Persist companies whenever companies state or current user changes
   useEffect(() => {
-    if (companies.length > 0) {
-      saveCompaniesToStorage(companies);
-    }
-  }, [companies]);
+    saveCompaniesForUserSession(companies, currentUser);
+  }, [companies, currentUser]);
 
   useEffect(() => {
     if (activeCompanyId) {
-      saveActiveCompanyIdToStorage(activeCompanyId);
+      saveActiveCompanyIdForUserSession(activeCompanyId, currentUser);
     }
-  }, [activeCompanyId]);
+  }, [activeCompanyId, currentUser]);
 
   // Google Drive Cloud Auto-Sync Handlers
   const handleConnectGoogleDrive = useCallback(async () => {
@@ -503,7 +554,7 @@ export default function App() {
 
         if (res.restored && res.companies && res.companies.length > 0) {
           setCompanies(res.companies);
-          saveCompaniesToStorage(res.companies);
+          saveCompaniesForUserSession(res.companies, currentUser);
 
           const targetId =
             res.activeCompanyId && res.companies.some((c) => c.id === res.activeCompanyId)
@@ -511,7 +562,7 @@ export default function App() {
               : res.companies[0].id;
           const activeComp = res.companies.find((c) => c.id === targetId) || res.companies[0];
           setActiveCompanyId(activeComp.id);
-          saveActiveCompanyIdToStorage(activeComp.id);
+          saveActiveCompanyIdForUserSession(activeComp.id, currentUser);
 
           setConfig({ ...activeComp.config });
           setRawRows([...(activeComp.rawRows || [])]);
@@ -748,6 +799,9 @@ export default function App() {
         }
       }
 
+      const userEmail = currentUser?.email?.trim().toLowerCase() || user?.email?.trim().toLowerCase() || undefined;
+      const userId = currentUser?.id || user?.uid || undefined;
+
       const newCompany: Company = {
         id: newId,
         config: newConfig,
@@ -761,18 +815,20 @@ export default function App() {
         pyFileName: pyName,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        userEmail,
+        userId,
       };
 
-      // Synchronously commit to state and localStorage immediately
+      // Synchronously commit to state and user-partitioned storage immediately
       setCompanies((prev) => {
         const updated = [...prev, newCompany];
-        saveCompaniesToStorage(updated);
+        saveCompaniesForUserSession(updated, currentUser);
         return updated;
       });
 
-      // Switch to new company and persist active ID
+      // Switch to new company and persist active ID for user
       setActiveCompanyId(newId);
-      saveActiveCompanyIdToStorage(newId);
+      saveActiveCompanyIdForUserSession(newId, currentUser);
 
       setConfig(newConfig);
       setRawRows(cyRows);
@@ -800,7 +856,7 @@ export default function App() {
         message: `Saved & opened working windows for client entity: "${newConfig.entityName}"`,
       });
     },
-    [companies]
+    [companies, currentUser, user]
   );
 
   // Handler: Update Existing Company Config
@@ -812,7 +868,7 @@ export default function App() {
             ? { ...c, config: updatedConfig, updatedAt: new Date().toISOString() }
             : c
         );
-        saveCompaniesToStorage(updated);
+        saveCompaniesForUserSession(updated, currentUser);
         return updated;
       });
       if (companyId === activeCompanyId) {
@@ -837,20 +893,22 @@ export default function App() {
                 ? { ...c, config: next, updatedAt: new Date().toISOString() }
                 : c
             );
-            saveCompaniesToStorage(updated);
+            saveCompaniesForUserSession(updated, currentUser);
             return updated;
           });
         }
         return next;
       });
     },
-    [activeCompanyId]
+    [activeCompanyId, currentUser]
   );
 
   // Handler: Delete Company
   const handleDeleteCompany = useCallback(
     (companyId: string) => {
+      const userKey = getUserStorageKey(currentUser);
       try {
+        localStorage.removeItem(`ca_comp_entry_${userKey}_${companyId}`);
         localStorage.removeItem(`ca_comp_entry_${companyId}`);
       } catch (e) {
         // ignore
@@ -862,9 +920,9 @@ export default function App() {
       if (remaining.length === 0) {
         // When deleting the only existing company, reset to empty
         setCompanies([]);
-        saveCompaniesToStorage([]);
+        saveCompaniesForUserSession([], currentUser);
         setActiveCompanyId('');
-        saveActiveCompanyIdToStorage('');
+        saveActiveCompanyIdForUserSession('', currentUser);
         setConfig({
           entityName: '',
           entityType: 'Partnership Firm',
@@ -897,12 +955,12 @@ export default function App() {
       }
 
       setCompanies(remaining);
-      saveCompaniesToStorage(remaining);
+      saveCompaniesForUserSession(remaining, currentUser);
 
       if (companyId === activeCompanyId) {
         const nextComp = remaining[0];
         setActiveCompanyId(nextComp.id);
-        saveActiveCompanyIdToStorage(nextComp.id);
+        saveActiveCompanyIdForUserSession(nextComp.id, currentUser);
 
         setConfig(nextComp.config);
         setRawRows(nextComp.rawRows || []);
@@ -929,7 +987,7 @@ export default function App() {
         });
       }
     },
-    [activeCompanyId, companies]
+    [activeCompanyId, companies, currentUser]
   );
 
   // Handler: Duplicate Company
@@ -940,6 +998,9 @@ export default function App() {
 
       isSwitchingCompanyRef.current = true;
       const newId = `comp-${Date.now()}`;
+      const userEmail = currentUser?.email?.trim().toLowerCase() || user?.email?.trim().toLowerCase() || undefined;
+      const userId = currentUser?.id || user?.uid || undefined;
+
       const duplicated: Company = {
         ...JSON.parse(JSON.stringify(source)),
         id: newId,
@@ -949,16 +1010,18 @@ export default function App() {
         },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        userEmail,
+        userId,
       };
 
       setCompanies((prev) => {
         const updated = [...prev, duplicated];
-        saveCompaniesToStorage(updated);
+        saveCompaniesForUserSession(updated, currentUser);
         return updated;
       });
 
       setActiveCompanyId(newId);
-      saveActiveCompanyIdToStorage(newId);
+      saveActiveCompanyIdForUserSession(newId, currentUser);
 
       setConfig(duplicated.config);
       setRawRows(duplicated.rawRows || []);
@@ -1029,6 +1092,8 @@ export default function App() {
     // If no company is active, create a new one for this dataset
     if (!activeCompanyId || companies.length === 0) {
       const newId = `comp-sample-${Date.now()}`;
+      const userEmail = currentUser?.email?.trim().toLowerCase() || user?.email?.trim().toLowerCase() || undefined;
+      const userId = currentUser?.id || user?.uid || undefined;
       const newCompany: Company = {
         id: newId,
         config: newConfig,
@@ -1042,9 +1107,13 @@ export default function App() {
         pyFileName,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        userEmail,
+        userId,
       };
       setCompanies([newCompany]);
+      saveCompaniesForUserSession([newCompany], currentUser);
       setActiveCompanyId(newId);
+      saveActiveCompanyIdForUserSession(newId, currentUser);
     }
 
     // Set all active company state
@@ -1317,6 +1386,8 @@ export default function App() {
         const entityName = file.name.replace(/\.(xlsx?|csv|pdf|txt)$/i, '').replace(/[-_]/g, ' ').trim() || 'New Entity';
         const newId = `comp-uploaded-${Date.now()}`;
         const newCfg = { ...config, entityName };
+        const userEmail = currentUser?.email?.trim().toLowerCase() || user?.email?.trim().toLowerCase() || undefined;
+        const userId = currentUser?.id || user?.uid || undefined;
         const newCompany: Company = {
           id: newId,
           config: newCfg,
@@ -1330,9 +1401,13 @@ export default function App() {
           pyFileName: '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          userEmail,
+          userId,
         };
         setCompanies([newCompany]);
+        saveCompaniesForUserSession([newCompany], currentUser);
         setActiveCompanyId(newId);
+        saveActiveCompanyIdForUserSession(newId, currentUser);
         setConfig(newCfg);
       }
 
@@ -1442,21 +1517,29 @@ export default function App() {
       if (comp.tbFileName) setTbFileName(comp.tbFileName);
       if (comp.pyFileName) setPyFileName(comp.pyFileName);
 
+      const userEmail = currentUser?.email?.trim().toLowerCase() || user?.email?.trim().toLowerCase() || undefined;
+      const userId = currentUser?.id || user?.uid || undefined;
+      const taggedComp: Company = {
+        ...comp,
+        userEmail: userEmail || comp.userEmail,
+        userId: userId || comp.userId,
+      };
+
       setCompanies((prev) => {
-        const idx = prev.findIndex((c) => c.id === comp.id);
+        const idx = prev.findIndex((c) => c.id === taggedComp.id);
         if (idx >= 0) {
           const copy = [...prev];
-          copy[idx] = comp;
-          saveCompaniesToStorage(copy);
+          copy[idx] = taggedComp;
+          saveCompaniesForUserSession(copy, currentUser);
           return copy;
         } else {
-          const updated = [...prev, comp];
-          saveCompaniesToStorage(updated);
+          const updated = [...prev, taggedComp];
+          saveCompaniesForUserSession(updated, currentUser);
           return updated;
         }
       });
-      setActiveCompanyId(comp.id);
-      saveActiveCompanyIdToStorage(comp.id);
+      setActiveCompanyId(taggedComp.id);
+      saveActiveCompanyIdForUserSession(taggedComp.id, currentUser);
 
       setNotification({
         type: 'success',
@@ -2082,6 +2165,7 @@ export default function App() {
         onDuplicateCompany={handleDuplicateCompany}
         initialTab={companyManagerInitialTab}
         onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
+        userEmail={currentUser?.email || user?.email || undefined}
       />
 
       {/* Backup & Restore Modal */}
@@ -2091,11 +2175,19 @@ export default function App() {
         companies={companies}
         activeCompanyId={activeCompanyId}
         onRestoreSuccess={(restoredCompanies, restoredActiveId) => {
-          setCompanies(restoredCompanies);
+          const userEmail = currentUser?.email?.trim().toLowerCase() || user?.email?.trim().toLowerCase() || undefined;
+          const userId = currentUser?.id || user?.uid || undefined;
+          const tagged = restoredCompanies.map((c) => ({
+            ...c,
+            userEmail: userEmail || c.userEmail,
+            userId: userId || c.userId,
+          }));
+          setCompanies(tagged);
+          saveCompaniesForUserSession(tagged, currentUser);
           handleSelectCompany(restoredActiveId);
           setNotification({
             type: 'success',
-            message: `Backup restored successfully! Loaded ${restoredCompanies.length} company entity/entities.`,
+            message: `Backup restored successfully! Loaded ${tagged.length} company entity/entities.`,
           });
         }}
         user={user}
@@ -2108,14 +2200,7 @@ export default function App() {
             message: `Cloud saving activated for ${authedUser.email}!`,
           });
         }}
-        onSignOut={() => {
-          setUser(null);
-          setAccessToken(null);
-          setNotification({
-            type: 'info',
-            message: 'Signed out of Google Workspace.',
-          });
-        }}
+        onSignOut={handleLogout}
         onNavigateToTab={(tab) => setActiveTab(tab as any)}
       />
 
