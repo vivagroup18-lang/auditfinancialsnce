@@ -20,9 +20,11 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { ReferralModal } from './components/ReferralModal';
 import { TermsAndConditionsModal } from './components/TermsAndConditionsModal';
+import { UserManualModal } from './components/UserManualModal';
+import { AIFinancialsCopilotModal } from './components/AIFinancialsCopilotModal';
 import { CompaniesWindow } from './components/CompaniesWindow';
 import { StepByStepWorkspace } from './components/StepByStepWorkspace';
-import { initAuth, googleSignIn, googleLogout } from './firebase';
+import { initAuth, googleSignIn, googleLogout, setAccessTokenInMemory } from './firebase';
 import type { User } from 'firebase/auth';
 import {
   EntityConfig,
@@ -75,12 +77,13 @@ import {
   recordTermsAccepted,
 } from './utils/storageManager';
 import { NCE_NOTE_DEFINITIONS } from './data/nceTaxonomy';
-import { CheckCircle2, AlertTriangle, Info, X, FileSpreadsheet, ArrowRight } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Info, X, FileSpreadsheet, ArrowRight, RefreshCw, BookOpen, Bot } from 'lucide-react';
 import { FinancialYearChangeModal } from './components/FinancialYearChangeModal';
 import {
   checkAndRestoreFromDrive,
   saveWorkspaceToDriveSync,
 } from './services/driveSyncService';
+import { isGoogleAuthExpired } from './services/driveService';
 import {
   claimPendingReferralRewards,
   syncUserReferralToCloud,
@@ -201,7 +204,14 @@ export default function App() {
   });
 
   const [isAIMapping, setIsAIMapping] = useState(false);
-  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+    action?: {
+      label: string;
+      onClick: () => void;
+    };
+  } | null>(null);
 
   // Authenticated User Modal & Subscription State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -211,6 +221,13 @@ export default function App() {
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [subscriptionUpgradeReason, setSubscriptionUpgradeReason] = useState<string | undefined>(undefined);
+
+  // In-App User Manual & ICAI Reference Guide State
+  const [isUserManualOpen, setIsUserManualOpen] = useState(false);
+
+  // AI NCE Financials Copilot & App Assistant State
+  const [isAICopilotOpen, setIsAICopilotOpen] = useState(false);
+  const [aiCopilotPrompt, setAiCopilotPrompt] = useState<string | undefined>(undefined);
 
   // Terms & Conditions Acceptance State (mandatory before accessing workspace)
   const [hasAcceptedTermsState, setHasAcceptedTermsState] = useState<boolean>(() => {
@@ -490,28 +507,60 @@ export default function App() {
   const handleConnectGoogleDrive = useCallback(async () => {
     try {
       setDriveSyncStatus('syncing');
+      setNotification({
+        type: 'info',
+        message: 'Connecting to Google Workspace...',
+      });
       const { user: authedUser, accessToken: token } = await googleSignIn();
       if (token) {
         setUser(authedUser);
         setAccessToken(token);
-        setNotification({
-          type: 'success',
-          message: 'Google Drive connected! Synchronizing your workspace...',
-        });
+        setAccessTokenInMemory(token);
+
+        // Immediately trigger workspace backup with the fresh token
+        try {
+          const userEmail = authedUser?.email || currentUser?.email || undefined;
+          const saveRes = await saveWorkspaceToDriveSync(
+            token,
+            companies,
+            activeCompanyId,
+            userEmail,
+            activeDriveFileIdRef.current
+          );
+          activeDriveFileIdRef.current = saveRes.fileId;
+          setDriveSyncStatus('synced');
+          setLastDriveSyncTime(new Date(saveRes.lastSyncedAt));
+          setNotification({
+            type: 'success',
+            message: `Google Drive connected & synced! All ${companies.length} company entity/entities backed up securely.`,
+          });
+        } catch (syncErr: any) {
+          console.error('Post-connect sync error:', syncErr);
+          setDriveSyncStatus('error');
+          setNotification({
+            type: 'error',
+            message: `Google Drive connected, but initial sync failed: ${syncErr.message || 'Check permissions'}`,
+          });
+        }
       } else {
         setDriveSyncStatus('idle');
       }
     } catch (err: any) {
-      console.error('Failed to connect Google Drive:', err);
+      console.warn('Google Drive connection notice:', err);
       setDriveSyncStatus('error');
       setNotification({
         type: 'error',
-        message: `Google Drive connection cancelled or failed: ${err.message || 'Unknown error'}`,
+        message: `Google Drive connection notice: ${err.message || 'Popups restricted in sandbox'}`,
+        action: {
+          label: 'Retry Connection',
+          onClick: () => handleConnectGoogleDrive(),
+        },
       });
     }
-  }, []);
+  }, [companies, activeCompanyId, currentUser]);
 
   const handleManualDriveSync = useCallback(async () => {
+    // If no accessToken is present or already invalidated, prompt connection immediately
     if (!accessToken) {
       await handleConnectGoogleDrive();
       return;
@@ -536,9 +585,60 @@ export default function App() {
     } catch (err: any) {
       console.error('Manual Drive sync error:', err);
       setDriveSyncStatus('error');
+
+      if (isGoogleAuthExpired(err)) {
+        // Clear expired token so subsequent actions don't use stale credentials
+        setAccessToken(null);
+        setAccessTokenInMemory(null);
+
+        // Attempt immediate token refresh / reconnection since this was an interactive click
+        try {
+          const { user: reauthedUser, accessToken: freshToken } = await googleSignIn();
+          if (freshToken) {
+            setUser(reauthedUser);
+            setAccessToken(freshToken);
+            setAccessTokenInMemory(freshToken);
+            setDriveSyncStatus('syncing');
+            const userEmail = reauthedUser?.email || currentUser?.email || undefined;
+            const saveRes = await saveWorkspaceToDriveSync(
+              freshToken,
+              companies,
+              activeCompanyId,
+              userEmail,
+              activeDriveFileIdRef.current
+            );
+            activeDriveFileIdRef.current = saveRes.fileId;
+            setDriveSyncStatus('synced');
+            setLastDriveSyncTime(new Date(saveRes.lastSyncedAt));
+            setNotification({
+              type: 'success',
+              message: `Google Drive reconnected and workspace synced successfully (${companies.length} entities backed up).`,
+            });
+            return;
+          }
+        } catch (reconnectErr: any) {
+          console.warn('Auto-reconnect prompt dismissed or cancelled:', reconnectErr);
+        }
+
+        // If popup was cancelled or blocked, display interactive toast with 1-click Reconnect button
+        setNotification({
+          type: 'error',
+          message: 'Google Workspace access token has expired. Please reconnect your Google account to sync.',
+          action: {
+            label: 'Reconnect Google Drive',
+            onClick: () => handleConnectGoogleDrive(),
+          },
+        });
+        return;
+      }
+
       setNotification({
         type: 'error',
         message: `Google Drive sync failed: ${err.message || 'Check network or permissions'}`,
+        action: {
+          label: 'Retry Sync',
+          onClick: () => handleManualDriveSync(),
+        },
       });
     }
   }, [accessToken, companies, activeCompanyId, currentUser, user, handleConnectGoogleDrive]);
@@ -628,8 +728,17 @@ export default function App() {
         if (!isMounted) return;
         console.error('Initial Google Drive sync failed:', err);
         setDriveSyncStatus('error');
-        if (err?.message?.includes('Token Expired') || err?.message?.includes('401')) {
+        if (isGoogleAuthExpired(err)) {
           setAccessToken(null);
+          setAccessTokenInMemory(null);
+          setNotification({
+            type: 'error',
+            message: 'Your Google Workspace session has expired. Click to reconnect Google Drive.',
+            action: {
+              label: 'Reconnect Google Drive',
+              onClick: () => handleConnectGoogleDrive(),
+            },
+          });
         }
       }
     };
@@ -639,7 +748,7 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, [accessToken, companies, currentUser, user]);
+  }, [accessToken, companies, currentUser, user, handleConnectGoogleDrive]);
 
   // Debounced auto-save to Google Drive whenever companies or active company change
   useEffect(() => {
@@ -667,6 +776,18 @@ export default function App() {
       } catch (err: any) {
         console.error('Drive auto-save error:', err);
         setDriveSyncStatus('error');
+        if (isGoogleAuthExpired(err)) {
+          setAccessToken(null);
+          setAccessTokenInMemory(null);
+          setNotification({
+            type: 'error',
+            message: 'Google Workspace access token expired. Reconnect Google Drive to keep backups synchronized.',
+            action: {
+              label: 'Reconnect Google Drive',
+              onClick: () => handleConnectGoogleDrive(),
+            },
+          });
+        }
       }
     }, 3500);
 
@@ -675,7 +796,7 @@ export default function App() {
         clearTimeout(driveSyncDebounceRef.current);
       }
     };
-  }, [companies, activeCompanyId, accessToken, currentUser, user]);
+  }, [companies, activeCompanyId, accessToken, currentUser, user, handleConnectGoogleDrive]);
 
   // Sync active company variables back to main companies array
   useEffect(() => {
@@ -2030,6 +2151,11 @@ export default function App() {
         onConnectDrive={handleConnectGoogleDrive}
         onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
         onOpenTermsModal={() => setIsTermsModalOpen(true)}
+        onOpenUserManual={() => setIsUserManualOpen(true)}
+        onOpenAICopilot={(prompt) => {
+          setAiCopilotPrompt(prompt);
+          setIsAICopilotOpen(true);
+        }}
       />
 
       {/* Main Content Area */}
@@ -2037,7 +2163,7 @@ export default function App() {
         {/* Notification Toast */}
         {notification && (
           <div
-            className={`mb-5 p-3 rounded-lg flex items-center justify-between text-xs shadow-xs border transition ${
+            className={`mb-5 p-3 sm:p-3.5 rounded-xl flex items-center justify-between text-xs shadow-xs border transition ${
               notification.type === 'success'
                 ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
                 : notification.type === 'error'
@@ -2045,15 +2171,29 @@ export default function App() {
                 : 'bg-blue-50 text-blue-900 border-blue-200'
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5 flex-wrap">
               {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
               {notification.type === 'error' && <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />}
               {notification.type === 'info' && <Info className="w-4 h-4 text-blue-600 shrink-0" />}
               <span className="font-medium">{notification.message}</span>
+              {notification.action && (
+                <button
+                  type="button"
+                  onClick={notification.action.onClick}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                    notification.type === 'error'
+                      ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>{notification.action.label}</span>
+                </button>
+              )}
             </div>
             <button
               onClick={() => setNotification(null)}
-              className="text-slate-400 hover:text-slate-600 p-1 rounded"
+              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg ml-2 cursor-pointer shrink-0"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -2389,6 +2529,93 @@ export default function App() {
           }
         }}
         isMandatory={!hasAcceptedTermsState}
+      />
+
+      {/* Floating AI CA Copilot & Quick Help Action Hub */}
+      <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 print:hidden">
+        <button
+          type="button"
+          onClick={() => {
+            setAiCopilotPrompt(undefined);
+            setIsAICopilotOpen(true);
+          }}
+          className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 hover:from-emerald-500 hover:to-teal-700 text-white font-bold text-xs shadow-xl shadow-emerald-950/40 border border-emerald-400/40 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          title="Ask AI CA Copilot (ICAI Non-Corporate Entity & App Guidance)"
+        >
+          <div className="relative">
+            <Bot className="w-4 h-4" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400" />
+          </div>
+          <span>Ask AI Copilot</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsUserManualOpen(true)}
+          className="p-2.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          title="Open User Manual & ICAI Reference Guide"
+        >
+          <BookOpen className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Comprehensive User Manual & ICAI CA Reference Guide Modal */}
+      <UserManualModal
+        isOpen={isUserManualOpen}
+        onClose={() => setIsUserManualOpen(false)}
+        onOpenAICopilot={(prompt) => {
+          setIsUserManualOpen(false);
+          setAiCopilotPrompt(prompt);
+          setIsAICopilotOpen(true);
+        }}
+        onNavigateStep={(step) => {
+          setIsUserManualOpen(false);
+          setWorkspaceStep(step as 1 | 2 | 3 | 4 | 5);
+          setDashboardView('workspace');
+        }}
+      />
+
+      {/* AI NCE Financials & App Copilot Modal */}
+      <AIFinancialsCopilotModal
+        isOpen={isAICopilotOpen}
+        onClose={() => {
+          setIsAICopilotOpen(false);
+          setAiCopilotPrompt(undefined);
+        }}
+        config={config}
+        trialBalanceSummary={{
+          totalDebits: rawRows.reduce((s, r) => s + (r.closingDebit || 0), 0),
+          totalCredits: rawRows.reduce((s, r) => s + (r.closingCredit || 0), 0),
+          isTallied: isTallyBalanced,
+          ledgerCount: mappedLedgers.length,
+        }}
+        currentStep={workspaceStep}
+        driveSyncStatus={driveSyncStatus}
+        userEmail={currentUser?.email || user?.email || undefined}
+        initialPrompt={aiCopilotPrompt}
+        onNavigateStep={(step) => {
+          setWorkspaceStep(step as 1 | 2 | 3 | 4 | 5);
+          setDashboardView('workspace');
+        }}
+        onOpenModal={(modalName) => {
+          if (modalName === 'year_end_adjustments') {
+            setAdjustmentsFocusPeriod('CY');
+            setIsYearEndAdjustmentsOpen(true);
+          } else if (modalName === 'backup_restore') {
+            setIsBackupRestoreOpen(true);
+          } else if (modalName === 'entity_config') {
+            setIsConfigModalOpen(true);
+          } else if (modalName === 'partner_capital' || modalName === 'trade_payables_msme') {
+            // Take user to Step 4 where Partner Capital & MSME schedules reside
+            setWorkspaceStep(4);
+            setDashboardView('workspace');
+          }
+        }}
+        onOpenManualSection={() => {
+          setIsAICopilotOpen(false);
+          setIsUserManualOpen(true);
+        }}
       />
     </div>
   );

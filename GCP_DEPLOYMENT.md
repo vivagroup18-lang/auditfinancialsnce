@@ -1,82 +1,68 @@
 # Google Cloud Run Deployment Guide
 
-This guide details how to deploy the **NCE Audit Financials (CA Financial Statement Automation Agent)** to **Google Cloud Run** using Docker.
+This guide details how to deploy the **NCE Audit Financials** application to **Google Cloud Run** using the included `Dockerfile` and your Google Cloud project (`gen-lang-client-0873724595`).
 
 ---
 
-## 🌟 Quickest Method: Deploy via Google Cloud Run Console (Connected to GitHub)
+## 🚀 Option 1: 1-Step Direct Deploy using Google Cloud CLI (`gcloud`)
 
-Since your code is pushed to **[https://github.com/vishalsutar7-bot/nceauditfinancials](https://github.com/vishalsutar7-bot/nceauditfinancials)**, you can deploy it directly from GitHub with automatic continuous deployment:
-
-1. Open the [Google Cloud Run Console](https://console.cloud.google.com/run).
-2. Click **Create Service**.
-3. Select **"Continuously deploy from a repository"** and click **Set Up with Cloud Build**.
-4. Choose **GitHub** as your repository provider:
-   - Select repository: `vishalsutar7-bot/nceauditfinancials`
-   - Branch: `^main$`
-   - Build Type: **Dockerfile** (Source location: `/Dockerfile`)
-5. **Service Settings**:
-   - Service name: `auditfinancials` (or your preferred name)
-   - Region: Select your closest region (e.g., `asia-south1` for Mumbai, `asia-east1`, or `us-central1`).
-   - Authentication: Select **"Allow unauthenticated invocations"** (to make the web app accessible via public URL).
-   - Container port: **`8080`** (pre-configured in Dockerfile).
-6. **Variables & Secrets (Optional)**:
-   - Click **Container, Volumes, Networking, Security** -> **Variables & Secrets**.
-   - Add Environment Variable:
-     - Name: `GEMINI_API_KEY`
-     - Value: `AQ.Ab8RN6IAPwIQy4k5WPBABJ4D2wIbwAA-U8r0jB74Y__mI5JOGw` (or your preferred Gemini API key).
-     *(Note: If omitted, the app automatically falls back to the built-in ICAI statutory rule classification engine).*
-7. Click **Create**!
-   Cloud Run will build the Docker container and provide a live secure **`https://auditfinancials-...run.app`** URL.
-
----
-
-## ⚡ Method 2: Deploy Using Google Cloud Shell (No Local Installs Needed)
-
-You can deploy directly using Google Cloud Shell in your browser:
-
-1. Open [Google Cloud Shell](https://shell.cloud.google.com).
-2. Clone your repository:
-   ```bash
-   git clone https://github.com/vishalsutar7-bot/nceauditfinancials.git
-   cd nceauditfinancials
-   ```
-3. Deploy directly using `gcloud`:
-   ```bash
-   gcloud run deploy auditfinancials \
-     --source . \
-     --region asia-south1 \
-     --allow-unauthenticated \
-     --port 8080 \
-     --set-env-vars GEMINI_API_KEY="AQ.Ab8RN6IAPwIQy4k5WPBABJ4D2wIbwAA-U8r0jB74Y__mI5JOGw"
-   ```
-4. Follow the prompt to enable Artifact Registry / Cloud Build if requested.
-5. In ~2 minutes, Google Cloud Run will return your live production URL.
-
----
-
-## 🛠️ Method 3: Cloud Build Pipeline (`cloudbuild.yaml`)
-
-If you prefer building and deploying via a Cloud Build pipeline:
+Run the following command from the root directory of your project:
 
 ```bash
-gcloud builds submit --config=cloudbuild.yaml
+gcloud run deploy auditfinancials \
+  --source . \
+  --project gen-lang-client-0873724595 \
+  --region us-west1 \
+  --allow-unauthenticated \
+  --port 8080
+```
+
+When prompted:
+1. Accept the creation of an Artifact Registry repository (if it is the first deployment).
+2. Cloud Run will automatically build the container via the `Dockerfile`, push the image, and output your live production URL:
+   `https://auditfinancials-xxxxxx-uw.a.run.app`
+
+---
+
+## 🛠️ Option 2: Deploy with Cloud Build Pipeline (`cloudbuild.yaml`)
+
+You can also submit the build directly to Google Cloud Build:
+
+```bash
+gcloud builds submit \
+  --project gen-lang-client-0873724595 \
+  --config=cloudbuild.yaml
 ```
 
 ---
 
-## 🐳 Local Docker Testing
+## 🌐 Option 3: Deploy via Google Cloud Run Web Console
 
-If you have Docker installed on your computer:
+1. Navigate to [Google Cloud Run Console](https://console.cloud.google.com/run?project=gen-lang-client-0873724595).
+2. Click **Create Service**.
+3. Select **"Continuously deploy from a repository"** or **"Deploy one revision from an existing container image"**.
+4. Set:
+   - **Service name**: `auditfinancials`
+   - **Region**: `us-west1` (or your preferred region)
+   - **Authentication**: **Allow unauthenticated invocations**
+   - **Container Port**: `8080` (defined in `Dockerfile`)
+5. Click **Deploy**.
+
+---
+
+## 🐳 Option 4: Local Docker Test
+
+If you have Docker installed locally on your workstation:
 
 ```bash
-# Build Docker image
+# 1. Build the production container image
 docker build -t auditfinancials:latest .
 
-# Run container locally
-docker run -d -p 8080:8080 \
-  -e GEMINI_API_KEY="AQ.Ab8RN6IAPwIQy4k5WPBABJ4D2wIbwAA-U8r0jB74Y__mI5JOGw" \
-  auditfinancials:latest
+# 2. Run the container locally on port 8080
+docker run -d -p 8080:8080 --name auditfinancials-app auditfinancials:latest
+
+# 3. Check health status
+curl http://localhost:8080/api/health
 ```
 
-Open [http://localhost:8080](http://localhost:8080) to test the container.
+Then visit [http://localhost:8080](http://localhost:8080) in your web browser.

@@ -1,0 +1,222 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Chartered Accountant user profile and subscription account state",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique user profile identifier matching auth uid",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Unique public user handle (e.g. ca_sharma)",
+          "maxLength": 64
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full name of the Chartered Accountant or user",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "Primary email address",
+          "maxLength": 256
+        },
+        "mobile": {
+          "type": "string",
+          "description": "Contact mobile number",
+          "maxLength": 32
+        },
+        "planTier": {
+          "type": "string",
+          "description": "Subscription tier",
+          "enum": ["free_trial", "professional", "enterprise"]
+        },
+        "subscriptionStatus": {
+          "type": "string",
+          "description": "Account subscription status",
+          "enum": ["active", "trial", "expired", "canceled"]
+        },
+        "credits": {
+          "type": "number",
+          "description": "Current available CA AI/mapping credits"
+        },
+        "referralCode": {
+          "type": "string",
+          "description": "Unique referral code for user",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of profile creation",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of last profile update",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "fullName", "email", "planTier", "credits"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "Client company entity under statutory audit",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique company client identifier",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owning Chartered Accountant user ID",
+          "maxLength": 128
+        },
+        "userEmail": {
+          "type": "string",
+          "description": "Owning Chartered Accountant email",
+          "maxLength": 256
+        },
+        "entityName": {
+          "type": "string",
+          "description": "Statutory name of the business entity",
+          "maxLength": 256
+        },
+        "entityType": {
+          "type": "string",
+          "description": "Type of Non-Corporate Entity",
+          "enum": ["Partnership Firm", "Sole Proprietorship", "LLP", "AOP/BOI"]
+        },
+        "financialYear": {
+          "type": "string",
+          "description": "Active statutory reporting financial year",
+          "maxLength": 32
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "userId", "entityName", "entityType"]
+    },
+    "CloudReferralProfile": {
+      "title": "CloudReferralProfile",
+      "description": "Public referral directory lookup entry for referral code or user handle",
+      "type": "object",
+      "properties": {
+        "referralCode": {
+          "type": "string",
+          "description": "Uppercase referral code (e.g. REF-BALAJI24)",
+          "maxLength": 64
+        },
+        "userId": {
+          "type": "string",
+          "description": "Public user handle without @ symbol",
+          "maxLength": 64
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Name of the referrer",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "Contact email of referrer",
+          "maxLength": 256
+        },
+        "userProfileId": {
+          "type": "string",
+          "description": "Owning user profile ID",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of entry publication",
+          "maxLength": 64
+        }
+      },
+      "required": ["referralCode", "fullName", "userProfileId"]
+    },
+    "CloudReferralRewardEvent": {
+      "title": "CloudReferralRewardEvent",
+      "description": "Referral reward event between an inviter and referee",
+      "type": "object",
+      "properties": {
+        "inviterReferralCode": {
+          "type": "string",
+          "description": "Referral code of inviter",
+          "maxLength": 64
+        },
+        "inviterUserId": {
+          "type": "string",
+          "description": "User handle of inviter",
+          "maxLength": 64
+        },
+        "refereeUserId": {
+          "type": "string",
+          "description": "User identifier of referee",
+          "maxLength": 128
+        },
+        "refereeEmail": {
+          "type": "string",
+          "description": "Email address of referee",
+          "maxLength": 256
+        },
+        "refereeName": {
+          "type": "string",
+          "description": "Full name of referee",
+          "maxLength": 128
+        },
+        "bonus": {
+          "type": "number",
+          "description": "Credit bonus amount awarded"
+        },
+        "status": {
+          "type": "string",
+          "description": "Event processing status",
+          "enum": ["pending", "claimed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp",
+          "maxLength": 64
+        },
+        "claimedAt": {
+          "type": "string",
+          "description": "Claim timestamp if claimed",
+          "maxLength": 64
+        }
+      },
+      "required": ["inviterReferralCode", "refereeUserId", "bonus", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Private user account profile and credits stored by auth UID"
+    },
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Client company audit workspace and financial statement records"
+    },
+    "/referral_directory/{lookupKey}": {
+      "schema": "CloudReferralProfile",
+      "description": "Directory of referral codes and handles for cross-client discovery"
+    },
+    "/referral_events/{eventId}": {
+      "schema": "CloudReferralRewardEvent",
+      "description": "Log of referral bonuses pending claim or claimed"
+    }
+  }
+}

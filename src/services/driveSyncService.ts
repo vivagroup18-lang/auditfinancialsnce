@@ -50,11 +50,14 @@ export async function findOrCreateSyncFolder(accessToken: string): Promise<Drive
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if (searchRes.ok) {
-    const data = await searchRes.json();
-    if (data.files && data.files.length > 0) {
-      return data.files[0];
-    }
+  if (!searchRes.ok) {
+    const errBody = await searchRes.text();
+    handleDriveError(searchRes, errBody, 'search for CA Financial Statement Backups folder');
+  }
+
+  const data = await searchRes.json();
+  if (data.files && data.files.length > 0) {
+    return data.files[0];
   }
 
   // Create folder if not found

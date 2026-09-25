@@ -27,6 +27,7 @@ import {
   RefreshCw,
   Download,
   HardDrive,
+  ExternalLink,
 } from 'lucide-react';
 import { Company, EntityConfig } from '../types';
 import { POPULAR_INDIAN_FY_PRESETS } from '../utils/financialYearUtils';
@@ -385,11 +386,21 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       </div>
 
       {/* Google Drive Automated Cloud Sync Banner */}
-      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-xs border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className={`rounded-2xl p-4 sm:p-5 shadow-xs border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${
+        driveSyncStatus === 'error'
+          ? 'bg-gradient-to-r from-rose-950 via-slate-900 to-slate-900 border-rose-500/40 text-white'
+          : 'bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 border-emerald-500/30 text-white'
+      }`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+          <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+            driveSyncStatus === 'error'
+              ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+              : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+          }`}>
             {driveSyncStatus === 'syncing' ? (
               <RefreshCw className="w-5 h-5 animate-spin text-emerald-300" />
+            ) : driveSyncStatus === 'error' ? (
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
             ) : (
               <Cloud className="w-5 h-5 text-emerald-400" />
             )}
@@ -412,9 +423,17 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                   Syncing...
                 </span>
               )}
+              {driveSyncStatus === 'error' && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-400/20 text-rose-300 border border-rose-400/30 flex items-center gap-1">
+                  <AlertTriangle className="w-2.5 h-2.5" />
+                  <span>Session Expired</span>
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              {userEmail
+              {driveSyncStatus === 'error'
+                ? 'Your Google Workspace session has expired. Click "Reconnect & Sync Drive" to refresh your session.'
+                : userEmail
                 ? 'Your companies, ledger mappings, and financial statements are automatically backed up in Google Drive and accessible on any computer upon login.'
                 : 'Connect your Gmail ID to automatically back up and access your companies anywhere on any laptop or desktop.'}
             </p>
@@ -432,7 +451,17 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
             <span className="hidden md:inline">Total Local Backup ({companies.length})</span>
             <span className="md:hidden">Local Backup</span>
           </button>
-          {userEmail ? (
+          {driveSyncStatus === 'error' ? (
+            <button
+              type="button"
+              onClick={onConnectDrive || onManualDriveSync}
+              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Renew Google Workspace OAuth session and synchronize workspace"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Reconnect & Sync Drive</span>
+            </button>
+          ) : userEmail ? (
             <button
               type="button"
               onClick={onManualDriveSync}
@@ -1068,6 +1097,37 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Compliance & Legal Footer for Google Verification */}
+      <footer className="mt-8 pt-6 pb-4 border-t border-slate-200/80 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-slate-600">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span>ICAI Non-Corporate Entity (NCE) Audit &amp; Financial Reporting Platform</span>
+        </div>
+        <div className="flex items-center gap-4 text-xs font-medium text-slate-600">
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-emerald-700 underline flex items-center gap-1"
+          >
+            <span>Privacy Policy</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+          <span>&bull;</span>
+          <a
+            href="/terms.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-emerald-700 underline flex items-center gap-1"
+          >
+            <span>Terms of Service</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+          <span>&bull;</span>
+          <span className="text-slate-400">Google API Limited Use Compliant</span>
+        </div>
+      </footer>
 
       {/* Edit Company Modal */}
       {editingCompany && editConfig && (

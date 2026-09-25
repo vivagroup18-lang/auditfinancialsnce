@@ -23,7 +23,7 @@ An intelligent, full-stack Chartered Accountant (CA) workflow application for au
   - Unique shareable invite links and 1-click WhatsApp/Email sharing.
 
 - **Authentication & Multi-Credential Sign-In**:
-  - Google OAuth 1-click SSO (`nceauditfinacials` Firebase integration).
+  - Google OAuth 1-click SSO (`auditfinancialsnce` Firebase integration).
   - Sign in via Email, Mobile Number, or User ID handle (`@handle`).
 
 ---
@@ -31,7 +31,7 @@ An intelligent, full-stack Chartered Accountant (CA) workflow application for au
 ## 🏗️ Architecture & Technology Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Lucide Icons, Canvas Confetti
-- **Backend / Services**: Node.js, Express, Firebase Authentication & Firestore, Google Drive API, Gmail API
+- **Backend / Services**: Node.js, Express, Firebase Authentication & Firestore & Analytics, Google Drive API, Gmail API
 - **Parsers & Engines**: SheetJS (`xlsx`), Custom Accounting Taxonomies (Schedule III / Non-Corporate Entities)
 - **Build Tool**: Vite 6, ESBuild
 
@@ -61,12 +61,13 @@ cp .env.example .env.local
 ```
 Add your Firebase, Gemini, and Google API keys:
 ```env
-VITE_FIREBASE_API_KEY=AIzaSyB7ezDormXjuSwrOxnLJX3f_Iok9rFAT7w
-VITE_FIREBASE_AUTH_DOMAIN=nceauditfinacials.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=nceauditfinacials
-VITE_FIREBASE_STORAGE_BUCKET=nceauditfinacials.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=471811229038
-VITE_FIREBASE_APP_ID=1:471811229038:web:ceb3417041a616e382ad7f
+VITE_FIREBASE_API_KEY=AIzaSyDxbAFBA8j14-27hPPt94JFPp5gMQdVbtM
+VITE_FIREBASE_AUTH_DOMAIN=auditfinancialsnce.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=auditfinancialsnce
+VITE_FIREBASE_STORAGE_BUCKET=auditfinancialsnce.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=640754559890
+VITE_FIREBASE_APP_ID=1:640754559890:web:4994516e4eff23601faf4b
+VITE_FIREBASE_MEASUREMENT_ID=G-N3BQHGREBQ
 ```
 
 ### 4. Run Locally

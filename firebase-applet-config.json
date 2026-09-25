@@ -1,11 +1,12 @@
 {
-  "projectId": "nceauditfinacials",
-  "appId": "1:471811229038:web:ceb3417041a616e382ad7f",
-  "apiKey": "AIzaSyB7ezDormXjuSwrOxnLJX3f_Iok9rFAT7w",
-  "authDomain": "nceauditfinacials.firebaseapp.com",
-  "storageBucket": "nceauditfinacials.firebasestorage.app",
-  "messagingSenderId": "471811229038",
+  "projectId": "gen-lang-client-0873724595",
+  "appId": "1:170662624350:web:3f914ee16a769043bf48cf",
+  "apiKey": "AIzaSyDxBJj92PnUYO_3CYjIjvzNDQiz02HLQcg",
+  "authDomain": "gen-lang-client-0873724595.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-remixnceauditfin-64cc9685-62bd-4654-8420-4673d35361c5",
+  "storageBucket": "gen-lang-client-0873724595.firebasestorage.app",
+  "messagingSenderId": "170662624350",
   "measurementId": "",
-  "oAuthClientId": "",
+  "oAuthClientId": "170662624350-0ht4cjh56ieg3go8c4kqi8ngl8dte3pf.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

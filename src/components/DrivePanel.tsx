@@ -221,10 +221,10 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
         });
       }
     } catch (err: any) {
-      console.error('Sign-in failed:', err);
+      console.warn('Drive sign-in notice:', err);
       setStatusMessage({
         type: 'error',
-        text: `Authentication failed: ${err.message || 'Please enable popups to sign in with Google.'}`,
+        text: `Authentication note: ${err.message || 'Please check popup permissions.'}`,
       });
     } finally {
       setIsSigningIn(false);

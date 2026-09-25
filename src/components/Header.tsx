@@ -28,6 +28,10 @@ import {
   Cloud,
   RefreshCw,
   Scale,
+  Rewind,
+  FastForward,
+  BookOpen,
+  Bot,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import { EntityConfig, Company, UserProfile } from '../types';
@@ -77,6 +81,8 @@ interface HeaderProps {
   onConnectDrive?: () => void;
   onExportTotalLocalBackup?: () => void;
   onOpenTermsModal?: () => void;
+  onOpenUserManual?: () => void;
+  onOpenAICopilot?: (prompt?: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -119,6 +125,8 @@ export const Header: React.FC<HeaderProps> = ({
   onConnectDrive,
   onExportTotalLocalBackup,
   onOpenTermsModal,
+  onOpenUserManual,
+  onOpenAICopilot,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
@@ -579,44 +587,76 @@ export const Header: React.FC<HeaderProps> = ({
                 <Printer className="w-3.5 h-3.5" />
               </button>
 
+              {/* User Manual & ICAI Reference Guide */}
+              {onOpenUserManual && (
+                <button
+                  type="button"
+                  onClick={onOpenUserManual}
+                  className="p-1.5 rounded-lg text-xs text-indigo-300 hover:text-white hover:bg-indigo-950/60 hover:border hover:border-indigo-500/50 transition cursor-pointer flex items-center gap-1 shrink-0"
+                  title="User Manual & ICAI Non-Corporate Entity Guide"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline text-[11px] font-bold">Manual</span>
+                </button>
+              )}
+
+              {/* AI NCE Financials Copilot */}
+              {onOpenAICopilot && (
+                <button
+                  type="button"
+                  onClick={() => onOpenAICopilot()}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-xs border border-emerald-400/40 transition cursor-pointer shrink-0"
+                  title="Ask AI CA Copilot (ICAI Non-Corporate Entity & App Guidance)"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline text-[11px]">AI Copilot</span>
+                </button>
+              )}
+
               {/* Google Drive Auto-Sync Status & Trigger */}
               {accessToken ? (
                 <button
                   type="button"
-                  onClick={onManualDriveSync}
+                  onClick={driveSyncStatus === 'error' ? onConnectDrive : onManualDriveSync}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer shrink-0 ${
                     driveSyncStatus === 'syncing'
                       ? 'bg-blue-950/60 border-blue-500/50 text-blue-300 shadow-xs'
                       : driveSyncStatus === 'error'
-                      ? 'bg-rose-950/60 border-rose-500/50 text-rose-300'
+                      ? 'bg-rose-950/70 border-rose-500/60 text-rose-300 hover:bg-rose-900/80 shadow-xs'
                       : 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60 shadow-xs'
                   }`}
                   title={
                     driveSyncStatus === 'syncing'
                       ? 'Syncing changes to your Google Drive...'
                       : driveSyncStatus === 'error'
-                      ? 'Google Drive sync failed. Click to retry.'
+                      ? 'Google Drive session expired or error occurred. Click to reconnect and sync.'
                       : `Google Drive Synced (${user?.email || 'Active'}) • Click to sync now`
                   }
                 >
                   {driveSyncStatus === 'syncing' ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
+                  ) : driveSyncStatus === 'error' ? (
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                   ) : (
                     <Cloud className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   )}
                   <span className="hidden xl:inline text-[11px] font-bold">
-                    {driveSyncStatus === 'syncing' ? 'Syncing...' : 'Drive Synced'}
+                    {driveSyncStatus === 'syncing'
+                      ? 'Syncing...'
+                      : driveSyncStatus === 'error'
+                      ? 'Reconnect Drive'
+                      : 'Drive Synced'}
                   </span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={onConnectDrive}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer shrink-0"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 transition cursor-pointer shrink-0"
                   title="Connect Google Drive to auto-save and access companies from any computer"
                 >
-                  <Cloud className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="hidden xl:inline text-[11px]">Connect Drive</span>
+                  <Cloud className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="hidden xl:inline text-[11px] font-bold">Connect Drive</span>
                 </button>
               )}
             </div>
@@ -807,6 +847,34 @@ export const Header: React.FC<HeaderProps> = ({
                         <Building2 className="w-3.5 h-3.5 text-slate-500" />
                         <span>Manage Companies</span>
                       </button>
+
+                      {onOpenUserManual && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            onOpenUserManual();
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-medium flex items-center gap-2 transition cursor-pointer"
+                        >
+                          <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>User Manual & Guide</span>
+                        </button>
+                      )}
+
+                      {onOpenAICopilot && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            onOpenAICopilot();
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-50 text-emerald-800 font-medium flex items-center gap-2 transition cursor-pointer"
+                        >
+                          <Bot className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Ask AI Copilot</span>
+                        </button>
+                      )}
 
                       {onOpenTermsModal && (
                         <button

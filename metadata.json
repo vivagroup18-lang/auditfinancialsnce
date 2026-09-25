@@ -1,6 +1,8 @@
 {
-  "name": "CA Financial Statement Automation Agent",
-  "description": "Automated ingestion of Trial Balances, Balance Sheets, and Profit & Loss statements for Current and Previous Years, multi-company client management, full workspace backup and restore, Google Drive cloud saving activation, semantic AI schedule linking under ICAI Non-Corporate Entity norms, Gmail audit communication, and exception reporting.",
+  "name": "Remix nceauditfinancials",
+  "description": "Imported from GitHub: vishalsutar7-bot/nceauditfinancials",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

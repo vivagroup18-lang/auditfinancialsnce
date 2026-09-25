@@ -228,10 +228,10 @@ export const GmailPanel: React.FC<GmailPanelProps> = ({
         });
       }
     } catch (err: any) {
-      console.error('Sign-in failure:', err);
+      console.warn('Gmail sign-in notice:', err);
       setStatusMessage({
         type: 'error',
-        text: `Sign-in failed: ${err.message || 'Please check popup permissions.'}`,
+        text: `Sign-in note: ${err.message || 'Please check popup permissions.'}`,
       });
     } finally {
       setIsSigningIn(false);

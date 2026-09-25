@@ -134,6 +134,15 @@ function buildMimeMessage(params: SendEmailParams): string {
  * Get Gmail User Profile
  */
 export async function getGmailProfile(accessToken: string): Promise<GmailProfile> {
+  if (accessToken && accessToken.startsWith('sandbox_')) {
+    return {
+      emailAddress: 'vishalsutar7@gmail.com',
+      messagesTotal: 12,
+      threadsTotal: 8,
+      historyId: '10001',
+    };
+  }
+
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -157,6 +166,20 @@ export async function listGmailMessages(
   query: string = '',
   maxResults: number = 15
 ): Promise<GmailMessageSummary[]> {
+  if (accessToken && accessToken.startsWith('sandbox_')) {
+    return [
+      {
+        id: 'msg_sandbox_1',
+        threadId: 'th_sandbox_1',
+        snippet: 'Statutory audit financial statements for FY 2025-26 under ICAI Non-Corporate Entity norms.',
+        subject: 'Audit Report & Financial Statements Transmittal - FY 2025-26',
+        from: 'vishalsutar7@gmail.com',
+        to: 'client.accountant@enterprise.in',
+        date: new Date().toLocaleDateString(),
+        labelIds: ['SENT', 'INBOX'],
+      },
+    ];
+  }
   const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
   url.searchParams.set('maxResults', maxResults.toString());
   if (query.trim()) {
@@ -301,6 +324,13 @@ export async function sendGmailEmail(
   accessToken: string,
   params: SendEmailParams
 ): Promise<{ id: string; threadId: string }> {
+  if (accessToken && accessToken.startsWith('sandbox_')) {
+    return {
+      id: 'msg_sandbox_' + Date.now(),
+      threadId: 'th_sandbox_' + Date.now(),
+    };
+  }
+
   const mime = buildMimeMessage(params);
   const raw = utf8ToBase64Url(mime);
 

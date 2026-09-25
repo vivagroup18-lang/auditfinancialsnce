@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access unless explicitly granted
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'vivagroup18@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation for UserProfile
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['id', 'fullName', 'email', 'planTier', 'credits']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.fullName is string && data.fullName.size() <= 128 &&
+        data.email is string && data.email.size() <= 256 &&
+        data.planTier in ['free_trial', 'professional', 'enterprise'] &&
+        data.credits is number;
+    }
+
+    // Validation for Company
+    function isValidCompany(data) {
+      return data.keys().hasAll(['id', 'userId', 'entityName', 'entityType']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.entityName is string && data.entityName.size() <= 256 &&
+        data.entityType in ['Partnership Firm', 'Sole Proprietorship', 'LLP', 'AOP/BOI'];
+    }
+
+    // Validation for CloudReferralProfile
+    function isValidReferralProfile(data) {
+      return data.keys().hasAll(['referralCode', 'fullName', 'userProfileId']) &&
+        data.referralCode is string && data.referralCode.size() <= 64 &&
+        data.fullName is string && data.fullName.size() <= 128 &&
+        data.userProfileId is string && data.userProfileId.size() <= 128;
+    }
+
+    // Validation for CloudReferralRewardEvent
+    function isValidReferralEvent(data) {
+      return data.keys().hasAll(['inviterReferralCode', 'refereeUserId', 'bonus', 'status']) &&
+        data.inviterReferralCode is string && data.inviterReferralCode.size() <= 64 &&
+        data.refereeUserId is string && data.refereeUserId.size() <= 128 &&
+        data.bonus is number &&
+        data.status in ['pending', 'claimed'];
+    }
+
+    // Connection testing endpoint
+    match /test/{docId} {
+      allow get: if true;
+      allow write: if false;
+    }
+
+    // User accounts collection
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isSignedIn() && (resource.data.id == request.auth.uid || isAdmin());
+      allow create: if isOwner(userId) && isValidUserProfile(incoming());
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUserProfile(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Companies / audit workspaces
+    match /companies/{companyId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email || isAdmin());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || incoming().userEmail == request.auth.token.email || isAdmin()) && isValidCompany(incoming());
+      allow update: if isSignedIn() && (existing().userId == request.auth.uid || existing().userEmail == request.auth.token.email || isAdmin()) && isValidCompany(incoming());
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || existing().userEmail == request.auth.token.email || isAdmin());
+    }
+
+    // Referral directory
+    match /referral_directory/{lookupKey} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidReferralProfile(incoming());
+      allow update: if isSignedIn() && isValidReferralProfile(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Referral reward events
+    match /referral_events/{eventId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidReferralEvent(incoming());
+      allow update: if isSignedIn() && isValidReferralEvent(incoming());
+      allow delete: if isAdmin();
+    }
+  }
+}

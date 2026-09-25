@@ -31,7 +31,7 @@ export class GoogleDriveApiDisabledError extends Error {
   projectId: string;
   activationUrl: string;
   constructor(
-    projectId = '471811229038',
+    projectId = '170662624350',
     activationUrl?: string,
     status = 403
   ) {
@@ -70,7 +70,7 @@ export function extractDriveActivationUrl(err: any): string {
     return urlMatch[0];
   }
   const projMatch = msg.match(/project(?:s\/|\s+)(\d+)/i);
-  const projId = projMatch ? projMatch[1] : '471811229038';
+  const projId = projMatch ? projMatch[1] : '170662624350';
   return `https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${projId}`;
 }
 
@@ -153,6 +153,22 @@ export interface ListDriveFilesOptions {
  * Fetches current user profile and Google Drive storage quota
  */
 export async function getDriveAbout(accessToken: string): Promise<DriveAbout> {
+  if (accessToken && accessToken.startsWith('sandbox_')) {
+    return {
+      user: {
+        displayName: 'Vishal Sutar',
+        emailAddress: 'vishalsutar7@gmail.com',
+        photoLink: '',
+      },
+      storageQuota: {
+        limit: '16106127360',
+        usage: '2147483648',
+        usageInDrive: '1073741824',
+        usageInDriveTrash: '0',
+      },
+    };
+  }
+
   const res = await fetch(
     'https://www.googleapis.com/drive/v3/about?fields=user,storageQuota',
     {
@@ -177,6 +193,30 @@ export async function listDriveFiles(
   accessToken: string,
   options: ListDriveFilesOptions = {}
 ): Promise<{ files: DriveFile[]; nextPageToken?: string }> {
+  if (accessToken && accessToken.startsWith('sandbox_')) {
+    return {
+      files: [
+        {
+          id: 'sandbox_file_1',
+          name: 'CA_Audit_Workspace_AutoSync.json',
+          mimeType: 'application/json',
+          size: '124800',
+          modifiedTime: new Date().toISOString(),
+          createdTime: new Date().toISOString(),
+          webViewLink: '#',
+        },
+        {
+          id: 'sandbox_file_2',
+          name: 'Sample_Statutory_Report_Durga_Steel.xlsx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          size: '48200',
+          modifiedTime: new Date().toISOString(),
+          createdTime: new Date().toISOString(),
+          webViewLink: '#',
+        },
+      ],
+    };
+  }
   const {
     query = '',
     folderId = '',
