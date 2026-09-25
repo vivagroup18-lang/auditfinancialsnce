@@ -101,30 +101,10 @@ standardGoogleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
-// Configure Google Auth Provider with Gmail and Drive Scopes (For Workspace sync)
+// Configure Google Auth Provider with Drive Scopes (Only used for Drive Backup & Sync)
 export const googleProvider = new GoogleAuthProvider();
-// Gmail Scopes
-googleProvider.addScope('https://mail.google.com/');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.compose');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.modify');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.labels');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.insert');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.metadata');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.addons.current.action.compose');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.addons.current.message.action');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.addons.current.message.metadata');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.addons.current.message.readonly');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.settings.basic');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.settings.sharing');
-
-// Google Drive Scopes
-googleProvider.addScope('https://www.googleapis.com/auth/drive');
 googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
 googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
-googleProvider.addScope('https://www.googleapis.com/auth/drive.metadata.readonly');
-googleProvider.addScope('https://www.googleapis.com/auth/drive.appdata');
 
 googleProvider.setCustomParameters({
   prompt: 'select_account',
@@ -167,6 +147,27 @@ export const initAuth = (
       if (onAuthFailure) onAuthFailure();
     }
   });
+};
+
+export const isSandboxEnvironment = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  // If running on custom production domain or Cloud Run/Hosting, it is NEVER a sandbox
+  if (
+    host === 'fintaxaudit.vivaproject.in' ||
+    host.includes('vivaproject.in') ||
+    host.includes('run.app') ||
+    host.includes('web.app') ||
+    host.includes('firebaseapp.com')
+  ) {
+    return false;
+  }
+  // Only fallback if embedded in an iframe preview environment
+  try {
+    return window.self !== window.top && (host.includes('webcontainer') || host.includes('stackblitz'));
+  } catch {
+    return false;
+  }
 };
 
 export const isPopupBlockedOrUnauthorized = (err: any): boolean => {
@@ -241,13 +242,26 @@ export const googleSignInStandard = async (): Promise<{ user: User; accessToken?
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
       cachedAccessToken = credential.accessToken;
+      try {
+        sessionStorage.setItem(SESSION_TOKEN_KEY, credential.accessToken);
+      } catch {}
     }
     return { user: result.user, accessToken: cachedAccessToken || undefined };
   } catch (error: any) {
-    if (isPopupBlockedOrUnauthorized(error)) {
-      console.warn('[Firebase Auth] Google popup sign-in restricted in this sandbox iframe / domain. Falling back to verified Google profile session.');
+    if (isSandboxEnvironment() && isPopupBlockedOrUnauthorized(error)) {
+      console.warn('[Firebase Auth] Sandbox environment detected. Falling back to sandbox user.');
       const fallbackUser = createSandboxGoogleUser();
       return { user: fallbackUser, accessToken: undefined };
+    }
+    if (error?.code === 'auth/popup-closed-by-user') {
+      throw new Error('Google Sign-In was cancelled.');
+    }
+    if (error?.code === 'auth/popup-blocked') {
+      throw new Error('Sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
+    }
+    if (error?.code === 'auth/unauthorized-domain') {
+      const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+      throw new Error(`Domain "${currentDomain}" is not authorized in Firebase Authentication.`);
     }
     console.error('Google Sign In Error:', error);
     throw error;
@@ -257,7 +271,7 @@ export const googleSignInStandard = async (): Promise<{ user: User; accessToken?
 };
 
 /**
- * Full Workspace Google Sign-In with Gmail & Drive scopes
+ * Full Workspace Google Sign-In with Drive backup scopes
  */
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string }> => {
   try {
@@ -273,18 +287,14 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     return { user: result.user, accessToken: cachedAccessToken || '' };
   } catch (error: any) {
     if (error?.code === 'auth/unauthorized-domain') {
-      // Domain not authorized in Firebase Console — surface a clear, actionable error
       const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
       throw new Error(
         `Google Sign-In is blocked because "${currentDomain}" is not an authorized domain in Firebase. ` +
-        `Please add "${currentDomain}" to Authorized Domains at: ` +
-        `https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings ` +
-        `and add "https://${currentDomain}" as an Authorized JavaScript Origin for your OAuth Client ID in Google Cloud Console.`
+        `Please add "${currentDomain}" to Authorized Domains in Firebase Console.`
       );
     }
-    if (isPopupBlockedOrUnauthorized(error)) {
-      // Popup was blocked by the browser (not a domain auth error) — only then use sandbox fallback
-      console.warn('[Firebase Auth] Google Workspace popup blocked by browser. Falling back to sandbox session.');
+    if (isSandboxEnvironment() && isPopupBlockedOrUnauthorized(error)) {
+      console.warn('[Firebase Auth] Sandbox environment detected. Falling back to sandbox session.');
       const fallbackUser = createSandboxGoogleUser();
       const fallbackToken = 'sandbox_workspace_token_' + Math.random().toString(36).substring(2, 9);
       cachedAccessToken = fallbackToken;
@@ -292,6 +302,12 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
         sessionStorage.setItem(SESSION_TOKEN_KEY, fallbackToken);
       } catch {}
       return { user: fallbackUser, accessToken: fallbackToken };
+    }
+    if (error?.code === 'auth/popup-closed-by-user') {
+      throw new Error('Google Drive connection was cancelled.');
+    }
+    if (error?.code === 'auth/popup-blocked') {
+      throw new Error('Popup was blocked by your browser. Please allow popups for this site and try again.');
     }
     console.error('Google Sign In Error:', error);
     throw error;

@@ -168,13 +168,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError(null);
     setLoading(true);
     try {
-      let res: { user: any; accessToken?: string };
-      try {
-        res = await googleSignIn();
-      } catch (scopeErr) {
-        console.warn('Google Workspace Drive scope sign-in fell back to standard:', scopeErr);
-        res = await googleSignInStandard();
-      }
+      // Use standard Google Sign-In (profile + email) for 1-click authentication
+      const res = await googleSignInStandard();
 
       if (res.user && res.user.email) {
         const effectiveReferral = referralCodeInput.trim() || (() => {
@@ -207,24 +202,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
       }
     } catch (err: any) {
-      if (isPopupBlockedOrUnauthorized(err)) {
-        console.warn('Google Sign-In popup restricted in sandbox preview. Falling back to local verified profile.');
-        const effectiveReferral = referralCodeInput.trim() || undefined;
-        const authRes = authenticateGoogleUser({
-          email: 'vishalsutar7@gmail.com',
-          name: 'Vishal Sutar',
-          referralCode: effectiveReferral,
-        });
-        if (authRes.success && authRes.user) {
-          if (onGoogleAuthSuccess) {
-            onGoogleAuthSuccess(authRes.user, !!authRes.isNewUser);
-          } else {
-            onAuthSuccess(authRes.user);
-          }
-          onClose();
-          return;
-        }
-      }
       console.warn('Google Sign-In notice:', err?.message || err);
       setError(err?.message || 'Google Sign-In was cancelled or failed.');
     } finally {
