@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Building2,
   FileSpreadsheet,
@@ -22,6 +22,9 @@ import {
   EntityConfig,
 } from '../types';
 import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
+import { computeBranchWiseFinancialSummary } from '../utils/branchConsolidation';
+
+export type Step3StatementTab = 'balance_sheet' | 'profit_loss' | 'notes_summary' | 'branch_consolidation';
 
 interface Step3ComparativeStatementsProps {
   config: EntityConfig;
@@ -34,6 +37,8 @@ interface Step3ComparativeStatementsProps {
   onProceedToStep4: () => void;
   onSelectNote?: (noteNumber: number) => void;
   onOpenTradePayables?: () => void;
+  activeStatementTab?: Step3StatementTab;
+  onChangeStatementTab?: (tab: Step3StatementTab) => void;
 }
 
 export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProps> = ({
@@ -43,8 +48,23 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
   onProceedToStep4,
   onSelectNote = () => {},
   onOpenTradePayables,
+  activeStatementTab,
+  onChangeStatementTab,
 }) => {
-  const [statementType, setStatementType] = useState<'balance_sheet' | 'profit_loss' | 'notes_summary'>('balance_sheet');
+  const [statementType, setStatementType] = useState<Step3StatementTab>(
+    activeStatementTab || 'balance_sheet'
+  );
+
+  useEffect(() => {
+    if (activeStatementTab) {
+      setStatementType(activeStatementTab);
+    }
+  }, [activeStatementTab]);
+
+  const handleSelectStatementTab = (tab: Step3StatementTab) => {
+    setStatementType(tab);
+    onChangeStatementTab?.(tab);
+  };
 
   const bs = computedFinancials.balanceSheet;
   const pl = computedFinancials.profitAndLoss;
@@ -54,6 +74,8 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
   const cyYear = config.financialYear || '2025-26';
   const pyYear = config.previousFinancialYear || '2024-25';
   const hasPY = bs.isPreviousYearUploaded;
+  const branchCount = config.numberOfBranches ?? (config.branches?.length || 0);
+  const branchSummaries = branchCount > 0 ? computeBranchWiseFinancialSummary(config) : [];
 
   const formatINR = (val?: number) => {
     if (val === undefined || val === null || isNaN(val)) return '-';
@@ -79,13 +101,19 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
       <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
                 Step 3 of 5
               </span>
               <span className="text-xs text-slate-500 font-medium">
                 Consolidated Comparative Reporting • FY {cyYear} vs FY {pyYear}
               </span>
+              {branchCount > 0 && (
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-300 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-indigo-700" />
+                  Consolidated Across {branchCount} {branchCount === 1 ? 'Branch' : 'Branches'} (CY &amp; PY)
+                </span>
+              )}
             </div>
             <h2 className="text-xl font-bold text-slate-900 tracking-tight">
               Comparative Financial Statements & Notes
@@ -121,7 +149,7 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setStatementType('balance_sheet')}
+              onClick={() => handleSelectStatementTab('balance_sheet')}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
                 statementType === 'balance_sheet'
                   ? 'bg-slate-900 text-white shadow-xs'
@@ -141,7 +169,7 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
 
             <button
               type="button"
-              onClick={() => setStatementType('profit_loss')}
+              onClick={() => handleSelectStatementTab('profit_loss')}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
                 statementType === 'profit_loss'
                   ? 'bg-slate-900 text-white shadow-xs'
@@ -157,7 +185,7 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
 
             <button
               type="button"
-              onClick={() => setStatementType('notes_summary')}
+              onClick={() => handleSelectStatementTab('notes_summary')}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
                 statementType === 'notes_summary'
                   ? 'bg-slate-900 text-white shadow-xs'
@@ -167,6 +195,24 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
               <Layers className="w-4 h-4 text-amber-400" />
               <span>Consolidated Notes (1–25)</span>
             </button>
+
+            {branchCount > 0 && (
+              <button
+                type="button"
+                onClick={() => handleSelectStatementTab('branch_consolidation')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                  statementType === 'branch_consolidation'
+                    ? 'bg-indigo-700 text-white shadow-xs'
+                    : 'bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100'
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                <span>Branch-wise vs Consolidated (CY &amp; PY)</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 font-bold">
+                  {branchCount} Branches
+                </span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs">
@@ -1630,6 +1676,194 @@ export const Step3ComparativeStatements: React.FC<Step3ComparativeStatementsProp
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. BRANCH-WISE VS CONSOLIDATED FINANCIALS SUMMARY (CY & PY)               */}
+      {/* ========================================================================= */}
+      {statementType === 'branch_consolidation' && branchCount > 0 && (
+        <div className="bg-white rounded-2xl border border-indigo-200 shadow-xs overflow-hidden space-y-6 p-5 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                  Multi-Branch Consolidation Matrix
+                </span>
+                <span className="text-xs text-slate-500 font-medium">
+                  {branchCount} Configured {branchCount === 1 ? 'Branch' : 'Branches'}
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900 mt-1">
+                Branch-wise vs. Consolidated Financials — Current Year ({cyYear}) &amp; Previous Year ({pyYear})
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Side-by-side breakdown of each branch's Trial Balance, Total Revenue, Total Expenses, Net Profit (PAT), and Balance Sheet Totals compared against the Consolidated Entity Statements.
+              </p>
+            </div>
+          </div>
+
+          {/* CURRENT YEAR (CY) BRANCH-WISE CONSOLIDATION TABLE */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 flex items-center justify-between">
+              <span>Current Year (FY {cyYear}) — Branch-wise &amp; Consolidated Breakdown</span>
+              <span className="font-mono text-[11px]">Consolidated Assets: ₹{formatINR(bs.totalAssets)}</span>
+            </h4>
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-white font-bold text-[11px] uppercase tracking-wider">
+                    <th className="py-2.5 px-3">Branch / Unit</th>
+                    <th className="py-2.5 px-3 text-center">CY Ledgers</th>
+                    <th className="py-2.5 px-3 text-right">TB Debit (₹)</th>
+                    <th className="py-2.5 px-3 text-right">TB Credit (₹)</th>
+                    <th className="py-2.5 px-3 text-right">Total Revenue (₹)</th>
+                    <th className="py-2.5 px-3 text-right">Total Expenses (₹)</th>
+                    <th className="py-2.5 px-3 text-right">Net Profit / PAT (₹)</th>
+                    <th className="py-2.5 px-3 text-right">Total Assets (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-800">
+                  {branchSummaries.map((b, idx) => (
+                    <tr key={b.branchId} className="hover:bg-slate-50">
+                      <td className="py-2.5 px-3 font-bold text-slate-900">
+                        <span className="text-[10px] font-mono text-indigo-600 mr-1.5">#{idx + 1}</span>
+                        {b.branchName}
+                        {b.cyFileName && (
+                          <span className="block text-[10px] font-normal text-slate-400 truncate max-w-[180px]">
+                            {b.cyFileName}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono">
+                        {b.hasCY ? b.cyLedgerCount : <span className="text-amber-600 text-[10px]">Pending</span>}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono">{b.hasCY ? formatINR(b.cyDebit) : '-'}</td>
+                      <td className="py-2.5 px-3 text-right font-mono">{b.hasCY ? formatINR(b.cyCredit) : '-'}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-emerald-700 font-medium">
+                        {b.hasCY ? formatINR(b.cyRevenue) : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                        {b.hasCY ? formatINR(b.cyExpenses) : '-'}
+                      </td>
+                      <td className={`py-2.5 px-3 text-right font-mono font-bold ${b.cyNetProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {b.hasCY ? formatINR(b.cyNetProfit) : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                        {b.hasCY ? formatINR(b.cyTotalAssets) : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-emerald-50/90 font-black text-slate-900 border-t-2 border-emerald-500">
+                    <td className="py-3 px-3 uppercase">Consolidated Entity Total (CY {cyYear})</td>
+                    <td className="py-3 px-3 text-center font-mono">
+                      {branchSummaries.reduce((acc, b) => acc + b.cyLedgerCount, 0)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono">
+                      {formatINR(branchSummaries.reduce((acc, b) => acc + b.cyDebit, 0))}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono">
+                      {formatINR(branchSummaries.reduce((acc, b) => acc + b.cyCredit, 0))}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-emerald-800">
+                      {formatINR(pl.totalRevenue)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono">
+                      {formatINR(pl.totalExpenses)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-emerald-800">
+                      {formatINR(pl.profitAfterTax)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-emerald-900">
+                      {formatINR(bs.totalAssets)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* PREVIOUS YEAR (PY) BRANCH-WISE CONSOLIDATION TABLE */}
+          <div className="space-y-2 pt-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-200 flex items-center justify-between">
+              <span>Previous Year (FY {pyYear}) — Branch-wise &amp; Consolidated Breakdown</span>
+              <span className="font-mono text-[11px]">
+                Consolidated PY Assets: ₹{formatINR(bs.previousYear?.totalAssets || 0)}
+              </span>
+            </h4>
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-white font-bold text-[11px] uppercase tracking-wider">
+                    <th className="py-2.5 px-3">Branch / Unit</th>
+                    <th className="py-2.5 px-3 text-center">PY Ledgers</th>
+                    <th className="py-2.5 px-3 text-right">PY TB Debit (₹)</th>
+                    <th className="py-2.5 px-3 text-right">PY TB Credit (₹)</th>
+                    <th className="py-2.5 px-3 text-right">PY Revenue (₹)</th>
+                    <th className="py-2.5 px-3 text-right">PY Expenses (₹)</th>
+                    <th className="py-2.5 px-3 text-right">PY Net Profit / PAT (₹)</th>
+                    <th className="py-2.5 px-3 text-right">PY Total Assets (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-800">
+                  {branchSummaries.map((b, idx) => (
+                    <tr key={b.branchId} className="hover:bg-slate-50">
+                      <td className="py-2.5 px-3 font-bold text-slate-900">
+                        <span className="text-[10px] font-mono text-indigo-600 mr-1.5">#{idx + 1}</span>
+                        {b.branchName}
+                        {b.pyFileName && (
+                          <span className="block text-[10px] font-normal text-slate-400 truncate max-w-[180px]">
+                            {b.pyFileName}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono">
+                        {b.hasPY ? b.pyLedgerCount : <span className="text-slate-400 text-[10px]">Not Uploaded</span>}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono">{b.hasPY ? formatINR(b.pyDebit) : '-'}</td>
+                      <td className="py-2.5 px-3 text-right font-mono">{b.hasPY ? formatINR(b.pyCredit) : '-'}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-indigo-700 font-medium">
+                        {b.hasPY ? formatINR(b.pyRevenue) : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                        {b.hasPY ? formatINR(b.pyExpenses) : '-'}
+                      </td>
+                      <td className={`py-2.5 px-3 text-right font-mono font-bold ${b.pyNetProfit >= 0 ? 'text-indigo-700' : 'text-rose-700'}`}>
+                        {b.hasPY ? formatINR(b.pyNetProfit) : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                        {b.hasPY ? formatINR(b.pyTotalAssets) : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-indigo-50/90 font-black text-slate-900 border-t-2 border-indigo-500">
+                    <td className="py-3 px-3 uppercase">Consolidated Entity Total (PY {pyYear})</td>
+                    <td className="py-3 px-3 text-center font-mono">
+                      {branchSummaries.reduce((acc, b) => acc + b.pyLedgerCount, 0)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono">
+                      {formatINR(branchSummaries.reduce((acc, b) => acc + b.pyDebit, 0))}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono">
+                      {formatINR(branchSummaries.reduce((acc, b) => acc + b.pyCredit, 0))}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-indigo-800">
+                      {hasPY ? formatINR(pl.previousYear?.totalRevenue || 0) : '-'}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono">
+                      {hasPY ? formatINR(pl.previousYear?.totalExpenses || 0) : '-'}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-indigo-800">
+                      {hasPY ? formatINR(pl.previousYear?.profitAfterTax || 0) : '-'}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-indigo-900">
+                      {hasPY ? formatINR(bs.previousYear?.totalAssets || 0) : '-'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Building2, Save, Layers } from 'lucide-react';
 import { EntityConfig } from '../types';
 import { PartnerConfigForm } from './PartnerConfigForm';
+import { syncBranchesWithCount } from '../utils/branchConsolidation';
 
 interface EntityConfigModalProps {
   isOpen: boolean;
@@ -102,6 +103,57 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
+          </div>
+
+          {/* No. of Branches Configuration */}
+          <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <label className="font-bold text-indigo-950 flex items-center gap-1.5 text-xs">
+                  <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>No. of Branches (Branch-wise TB Consolidation)</span>
+                </label>
+                <span className="text-[10px] text-indigo-700 block">
+                  Set 0 for single Trial Balance, or enter number of branches to import branch-wise CY &amp; PY Trial Balances
+                </span>
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={50}
+                value={formData.numberOfBranches ?? (formData.branches?.length || 0)}
+                onChange={(e) => {
+                  const count = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0));
+                  const synced = syncBranchesWithCount(formData.branches, count);
+                  setFormData({
+                    ...formData,
+                    numberOfBranches: count,
+                    branches: synced,
+                  });
+                }}
+                className="w-20 px-2.5 py-1.5 rounded-lg bg-white border border-indigo-300 text-center font-mono font-bold text-xs text-indigo-950"
+              />
+            </div>
+            {(formData.numberOfBranches ?? 0) > 0 && formData.branches && formData.branches.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-indigo-200/60 max-h-32 overflow-y-auto">
+                {formData.branches.map((b, idx) => (
+                  <div key={b.branchId} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded border border-indigo-200">
+                    <span className="text-[10px] font-mono font-bold text-indigo-600">#{idx + 1}</span>
+                    <input
+                      type="text"
+                      value={b.branchName}
+                      onChange={(e) => {
+                        const updated = (formData.branches || []).map((item) =>
+                          item.branchId === b.branchId ? { ...item, branchName: e.target.value } : item
+                        );
+                        setFormData({ ...formData, branches: updated });
+                      }}
+                      className="w-full text-[11px] font-medium text-slate-800 focus:outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Proprietor Name for Sole Proprietorship */}

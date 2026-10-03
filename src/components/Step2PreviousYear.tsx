@@ -29,6 +29,7 @@ import { TrialBalanceMapping } from './TrialBalanceMapping';
 import { BalanceSheetView } from './BalanceSheetView';
 import { ProfitLossView } from './ProfitLossView';
 import { NotesView } from './NotesView';
+import { BranchTrialBalanceManager } from './BranchTrialBalanceManager';
 
 interface Step2PreviousYearProps {
   config: EntityConfig;
@@ -57,6 +58,11 @@ interface Step2PreviousYearProps {
   onProceedToStep3: () => void;
   onSelectNote?: (noteNumber: number) => void;
   onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
+  onUploadBranchTB?: (branchId: string, file: File, period: 'CY' | 'PY') => void;
+  onBulkUploadBranchTBs?: (files: File[], period: 'CY' | 'PY') => void;
+  onClearBranchTB?: (branchId: string, period: 'CY' | 'PY') => void;
+  onLoadSampleBranches?: (period: 'CY' | 'PY') => void;
+  onUpdateBranchClosingStock?: (branchId: string, stockAmount: number | undefined, period: 'CY' | 'PY') => void;
 }
 
 export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
@@ -81,8 +87,20 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
   onBackToStep1,
   onProceedToStep3,
   onSelectNote = () => {},
+  onUploadBranchTB,
+  onBulkUploadBranchTBs,
+  onClearBranchTB,
+  onLoadSampleBranches,
+  onUpdateBranchClosingStock,
 }) => {
+  const hasUploadedPYBranches = Boolean(
+    (config.numberOfBranches ?? 0) > 0 &&
+      config.branches?.some((b) => (b.pyMappedLedgers?.length || 0) > 0)
+  );
   const [activeSubTab, setActiveSubTab] = useState<'upload' | 'mapping' | 'statements'>(() => {
+    if ((config.numberOfBranches ?? 0) > 0 && !hasUploadedPYBranches) {
+      return 'upload';
+    }
     return pyMappedLedgers && pyMappedLedgers.length > 0 ? 'mapping' : 'upload';
   });
   const [statementSubView, setStatementSubView] = useState<'bs' | 'pl' | 'notes'>('bs');
@@ -289,6 +307,21 @@ export const Step2PreviousYear: React.FC<Step2PreviousYearProps> = ({
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Branch-wise PY Trial Balance Import & Consolidation Manager */}
+          {onUpdateConfig && onUploadBranchTB && onClearBranchTB && (
+            <BranchTrialBalanceManager
+              config={config}
+              period="PY"
+              onUpdateConfig={onUpdateConfig}
+              onUploadBranchTB={onUploadBranchTB}
+              onBulkUploadBranchTBs={onBulkUploadBranchTBs}
+              onClearBranchTB={onClearBranchTB}
+              onLoadSampleBranches={onLoadSampleBranches}
+              onUpdateBranchClosingStock={onUpdateBranchClosingStock}
+              onReviewConsolidatedMappings={() => setActiveSubTab('mapping')}
+            />
           )}
 
           {/* Upload Drop Zone & First Year / Skip Card */}

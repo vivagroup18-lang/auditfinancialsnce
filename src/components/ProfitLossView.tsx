@@ -4,7 +4,7 @@ import { ProfitAndLossData, EntityConfig } from '../types';
 import { computeSection40bLimit } from '../utils/financialCalculations';
 
 interface ProfitLossViewProps {
-  profitAndLoss: ProfitAndLossData;
+  profitAndLoss: ProfitAndLossData | Omit<ProfitAndLossData, 'previousYear'>;
   config: EntityConfig;
   onSelectNote: (noteNumber: number) => void;
   onEmailStatement?: () => void;
@@ -21,15 +21,20 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
     return val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  const prev: Partial<ProfitAndLossData> =
+    (profitAndLoss as Partial<ProfitAndLossData>)?.previousYear || {};
+
   // PY column: show "-" for zero values when no PY data has been uploaded
-  const hasPYData = profitAndLoss.isPreviousYearUploaded;
+  const hasPYData = Boolean(
+    profitAndLoss?.isPreviousYearUploaded &&
+      (profitAndLoss as Partial<ProfitAndLossData>)?.previousYear
+  );
   const formatPY = (val?: number) => {
     if (!hasPYData) return '-';
     if (val === undefined || val === null || val === 0 || isNaN(val)) return '-';
     return val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const prev = profitAndLoss.previousYear;
   const isProfitable = profitAndLoss.profitAfterTax >= 0;
   const currentPeriod = config.reportingPeriod || 'March 31, 2025';
   const previousPeriod = config.previousReportingPeriod || 'March 31, 2024';
@@ -414,7 +419,7 @@ export const ProfitLossView: React.FC<ProfitLossViewProps> = ({
                   {profitAndLoss.partnersRemuneration > 0 ? formatINR(profitAndLoss.partnersRemuneration) : '-'}
                 </td>
                 <td className="py-2.5 px-4 text-right font-mono text-slate-500 font-semibold">
-                  {prev.partnersRemuneration > 0 ? formatPY(prev.partnersRemuneration) : '-'}
+                  {(prev.partnersRemuneration || 0) > 0 ? formatPY(prev.partnersRemuneration) : '-'}
                 </td>
               </tr>
             )}

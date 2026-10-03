@@ -466,8 +466,13 @@ export interface UserInvoice {
   gstAmount: number; // 18% GST (CGST + SGST or IGST)
   totalAmount: number;
   status: 'paid' | 'pending' | 'failed';
-  paymentMethod: 'UPI' | 'Credit Card' | 'Debit Card' | 'Net Banking' | 'Demo';
+  paymentMethod: 'UPI' | 'Credit Card' | 'Debit Card' | 'Net Banking' | 'Demo' | 'Razorpay';
   transactionId: string;
+  razorpayOrderId?: string;
+  razorpaySignature?: string;
+  creditsGranted?: number;
+  discountAmount?: number;
+  promoCode?: string;
   firmName?: string;
   gstin?: string;
   notes?: string;

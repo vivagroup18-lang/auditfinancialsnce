@@ -140,7 +140,7 @@ export async function fetchDriveSyncContent(
       return parsed as DriveSyncPayload;
     }
   } catch (e) {
-    console.error('Failed to parse Google Drive sync file JSON:', e);
+    console.warn('Failed to parse Google Drive sync file JSON:', e);
   }
   return null;
 }
@@ -160,9 +160,14 @@ export async function checkAndRestoreFromDrive(
   try {
     const cleanEmail = userEmail ? userEmail.trim().toLowerCase() : undefined;
 
-    // Filter incoming local companies so only records belonging to this user are considered
+    // Filter incoming local companies so only records belonging to this user or guest working session are considered
     const safeLocalCompanies = cleanEmail
-      ? localCompanies.filter((c) => !c.userEmail || c.userEmail.trim().toLowerCase() === cleanEmail)
+      ? localCompanies.filter(
+          (c) =>
+            !c.userEmail ||
+            c.userEmail === 'guest' ||
+            c.userEmail.trim().toLowerCase() === cleanEmail
+        )
       : localCompanies;
 
     // 1. Get or create root sync folder
@@ -180,7 +185,12 @@ export async function checkAndRestoreFromDrive(
         const cloudCompanies = cloudPayload.companies
           .filter((c) => {
             if (!c?.id) return false;
-            if (cleanEmail && c.userEmail && c.userEmail.trim().toLowerCase() !== cleanEmail) {
+            if (
+              cleanEmail &&
+              c.userEmail &&
+              c.userEmail !== 'guest' &&
+              c.userEmail.trim().toLowerCase() !== cleanEmail
+            ) {
               return false;
             }
             return true;
@@ -206,29 +216,46 @@ export async function checkAndRestoreFromDrive(
           };
         }
 
-        // Scenario B: Both have companies -> Merge by company ID (scoped strictly to this user)
+        // Scenario B: Both have companies -> Merge by company ID, preserving all local working files
         const mergedMap = new Map<string, Company>();
 
-        // Put cloud companies in first
-        cloudCompanies.forEach((c) => {
-          if (c?.id) mergedMap.set(c.id, c);
-        });
-
-        // Add any local companies that don't exist in the cloud
-        let hasNewLocal = false;
+        // Put local working companies in first so active working files are never lost
         safeLocalCompanies.forEach((localComp) => {
-          if (localComp?.id && !mergedMap.has(localComp.id)) {
+          if (localComp?.id) {
             mergedMap.set(localComp.id, {
               ...localComp,
               userEmail: cleanEmail || localComp.userEmail,
             });
-            hasNewLocal = true;
+          }
+        });
+
+        let hasNewLocal = safeLocalCompanies.some(
+          (lc) => lc?.id && !cloudCompanies.some((cc) => cc.id === lc.id)
+        );
+
+        // Add any cloud companies not in local, or update if cloud copy has a newer updatedAt timestamp
+        cloudCompanies.forEach((cloudComp) => {
+          if (!cloudComp?.id) return;
+          const existingLocal = mergedMap.get(cloudComp.id);
+          if (!existingLocal) {
+            mergedMap.set(cloudComp.id, cloudComp);
+          } else {
+            const localTime = existingLocal.updatedAt ? new Date(existingLocal.updatedAt).getTime() : 0;
+            const cloudTime = cloudComp.updatedAt ? new Date(cloudComp.updatedAt).getTime() : 0;
+            const localLedgers = existingLocal.mappedLedgers?.length || existingLocal.rawRows?.length || 0;
+            const cloudLedgers = cloudComp.mappedLedgers?.length || cloudComp.rawRows?.length || 0;
+
+            if (cloudTime > localTime || (localLedgers === 0 && cloudLedgers > 0)) {
+              mergedMap.set(cloudComp.id, cloudComp);
+            } else if (localTime > cloudTime) {
+              hasNewLocal = true;
+            }
           }
         });
 
         const mergedCompanies = Array.from(mergedMap.values());
 
-        // If local had new companies not yet in Drive, update Drive
+        // If local had new or updated companies not yet in Drive, update Drive
         if (hasNewLocal) {
           await saveWorkspaceToDriveSync(accessToken, mergedCompanies, cloudPayload.activeCompanyId, userEmail, syncFile.id, folder.id);
         }
@@ -238,7 +265,7 @@ export async function checkAndRestoreFromDrive(
           syncedToCloud: hasNewLocal,
           companies: mergedCompanies,
           activeCompanyId: cloudPayload.activeCompanyId || mergedCompanies[0]?.id,
-          message: `Synced ${mergedCompanies.length} companies with your Google Drive.`,
+          message: `Synced ${mergedCompanies.length} companies with your Google Drive (all working files preserved).`,
           lastSyncedAt: new Date().toISOString(),
           fileId: syncFile.id,
         };
@@ -275,7 +302,9 @@ export async function checkAndRestoreFromDrive(
       message: 'Google Drive connected. Ready to sync created companies.',
     };
   } catch (error: any) {
-    console.error('Error during checkAndRestoreFromDrive:', error);
+    if (!isGoogleAuthExpired(error)) {
+      console.warn('Notice during checkAndRestoreFromDrive:', error?.message || error);
+    }
     throw error;
   }
 }
@@ -392,7 +421,9 @@ export async function saveWorkspaceToDriveSync(
       };
     }
   } catch (error: any) {
-    console.error('Error during saveWorkspaceToDriveSync:', error);
+    if (!isGoogleAuthExpired(error)) {
+      console.warn('Notice during saveWorkspaceToDriveSync:', error?.message || error);
+    }
     throw error;
   }
 }

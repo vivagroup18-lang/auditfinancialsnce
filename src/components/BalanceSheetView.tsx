@@ -3,7 +3,7 @@ import { CheckCircle2, AlertTriangle, ExternalLink, Printer, ShieldCheck, Mail, 
 import { BalanceSheetData, EntityConfig } from '../types';
 
 interface BalanceSheetViewProps {
-  balanceSheet: BalanceSheetData;
+  balanceSheet: BalanceSheetData | Omit<BalanceSheetData, 'previousYear'>;
   config: EntityConfig;
   onSelectNote: (noteNumber: number) => void;
   onEmailStatement?: () => void;
@@ -22,15 +22,20 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({
     return val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  const prev: Partial<BalanceSheetData> =
+    (balanceSheet as Partial<BalanceSheetData>)?.previousYear || {};
+
   // PY column: show "-" for zero values when no PY data has been uploaded
-  const hasPYData = balanceSheet.isPreviousYearUploaded;
+  const hasPYData = Boolean(
+    balanceSheet?.isPreviousYearUploaded &&
+      (balanceSheet as Partial<BalanceSheetData>)?.previousYear
+  );
   const formatPY = (val?: number) => {
     if (!hasPYData) return '-';
     if (val === undefined || val === null || val === 0 || isNaN(val)) return '-';
     return val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const prev = balanceSheet.previousYear;
   const currentPeriod = config.reportingPeriod || 'March 31, 2025';
   const previousPeriod = config.previousReportingPeriod || 'March 31, 2024';
 

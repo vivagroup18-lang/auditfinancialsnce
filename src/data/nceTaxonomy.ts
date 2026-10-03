@@ -420,3 +420,124 @@ export const NCE_NOTE_DEFINITIONS: NoteDefinition[] = [
   },
 ];
 
+export type FourPillarCategory = 'Assets' | 'Liability' | 'Income' | 'Expenditures';
+
+export interface FourCategoryTheme {
+  category: FourPillarCategory;
+  label: string;
+  shortLabel: string;
+  statementLabel: 'Balance Sheet' | 'P & L';
+  noteRange: string;
+  dotClass: string;
+  rowBorderClass: string;
+  badgeClass: string;
+  selectClass: string;
+  optgroupClass: string;
+  filterActiveClass: string;
+  filterInactiveClass: string;
+  cardBorderClass: string;
+  cardHeaderBgClass: string;
+  numberBadgeClass: string;
+}
+
+export function getLedgerFourCategory(noteNumber: number, nature?: string): FourPillarCategory {
+  if (noteNumber >= 11 && noteNumber <= 18) return 'Assets';
+  if (noteNumber >= 3 && noteNumber <= 10) return 'Liability';
+  if (noteNumber >= 19 && noteNumber <= 20) return 'Income';
+  if (noteNumber >= 21 && noteNumber <= 25) return 'Expenditures';
+
+  if (nature === 'Asset') return 'Assets';
+  if (nature === 'Liability' || nature === 'Equity') return 'Liability';
+  if (nature === 'Income') return 'Income';
+  return 'Expenditures';
+}
+
+export const FOUR_CATEGORY_THEMES: Record<FourPillarCategory, FourCategoryTheme> = {
+  Assets: {
+    category: 'Assets',
+    label: 'Assets',
+    shortLabel: 'Assets',
+    statementLabel: 'Balance Sheet',
+    noteRange: 'Notes 11–18',
+    dotClass: 'bg-blue-500',
+    rowBorderClass: 'border-l-4 border-l-blue-500',
+    badgeClass: 'bg-blue-100 text-blue-900 border-blue-300',
+    selectClass:
+      'bg-blue-50/90 hover:bg-blue-100/70 text-blue-950 border-blue-300 hover:border-blue-400 focus:ring-blue-400 focus:border-blue-400',
+    optgroupClass: 'bg-blue-50 text-blue-950 font-bold',
+    filterActiveClass:
+      'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-400/30',
+    filterInactiveClass:
+      'bg-blue-50/90 hover:bg-blue-100 text-blue-900 border-blue-200/90',
+    cardBorderClass: 'border-slate-200 hover:border-blue-300/90',
+    cardHeaderBgClass: 'bg-blue-50/40 hover:bg-blue-50/70 border-slate-200',
+    numberBadgeClass: 'bg-blue-100 text-blue-900 border-blue-300',
+  },
+  Liability: {
+    category: 'Liability',
+    label: 'Liability',
+    shortLabel: 'Liability',
+    statementLabel: 'Balance Sheet',
+    noteRange: 'Notes 3–10',
+    dotClass: 'bg-amber-500',
+    rowBorderClass: 'border-l-4 border-l-amber-500',
+    badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+    selectClass:
+      'bg-amber-50/90 hover:bg-amber-100/70 text-amber-950 border-amber-300 hover:border-amber-400 focus:ring-amber-400 focus:border-amber-400',
+    optgroupClass: 'bg-amber-50 text-amber-950 font-bold',
+    filterActiveClass:
+      'bg-amber-500 text-slate-950 border-amber-600 shadow-xs ring-2 ring-amber-400/30',
+    filterInactiveClass:
+      'bg-amber-50/90 hover:bg-amber-100 text-amber-900 border-amber-200/90',
+    cardBorderClass: 'border-slate-200 hover:border-amber-300/90',
+    cardHeaderBgClass: 'bg-amber-50/40 hover:bg-amber-50/70 border-slate-200',
+    numberBadgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+  },
+  Income: {
+    category: 'Income',
+    label: 'Income',
+    shortLabel: 'Income',
+    statementLabel: 'P & L',
+    noteRange: 'Notes 19–20',
+    dotClass: 'bg-emerald-500',
+    rowBorderClass: 'border-l-4 border-l-emerald-500',
+    badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+    selectClass:
+      'bg-emerald-50/90 hover:bg-emerald-100/70 text-emerald-950 border-emerald-300 hover:border-emerald-400 focus:ring-emerald-400 focus:border-emerald-400',
+    optgroupClass: 'bg-emerald-50 text-emerald-950 font-bold',
+    filterActiveClass:
+      'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-400/30',
+    filterInactiveClass:
+      'bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 border-emerald-200/90',
+    cardBorderClass: 'border-slate-200 hover:border-emerald-300/90',
+    cardHeaderBgClass: 'bg-emerald-50/40 hover:bg-emerald-50/70 border-slate-200',
+    numberBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+  },
+  Expenditures: {
+    category: 'Expenditures',
+    label: 'Expenditures',
+    shortLabel: 'Expenditures',
+    statementLabel: 'P & L',
+    noteRange: 'Notes 21–25',
+    dotClass: 'bg-rose-500',
+    rowBorderClass: 'border-l-4 border-l-rose-500',
+    badgeClass: 'bg-rose-100 text-rose-900 border-rose-300',
+    selectClass:
+      'bg-rose-50/90 hover:bg-rose-100/70 text-rose-950 border-rose-300 hover:border-rose-400 focus:ring-rose-400 focus:border-rose-400',
+    optgroupClass: 'bg-rose-50 text-rose-950 font-bold',
+    filterActiveClass:
+      'bg-rose-600 text-white border-rose-600 shadow-xs ring-2 ring-rose-400/30',
+    filterInactiveClass:
+      'bg-rose-50/90 hover:bg-rose-100 text-rose-900 border-rose-200/90',
+    cardBorderClass: 'border-slate-200 hover:border-rose-300/90',
+    cardHeaderBgClass: 'bg-rose-50/40 hover:bg-rose-50/70 border-slate-200',
+    numberBadgeClass: 'bg-rose-100 text-rose-900 border-rose-300',
+  },
+};
+
+export function getNoteCategoryTheme(noteNumber: number, nature?: string): FourCategoryTheme {
+  const cat = getLedgerFourCategory(noteNumber, nature);
+  return FOUR_CATEGORY_THEMES[cat];
+}
+
+

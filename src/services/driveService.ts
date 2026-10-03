@@ -22,6 +22,10 @@ export function isGoogleAuthExpired(err: any): boolean {
     msg.includes('UNAUTHENTICATED') ||
     msg.includes('Invalid Credentials') ||
     msg.includes('invalid authentication credentials') ||
+    msg.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT') ||
+    msg.includes('insufficientPermissions') ||
+    msg.includes('Insufficient Permission') ||
+    msg.includes('access token has expired') ||
     msg.includes('authError')
   );
 }
@@ -79,6 +83,9 @@ export function handleDriveError(res: Response, errorBody: string, actionDesc: s
     res.status === 401 ||
     errorBody.includes('UNAUTHENTICATED') ||
     errorBody.includes('Invalid Credentials') ||
+    errorBody.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT') ||
+    errorBody.includes('insufficientPermissions') ||
+    errorBody.includes('Insufficient Permission') ||
     errorBody.includes('authError')
   ) {
     throw new GoogleAuthExpiredError(
@@ -94,7 +101,7 @@ export function handleDriveError(res: Response, errorBody: string, actionDesc: s
     (res.status === 403 && errorBody.includes('drive.googleapis.com'))
   ) {
     const projMatch = errorBody.match(/project(?:s\/|\s+)(\d+)/i);
-    const projId = projMatch ? projMatch[1] : '471811229038';
+    const projId = projMatch ? projMatch[1] : '170662624350';
     const urlMatch = errorBody.match(/https:\/\/[^\s"',)]+/);
     const activationUrl =
       urlMatch && urlMatch[0].includes('drive.googleapis.com')
@@ -153,20 +160,8 @@ export interface ListDriveFilesOptions {
  * Fetches current user profile and Google Drive storage quota
  */
 export async function getDriveAbout(accessToken: string): Promise<DriveAbout> {
-  if (accessToken && accessToken.startsWith('sandbox_')) {
-    return {
-      user: {
-        displayName: 'Vishal Sutar',
-        emailAddress: 'vishalsutar7@gmail.com',
-        photoLink: '',
-      },
-      storageQuota: {
-        limit: '16106127360',
-        usage: '2147483648',
-        usageInDrive: '1073741824',
-        usageInDriveTrash: '0',
-      },
-    };
+  if (!accessToken || accessToken.startsWith('sandbox_')) {
+    throw new Error('Google Workspace session is not active or token has expired. Please sign in with Google Drive.');
   }
 
   const res = await fetch(
@@ -193,29 +188,8 @@ export async function listDriveFiles(
   accessToken: string,
   options: ListDriveFilesOptions = {}
 ): Promise<{ files: DriveFile[]; nextPageToken?: string }> {
-  if (accessToken && accessToken.startsWith('sandbox_')) {
-    return {
-      files: [
-        {
-          id: 'sandbox_file_1',
-          name: 'CA_Audit_Workspace_AutoSync.json',
-          mimeType: 'application/json',
-          size: '124800',
-          modifiedTime: new Date().toISOString(),
-          createdTime: new Date().toISOString(),
-          webViewLink: '#',
-        },
-        {
-          id: 'sandbox_file_2',
-          name: 'Sample_Statutory_Report_Durga_Steel.xlsx',
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          size: '48200',
-          modifiedTime: new Date().toISOString(),
-          createdTime: new Date().toISOString(),
-          webViewLink: '#',
-        },
-      ],
-    };
+  if (!accessToken || accessToken.startsWith('sandbox_')) {
+    return { files: [] };
   }
   const {
     query = '',

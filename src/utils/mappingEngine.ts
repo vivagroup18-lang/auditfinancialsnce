@@ -11,10 +11,116 @@ interface RuleMatch {
   reasoning: string;
 }
 
+/**
+ * Identifies whether a Trial Balance ledger represents the Profit & Loss Account
+ * or a Profit/Loss Transferred to Capital entry (as opposed to an operating gain/loss like "Profit on Sale of Asset").
+ */
+export function isProfitAndLossLedger(accountName: string): boolean {
+  const raw = (accountName || '').toLowerCase().trim();
+  const name = raw.replace(/[\/\-_,\(\)\.]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (
+    name.includes('on sale') ||
+    name.includes('on disposal') ||
+    name.includes('by fire') ||
+    name.includes('by theft') ||
+    name.includes('exchange') ||
+    name.includes('forex') ||
+    name.includes('foreign') ||
+    name.includes('revaluation') ||
+    name.includes('impairment') ||
+    name.includes('chit') ||
+    name.includes('joint venture')
+  ) {
+    return false;
+  }
+
+  return (
+    name === 'profit & loss' ||
+    name === 'profit and loss' ||
+    name === 'p & l' ||
+    name === 'p&l' ||
+    name === 'p and l' ||
+    name.startsWith('profit & loss ') ||
+    name.startsWith('profit and loss ') ||
+    name.endsWith(' profit & loss') ||
+    name.endsWith(' profit and loss') ||
+    name.includes('profit & loss a c') ||
+    name.includes('profit and loss a c') ||
+    name.includes('profit & loss account') ||
+    name.includes('profit and loss account') ||
+    name.includes('profit & loss acc') ||
+    name.includes('profit and loss acc') ||
+    name.includes('profit loss a c') ||
+    name.includes('profit loss account') ||
+    name.includes('p & l a c') ||
+    name.includes('p&l a c') ||
+    name.includes('p & l account') ||
+    name.includes('p&l account') ||
+    name.includes('p and l a c') ||
+    name.includes('p and l account') ||
+    name.includes('profit transferred') ||
+    name.includes('profit transfer') ||
+    name.includes('loss transferred') ||
+    name.includes('loss transfer') ||
+    name.includes('transfer of profit') ||
+    name.includes('transfer of loss')
+  );
+}
+
+/**
+ * Ensures any Profit & Loss Account / Profit Transferred ledger in a mapped ledger array
+ * that was previously categorized into Expense (e.g. Note 25) or P&L is categorized into Note 3 (Owners' Capital Account).
+ */
+export function normalizeProfitAndLossLedgers(ledgers: MappedLedger[]): MappedLedger[] {
+  if (!Array.isArray(ledgers)) return [];
+  return ledgers.map((l) => {
+    if (
+      l &&
+      !l.accountCode?.startsWith('VIRT-') &&
+      isProfitAndLossLedger(l.accountName) &&
+      (l.noteNumber === 25 || l.statement === 'ProfitAndLoss' || l.nature === 'Expense')
+    ) {
+      const dr = Number(l.originalDebit) || 0;
+      const cr = Number(l.originalCredit) || 0;
+      return {
+        ...l,
+        noteNumber: 3,
+        noteName: "Owners' Capital Account",
+        subCategory: dr > cr ? 'Share of Profit / Loss' : 'Opening Profit / Loss Account Balance',
+        statement: 'BalanceSheet',
+        nature: 'Equity',
+        confidence: 0.99,
+      };
+    }
+    return l;
+  });
+}
+
 export function classifyLedgerAccount(accountName: string, netDebit: number, netCredit: number): RuleMatch {
   const rawName = accountName.toLowerCase().trim();
   // Clean punctuation for multi-word phrase comparison while retaining words
   const name = rawName.replace(/[\/\-_,\(\)]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // ==========================================
+  // TIER 0: PROFIT & LOSS ACCOUNT / PROFIT TRANSFERRED TO CAPITAL (Note 3)
+  // When profit transferred to capital entry is passed, Profit & Loss A/c is disclosed in
+  // the Trial Balance (with Capital already increased by the profit transferred).
+  // Categorizing Profit & Loss A/c under Note 3 (Owners' Capital Account) prevents it from
+  // being treated as an Expense and properly adjusts the Capital schedule without double-counting.
+  // ==========================================
+  if (isProfitAndLossLedger(accountName)) {
+    return {
+      noteNumber: 3,
+      noteName: "Owners' Capital Account",
+      subCategory: netDebit > netCredit ? 'Share of Profit / Loss' : 'Opening Profit / Loss Account Balance',
+      statement: 'BalanceSheet',
+      nature: 'Equity',
+      confidence: 0.99,
+      reasoning:
+        "Profit & Loss Account / Profit Transferred in Trial Balance mapped to Note 3 (Owners' Capital Account) so P&L expenses are not distorted and Capital balance is accurately adjusted.",
+    };
+  }
 
   // ==========================================
   // TIER 1: EXACT FULL SENTENCE & MULTI-WORD PHRASES
@@ -716,6 +822,37 @@ export function classifyLedgerAccount(accountName: string, netDebit: number, net
     };
   }
 
+  // 22B. Round Off / Rounding Off / Kasar (Balance-aware: Credit -> Note 20 Other Income, Debit -> Note 25 Other Expenses)
+  if (
+    name.includes('round off') ||
+    name.includes('rounding off') ||
+    name.includes('rounded off') ||
+    name === 'roundoff' ||
+    name.includes('kasar') ||
+    name.includes('kasur')
+  ) {
+    if (netCredit > netDebit) {
+      return {
+        noteNumber: 20,
+        noteName: 'Other Income',
+        subCategory: '(d) Other non-operating income (Discounts, Rent)',
+        statement: 'ProfitAndLoss',
+        nature: 'Income',
+        confidence: 0.98,
+        reasoning: 'Round Off with Credit balance mapped to Note 20: Other Income.',
+      };
+    }
+    return {
+      noteNumber: 25,
+      noteName: 'Other Expenses',
+      subCategory: '(x) Miscellaneous expenses',
+      statement: 'ProfitAndLoss',
+      nature: 'Expense',
+      confidence: 0.98,
+      reasoning: 'Round Off with Debit balance mapped to Note 25: Other Expenses.',
+    };
+  }
+
   // 23. Other Expenses (Note 25)
   if (
     name.includes('audit fee') || name.includes('audit fees') || name.includes('auditor') || name.includes('tax audit') ||
@@ -725,7 +862,7 @@ export function classifyLedgerAccount(accountName: string, netDebit: number, net
     name.includes('travelling') || name.includes('traveling') || name.includes('conveyance') || name.includes('hotel') || name.includes('printing') || name.includes('stationery') ||
     name.includes('postage') || name.includes('courier') || name.includes('telephone') || name.includes('internet') || name.includes('communication') || name.includes('advertising') ||
     name.includes('sales promotion') || name.includes('commission') || name.includes('pooja') || name.includes('petrol') || name.includes('diesel') || name.includes('late fee') ||
-    name.includes('penalty') || name.includes('round off') || name.includes('labour charge') || name.includes('processing charge') || name.includes('expence') || name.includes('expense') ||
+    name.includes('penalty') || name.includes('labour charge') || name.includes('processing charge') || name.includes('expence') || name.includes('expense') ||
     name.includes('office expense') || name.includes('stores and spares') || name.includes('admin expenses') || name.includes('administrative')
   ) {
     let subCat = '(x) Miscellaneous expenses';

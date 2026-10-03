@@ -45,6 +45,7 @@ import { SAMPLE_DATASETS } from '../data/sampleTrialBalances';
 import { POPULAR_INDIAN_FY_PRESETS } from '../utils/financialYearUtils';
 import { FinancialYearChangeModal } from './FinancialYearChangeModal';
 import { CompaniesWindow } from './CompaniesWindow';
+import { BranchTrialBalanceManager } from './BranchTrialBalanceManager';
 
 interface IngestionPanelProps {
   config: EntityConfig;
@@ -130,6 +131,11 @@ interface IngestionPanelProps {
   onExportExcel?: () => void;
   exceptionCount?: number;
   onOpenBackupRestore?: () => void;
+  onUploadBranchTB?: (branchId: string, file: File, period: 'CY' | 'PY') => void;
+  onBulkUploadBranchTBs?: (files: File[], period: 'CY' | 'PY') => void;
+  onClearBranchTB?: (branchId: string, period: 'CY' | 'PY') => void;
+  onLoadSampleBranches?: (period: 'CY' | 'PY') => void;
+  onUpdateBranchClosingStock?: (branchId: string, stockAmount: number | undefined, period: 'CY' | 'PY') => void;
 }
 
 export const IngestionPanel: React.FC<IngestionPanelProps> = ({
@@ -197,7 +203,13 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
   onNavigateToTab,
   onExportExcel,
   exceptionCount = 0,
+  onUploadBranchTB,
+  onBulkUploadBranchTBs,
+  onClearBranchTB,
+  onLoadSampleBranches,
+  onUpdateBranchClosingStock,
 }) => {
+  const [branchPeriodTab, setBranchPeriodTab] = useState<'CY' | 'PY'>('CY');
   // Input refs for manual file picking
   const cyInputRef = useRef<HTMLInputElement>(null);
   const pyInputRef = useRef<HTMLInputElement>(null);
@@ -890,6 +902,55 @@ export const IngestionPanel: React.FC<IngestionPanelProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Branch-wise Trial Balance Consolidation Hub */}
+              {onUpdateConfig && onUploadBranchTB && onClearBranchTB && (
+                <div className="space-y-2">
+                  {(config.numberOfBranches ?? 0) > 0 && (
+                    <div className="flex items-center justify-between bg-indigo-50/70 border border-indigo-200 rounded-xl px-3.5 py-2">
+                      <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Branch-wise Trial Balance Period Selector:</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setBranchPeriodTab('CY')}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            branchPeriodTab === 'CY'
+                              ? 'bg-emerald-700 text-white shadow-2xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Current Year (FY {config.financialYear})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBranchPeriodTab('PY')}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            branchPeriodTab === 'PY'
+                              ? 'bg-indigo-700 text-white shadow-2xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          Previous Year (FY {config.previousFinancialYear || '2024-25'})
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <BranchTrialBalanceManager
+                    config={config}
+                    period={branchPeriodTab}
+                    onUpdateConfig={(partial) => onUpdateConfig({ ...config, ...partial })}
+                    onUploadBranchTB={onUploadBranchTB}
+                    onBulkUploadBranchTBs={onBulkUploadBranchTBs}
+                    onClearBranchTB={onClearBranchTB}
+                    onLoadSampleBranches={onLoadSampleBranches}
+                    onUpdateBranchClosingStock={onUpdateBranchClosingStock}
+                    onReviewConsolidatedMappings={onNavigateToMapping}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* 1. Current Year TB Card */}

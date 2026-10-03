@@ -45,13 +45,13 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
     if (isOpen) {
       const info = getTermsAcceptedInfo();
       setAcceptedInfo(info);
-      if (info.accepted) {
+      if (info.accepted && !isMandatory) {
         setIsChecked(true);
       } else {
         setIsChecked(false);
       }
     }
-  }, [isOpen]);
+  }, [isOpen, isMandatory]);
 
   if (!isOpen) return null;
 
@@ -66,7 +66,7 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
     if (!isChecked) return;
     recordTermsAccepted(CURRENT_TERMS_VERSION);
     onAccept();
-    if (onClose) onClose();
+    if (onClose && !isMandatory) onClose();
   };
 
   const formattedAcceptedDate = acceptedInfo.acceptedAt
@@ -80,9 +80,9 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-sm overflow-y-auto">
       <div
-        className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] my-auto animate-in fade-in zoom-in-95 duration-200"
+        className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] my-auto animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
         aria-labelledby="terms-modal-title"
@@ -96,11 +96,16 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 id="terms-modal-title" className="text-base sm:text-lg font-bold text-white tracking-tight">
-                  Terms of Service &amp; Professional Disclaimer
+                  Compulsory Terms &amp; Conditions Acceptance
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                   v{CURRENT_TERMS_VERSION}
                 </span>
+                {isMandatory && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
+                    Compulsory Before Using App
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
                 Statutory Non-Corporate Entity (NCE) Audit &amp; Financial Statements Preparation Platform
@@ -120,8 +125,8 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
           )}
         </div>
 
-        {/* Existing Acceptance Banner (if reviewing) */}
-        {acceptedInfo.accepted && formattedAcceptedDate && (
+        {/* Existing Acceptance Banner (only when opened manually after accepting) */}
+        {!isMandatory && acceptedInfo.accepted && formattedAcceptedDate && (
           <div className="bg-emerald-50 border-b border-emerald-200 px-5 py-2.5 flex items-center justify-between text-xs text-emerald-900 shrink-0">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -136,11 +141,16 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
         )}
 
         {/* Mandatory Warning Notice */}
-        {isMandatory && !acceptedInfo.accepted && (
-          <div className="bg-amber-50 border-b border-amber-200 px-5 py-2.5 flex items-center gap-2 text-xs text-amber-900 shrink-0">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>
-              <strong>Mandatory Acknowledgment:</strong> Please read and accept the professional accounting disclaimer below to proceed into the audit workspace.
+        {isMandatory && (
+          <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center justify-between gap-3 text-xs text-amber-950 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Compulsory Acknowledgment Required:</strong> You must review and accept the Terms &amp; Conditions and ICAI Professional Accounting Disclaimer below before accessing or using the application.
+              </span>
+            </div>
+            <span className="px-2 py-0.5 rounded bg-amber-200/80 text-amber-950 font-black text-[10px] uppercase shrink-0">
+              Action Required
             </span>
           </div>
         )}
@@ -251,15 +261,21 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
         {/* Modal Footer / Acceptance Controls */}
         <div className="px-5 sm:px-6 py-4 bg-slate-50 border-t border-slate-200 shrink-0 space-y-3">
           {/* Checkbox Acknowledgment */}
-          <label className="flex items-start gap-3 cursor-pointer group select-none">
+          <label
+            className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer group select-none ${
+              isChecked
+                ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950'
+                : 'bg-white border-amber-300 hover:border-emerald-400 text-slate-800'
+            }`}
+          >
             <input
               type="checkbox"
               checked={isChecked}
               onChange={(e) => setIsChecked(e.target.checked)}
               className="mt-0.5 w-4 h-4 rounded text-emerald-700 border-slate-300 focus:ring-emerald-500 cursor-pointer shrink-0"
             />
-            <span className="text-xs text-slate-800 leading-snug group-hover:text-slate-900">
-              <strong>I confirm that I am a Chartered Accountant, tax auditor, accounting professional, or authorized entity representative.</strong> I have read, understood, and agree to the Terms of Service, Professional Disclaimer, and Data Confidentiality Policies.
+            <span className="text-xs leading-snug">
+              <strong>I have read, understood, and accept all Compulsory Terms &amp; Conditions.</strong> I confirm that I am a Chartered Accountant, tax auditor, accounting professional, or authorized entity representative, and I agree to the ICAI Professional Disclaimer and Data Confidentiality Policies before using this application.
             </span>
           </label>
 
@@ -267,7 +283,7 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
             <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Governed by Indian Law &amp; Professional Standards</span>
+              <span>Governed by Indian Law &amp; ICAI Professional Standards</span>
             </div>
 
             <div className="flex items-center gap-2 justify-end">
@@ -285,10 +301,14 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
                 type="button"
                 onClick={handleConfirmAccept}
                 disabled={!isChecked}
-                className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-extrabold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Check className="w-4 h-4" />
-                <span>{acceptedInfo.accepted ? 'Confirm & Continue' : 'Accept & Enter Workspace'}</span>
+                <span>
+                  {!isMandatory && acceptedInfo.accepted
+                    ? 'Confirm & Continue'
+                    : 'I Accept Terms & Conditions — Enter App'}
+                </span>
               </button>
             </div>
           </div>

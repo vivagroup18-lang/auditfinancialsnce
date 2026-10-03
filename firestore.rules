@@ -97,19 +97,19 @@ service cloud.firestore {
 
     // Referral directory
     match /referral_directory/{lookupKey} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidReferralProfile(incoming());
-      allow update: if isSignedIn() && isValidReferralProfile(incoming());
+      allow get: if true;
+      allow list: if true;
+      allow create: if isValidReferralProfile(incoming());
+      allow update: if isValidReferralProfile(incoming());
       allow delete: if isAdmin();
     }
 
     // Referral reward events
     match /referral_events/{eventId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidReferralEvent(incoming());
-      allow update: if isSignedIn() && isValidReferralEvent(incoming());
+      allow get: if true;
+      allow list: if true;
+      allow create: if isValidReferralEvent(incoming());
+      allow update: if isValidReferralEvent(incoming());
       allow delete: if isAdmin();
     }
   }

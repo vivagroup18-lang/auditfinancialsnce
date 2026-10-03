@@ -149,7 +149,7 @@ export const DrivePanel: React.FC<DrivePanelProps> = ({
       } else if (isGoogleDriveApiDisabled(err)) {
         setStatusMessage({
           type: 'error',
-          text: 'Google Drive API is disabled in your Google Cloud Project (471811229038). Please click the button below to enable it in the Google Cloud Console.',
+          text: 'Google Drive API is disabled in your Google Cloud Project. Please click the button below to enable it in the Google Cloud Console.',
           activationUrl: extractDriveActivationUrl(err),
         });
       } else {

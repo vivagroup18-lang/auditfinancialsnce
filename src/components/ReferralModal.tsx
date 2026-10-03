@@ -1,34 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Gift,
   Copy,
   Check,
-  Share2,
   Users,
   Zap,
   Sparkles,
-  ArrowRight,
-  ShieldCheck,
   CheckCircle2,
   Mail,
   MessageSquare,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { REFERRAL_CREDIT_BONUS, CREDIT_COSTS } from '../data/subscriptionPlans';
+import {
+  claimPendingReferralRewards,
+  syncUserReferralToCloud,
+} from '../services/referralCloudService';
+import {
+  applyReferralRewardAsync,
+  loadActiveUserFromStorage,
+} from '../utils/storageManager';
 
 interface ReferralModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile;
+  onUserUpdated?: (updatedUser: UserProfile) => void;
 }
 
 export const ReferralModal: React.FC<ReferralModalProps> = ({
   isOpen,
   onClose,
   currentUser,
+  onUserUpdated,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'info' | 'error'; text: string } | null>(null);
+  const [claimInput, setClaimInput] = useState('');
+  const [claimingCode, setClaimingCode] = useState(false);
+
+  // Automatically sync & claim any pending referral rewards when modal opens
+  useEffect(() => {
+    if (!isOpen || !currentUser) return;
+    setSyncMessage(null);
+
+    let isMounted = true;
+    const autoSync = async () => {
+      try {
+        await syncUserReferralToCloud(currentUser);
+        const res = await claimPendingReferralRewards(currentUser);
+        if (!isMounted) return;
+        if (res.claimedCount > 0 && res.updatedUser) {
+          onUserUpdated?.(res.updatedUser);
+          setSyncMessage({
+            type: 'success',
+            text: `🎁 Claimed +${res.totalAwarded} Referral Credits from ${res.refereeNames.join(', ')}!`,
+          });
+        } else {
+          const fresh = loadActiveUserFromStorage();
+          if (fresh && fresh.credits !== currentUser.credits) {
+            onUserUpdated?.(fresh);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    autoSync();
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, currentUser?.id]);
 
   if (!isOpen) return null;
 
@@ -45,6 +91,81 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({
     navigator.clipboard.writeText(referralCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleManualSyncRewards = async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      await syncUserReferralToCloud(currentUser);
+      const res = await claimPendingReferralRewards(currentUser);
+      if (res.claimedCount > 0 && res.updatedUser) {
+        onUserUpdated?.(res.updatedUser);
+        setSyncMessage({
+          type: 'success',
+          text: `🎁 Added +${res.totalAwarded} Referral Credits! Referred: ${res.refereeNames.join(', ')}`,
+        });
+      } else {
+        const fresh = loadActiveUserFromStorage();
+        if (fresh) {
+          onUserUpdated?.(fresh);
+        }
+        setSyncMessage({
+          type: 'info',
+          text: 'Referral ledger synced! All earned referral credits are up to date.',
+        });
+      }
+    } catch {
+      setSyncMessage({
+        type: 'error',
+        text: 'Could not reach cloud referral service. Please try again.',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleClaimColleagueCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!claimInput.trim()) return;
+    setClaimingCode(true);
+    setSyncMessage(null);
+    try {
+      // Allow pasting either a full referral URL (?ref=REF-...) or a code/handle/email
+      let codeToApply = claimInput.trim();
+      if (codeToApply.includes('ref=')) {
+        try {
+          const url = new URL(codeToApply);
+          codeToApply = url.searchParams.get('ref') || codeToApply;
+        } catch {
+          const match = codeToApply.match(/[?&]ref=([^&#\s]+)/i);
+          if (match?.[1]) codeToApply = decodeURIComponent(match[1]);
+        }
+      }
+
+      const res = await applyReferralRewardAsync(currentUser.id, codeToApply);
+      if (res.success) {
+        const fresh = loadActiveUserFromStorage();
+        if (fresh) onUserUpdated?.(fresh);
+        setClaimInput('');
+        setSyncMessage({
+          type: 'success',
+          text: `🎉 +${res.bonusGranted} Credits added! Both you and ${res.inviterName || 'your colleague'} received +500 credits.`,
+        });
+      } else {
+        setSyncMessage({
+          type: 'error',
+          text: res.error || 'Could not apply referral code.',
+        });
+      }
+    } catch (err: any) {
+      setSyncMessage({
+        type: 'error',
+        text: err.message || 'Error applying referral code.',
+      });
+    } finally {
+      setClaimingCode(false);
+    }
   };
 
   const userHandle = currentUser.userId ? `@${currentUser.userId.replace(/^@/, '')}` : referralCode;
@@ -89,19 +210,38 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           <p className="text-xs text-emerald-100/90 mt-3 max-w-xl leading-relaxed">
-            Invite fellow Chartered Accountants, article assistants, and auditing colleagues. When they sign up using your unique code, <span className="font-bold text-amber-300">both of you get 500 credits</span> added to your account instantly!
+            Invite fellow Chartered Accountants, article assistants, and auditing colleagues. When they sign in or register using your referral link or code, <span className="font-bold text-amber-300">both of you get 500 credits</span> added to your account instantly!
           </p>
         </div>
 
         {/* Content Body */}
         <div className="overflow-y-auto p-6 space-y-6 flex-1">
+          {syncMessage && (
+            <div
+              className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                syncMessage.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : syncMessage.type === 'error'
+                  ? 'bg-rose-50 border-rose-200 text-rose-800'
+                  : 'bg-blue-50 border-blue-200 text-blue-900'
+              }`}
+            >
+              {syncMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              )}
+              <span>{syncMessage.text}</span>
+            </div>
+          )}
+
           {/* Live Stats Row */}
           <div className="grid grid-cols-3 gap-3">
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center">
@@ -140,23 +280,33 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({
 
           {/* Share Code & Link Card */}
           <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border border-emerald-200/80 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Your Unique Referral Code
               </label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 px-4 py-2.5 bg-white border border-emerald-300 rounded-xl font-mono text-base font-black text-slate-900 tracking-wider shadow-xs">
-                  {referralCode}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCopyCode}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  <span>{copied ? 'Copied Code!' : 'Copy Code'}</span>
-                </button>
+              <button
+                type="button"
+                onClick={handleManualSyncRewards}
+                disabled={syncing}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
+                <span>{syncing ? 'Syncing...' : 'Sync Referral Credits'}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-4 py-2.5 bg-white border border-emerald-300 rounded-xl font-mono text-base font-black text-slate-900 tracking-wider shadow-xs">
+                {referralCode}
               </div>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? 'Copied Code!' : 'Copy Code'}</span>
+              </button>
             </div>
 
             <div>
@@ -204,10 +354,38 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({
             <div className="p-3 bg-white/90 rounded-xl border border-emerald-200/90 text-[11px] text-emerald-950 flex items-start gap-2 shadow-2xs">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <span>
-                <strong>Flexible Colleague Referral:</strong> Your colleague can sign up using your Referral Code (<strong>{referralCode}</strong>), your User ID handle (<strong>{userHandle}</strong>), or your email. Both parties instantly receive +500 credits!
+                <strong>Flexible Colleague Referral:</strong> Your colleague can sign in or register using your Referral Link, Referral Code (<strong>{referralCode}</strong>), User ID handle (<strong>{userHandle}</strong>), or email. Both parties receive +500 credits!
               </span>
             </div>
           </div>
+
+          {/* Redeem a Colleague's Referral Code or Link (if not yet referred) */}
+          {!currentUser.referredBy && (
+            <form
+              onSubmit={handleClaimColleagueCode}
+              className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5"
+            >
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Were You Referred by a Colleague? Claim +500 Credits
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={claimInput}
+                  onChange={(e) => setClaimInput(e.target.value)}
+                  placeholder="Paste referral link, code (REF-...), @handle, or inviter email"
+                  className="flex-1 px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
+                />
+                <button
+                  type="submit"
+                  disabled={claimingCode || !claimInput.trim()}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  {claimingCode ? 'Claiming...' : 'Claim +500'}
+                </button>
+              </div>
+            </form>
+          )}
 
           {/* What 500 Credits Unlocks */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">

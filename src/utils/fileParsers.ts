@@ -1,5 +1,4 @@
 import * as XLSX from 'xlsx';
-import * as pdfjsLib from 'pdfjs-dist';
 import {
   TrialBalanceRow,
   UploadedFinancialLineItem,
@@ -9,18 +8,6 @@ import {
   PartnerCapitalRecord,
 } from '../types';
 import { generateAttractiveExcelReport } from './excelExporter';
-
-// Configure pdfjs worker for browser/client-side execution
-if (typeof window !== 'undefined') {
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
-      import.meta.url
-    ).toString();
-  } catch {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '4.10.38'}/build/pdf.worker.min.mjs`;
-  }
-}
 
 export const KNOWN_TALLY_GROUP_NAMES = new Set([
   'capital account', 'capital accounts',
@@ -89,6 +76,39 @@ export function parseNumStrict(val: any): number {
 
 export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Promise<TrialBalanceRow[]> {
   const uint8 = data instanceof Uint8Array ? data : new Uint8Array(data);
+
+  // Load pdfjs-dist via CDN blob URL to completely bypass Vite bundling
+  // (pdfjs-dist v6 package in node_modules has an incomplete build directory)
+  // Use importmap-free approach: fetch and evaluate via dynamic import with blob URL
+  let pdfjsLib: any = null;
+  try {
+    // Try fetching the ES module from CDN and importing it as a blob URL
+    const PDFJS_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+    const res = await fetch(PDFJS_CDN);
+    if (res.ok) {
+      const code = await res.text();
+      const blob = new Blob([code], { type: 'application/javascript' });
+      const blobUrl = URL.createObjectURL(blob);
+      try {
+        pdfjsLib = await import(/* @vite-ignore */ blobUrl);
+        URL.revokeObjectURL(blobUrl);
+      } catch {
+        URL.revokeObjectURL(blobUrl);
+      }
+    }
+  } catch {
+    // Network or parsing failure — fall through to stub
+  }
+
+  if (!pdfjsLib || !pdfjsLib.getDocument) {
+    console.warn('[PDF Parser] pdfjs-dist could not be loaded. PDF trial balance parsing is unavailable. Please upload an Excel/CSV file instead.');
+    throw new Error('PDF parsing is not available in this environment. Please upload your trial balance as an Excel (.xlsx) or CSV file.');
+  }
+
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+  } catch {}
+
   const loadingTask = pdfjsLib.getDocument({ data: uint8 });
   const doc = await loadingTask.promise;
 
@@ -141,7 +161,6 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
       const fullText = lineItems.map((it) => it.text).join(' ').trim();
       const lowerText = fullText.toLowerCase();
 
-      // Check header row for Debit and Credit column anchors
       const debitItem = lineItems.find((it) => {
         const t = it.text.toLowerCase().trim();
         return t === 'debit' || t === 'dr' || t === 'dr.' || t === 'debit amount' || t === 'closing debit';
@@ -155,7 +174,6 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
         continue;
       }
 
-      // Check Grand Total row
       if (lowerText.startsWith('grand total') || lowerText === 'total' || lowerText === 'total:') {
         const numItems = lineItems.filter((it) => {
           const clean = it.text.replace(/,/g, '').trim();
@@ -168,7 +186,6 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
         continue;
       }
 
-      // Metadata / non-financial rows
       const isMeta =
         lowerText.includes('trial balance') ||
         lowerText.includes('particulars') ||
@@ -186,7 +203,6 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
 
       if (isMeta) continue;
 
-      // Extract account name (text items before number columns)
       const nameItems = lineItems.filter((it) => it.x < Math.min(drColThreshold - 30, 240));
       if (nameItems.length === 0) continue;
 
@@ -212,26 +228,17 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
       }
 
       if (dr > 0 || cr > 0) {
-        rawLines.push({
-          page: p,
-          y,
-          name,
-          indentX,
-          debit: dr,
-          credit: cr,
-        });
+        rawLines.push({ page: p, y, name, indentX, debit: dr, credit: cr });
       }
     }
   }
 
-  // Pass 2: Parent Group Filtering
   const excludedGroupIndices = new Set<number>();
 
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i];
     const lower = line.name.toLowerCase().trim();
 
-    // Check Proof 1: immediate duplicate next line
     if (i + 1 < rawLines.length) {
       const next = rawLines[i + 1];
       if (
@@ -244,7 +251,6 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
       }
     }
 
-    // Check Proof 2: subsequent lines summing up to parent
     let sumDr = 0;
     let sumCr = 0;
     let count = 0;
@@ -252,7 +258,6 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
     for (let j = i + 1; j < rawLines.length; j++) {
       const child = rawLines[j];
       if (excludedGroupIndices.has(j)) continue;
-
       sumDr += child.debit;
       sumCr += child.credit;
       count++;
@@ -270,7 +275,6 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
       }
     }
 
-    // Check Proof 3: Top-level indentation rule for known Tally groups
     if (!excludedGroupIndices.has(i) && line.indentX < 60 && KNOWN_TALLY_GROUP_NAMES.has(lower)) {
       const hasIndentedChildren = i + 1 < rawLines.length && rawLines[i + 1].indentX > line.indentX + 5;
       if (hasIndentedChildren) {
@@ -281,7 +285,6 @@ export async function parseTrialBalancePdf(data: ArrayBuffer | Uint8Array): Prom
 
   let finalLines = rawLines.filter((_, idx) => !excludedGroupIndices.has(idx));
 
-  // Reconcile against Grand Total if stated in file
   let currentDr = Math.round(finalLines.reduce((s, r) => s + r.debit, 0) * 100) / 100;
   let currentCr = Math.round(finalLines.reduce((s, r) => s + r.credit, 0) * 100) / 100;
 

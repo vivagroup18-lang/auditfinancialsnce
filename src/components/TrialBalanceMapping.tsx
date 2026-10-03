@@ -21,7 +21,13 @@ import {
   Edit3,
 } from 'lucide-react';
 import { MappedLedger, StatementType } from '../types';
-import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
+import {
+  NCE_NOTE_DEFINITIONS,
+  FourPillarCategory,
+  FOUR_CATEGORY_THEMES,
+  getLedgerFourCategory,
+  getNoteCategoryTheme,
+} from '../data/nceTaxonomy';
 
 interface TrialBalanceMappingProps {
   mappedLedgers: MappedLedger[];
@@ -210,53 +216,73 @@ const EditLedgerModal: React.FC<{
 
           {/* Statutory Note Assignment */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="font-bold text-slate-800 text-xs">Statutory ICAI Note Schedule</label>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                  noteNumber <= 18
-                    ? 'bg-amber-100 text-amber-900 border-amber-300'
-                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                }`}
-              >
-                {noteNumber <= 18 ? '📋 Balance Sheet Schedule' : '📈 Profit & Loss Schedule'}
-              </span>
-            </div>
-            <select
-              value={noteNumber}
-              onChange={(e) => {
-                const num = Number(e.target.value);
-                setNoteNumber(num);
-                const nDef = NCE_NOTE_DEFINITIONS.find((n) => n.noteNumber === num);
-                if (nDef && nDef.subCategories?.[0]) {
-                  setSubCategory(nDef.subCategories[0]);
-                }
-              }}
-              className={`w-full px-3 py-2 border rounded-xl font-semibold text-xs transition focus:outline-none focus:ring-2 ${
-                noteNumber <= 18
-                  ? 'bg-amber-50/80 text-amber-950 border-amber-300 focus:ring-amber-400'
-                  : 'bg-emerald-50/80 text-emerald-950 border-emerald-300 focus:ring-emerald-400'
-              }`}
-            >
-              <optgroup label="📋 Balance Sheet Schedules (Notes 3 to 18)">
-                {selectableNotes
-                  .filter((n) => n.statement === 'BalanceSheet' || n.noteNumber <= 18)
-                  .map((n) => (
-                    <option key={n.noteNumber} value={n.noteNumber}>
-                      Note {n.noteNumber}: {n.name} (Balance Sheet)
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="📈 Profit & Loss Schedules (Notes 19 to 25)">
-                {selectableNotes
-                  .filter((n) => n.statement === 'ProfitAndLoss' || n.noteNumber >= 19)
-                  .map((n) => (
-                    <option key={n.noteNumber} value={n.noteNumber}>
-                      Note {n.noteNumber}: {n.name} (P & L)
-                    </option>
-                  ))}
-              </optgroup>
-            </select>
+            {(() => {
+              const modalCatTheme = getNoteCategoryTheme(noteNumber);
+              return (
+                <>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-800 text-xs">Statutory ICAI Note Schedule</label>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1.5 ${modalCatTheme.badgeClass}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${modalCatTheme.dotClass}`} />
+                      <span>
+                        {modalCatTheme.label} ({modalCatTheme.statementLabel})
+                      </span>
+                    </span>
+                  </div>
+                  <select
+                    value={noteNumber}
+                    onChange={(e) => {
+                      const num = Number(e.target.value);
+                      setNoteNumber(num);
+                      const nDef = NCE_NOTE_DEFINITIONS.find((n) => n.noteNumber === num);
+                      if (nDef && nDef.subCategories?.[0]) {
+                        setSubCategory(nDef.subCategories[0]);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-xl font-semibold text-xs transition focus:outline-none focus:ring-2 ${modalCatTheme.selectClass}`}
+                  >
+                    <optgroup label="🏦 Assets Schedules (Notes 11 to 18)" className="bg-blue-50 text-blue-950 font-bold">
+                      {selectableNotes
+                        .filter((n) => n.noteNumber >= 11 && n.noteNumber <= 18)
+                        .map((n) => (
+                          <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                            Note {n.noteNumber}: {n.name} (Assets)
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label="🏛️ Liability Schedules (Notes 3 to 10)" className="bg-amber-50 text-amber-950 font-bold">
+                      {selectableNotes
+                        .filter((n) => n.noteNumber >= 3 && n.noteNumber <= 10)
+                        .map((n) => (
+                          <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                            Note {n.noteNumber}: {n.name} (Liability)
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label="📈 Income Schedules (Notes 19 to 20)" className="bg-emerald-50 text-emerald-950 font-bold">
+                      {selectableNotes
+                        .filter((n) => n.noteNumber >= 19 && n.noteNumber <= 20)
+                        .map((n) => (
+                          <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                            Note {n.noteNumber}: {n.name} (Income)
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label="📉 Expenditures Schedules (Notes 21 to 25)" className="bg-rose-50 text-rose-950 font-bold">
+                      {selectableNotes
+                        .filter((n) => n.noteNumber >= 21 && n.noteNumber <= 25)
+                        .map((n) => (
+                          <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                            Note {n.noteNumber}: {n.name} (Expenditures)
+                          </option>
+                        ))}
+                    </optgroup>
+                  </select>
+                </>
+              );
+            })()}
           </div>
 
           {/* Sub-Category Assignment */}
@@ -327,7 +353,7 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
 }) => {
   const [selectedYear, setSelectedYear] = useState<'CY' | 'PY'>('CY');
   const [searchTerm, setSearchTerm] = useState('');
-  const [statementFilter, setStatementFilter] = useState<'ALL' | StatementType>('ALL');
+  const [statementFilter, setStatementFilter] = useState<'ALL' | StatementType | FourPillarCategory>('ALL');
   const [noteFilter, setNoteFilter] = useState<string>('ALL');
   const [flagFilter, setFlagFilter] = useState<'ALL' | 'AUDIT_FLAG' | 'LOW_CONFIDENCE'>('ALL');
   const [dragOverPY, setDragOverPY] = useState(false);
@@ -365,15 +391,25 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
 
       if (!searchMatch) return false;
 
-      // Statement filter
-      if (statementFilter !== 'ALL' && l.statement !== statementFilter) return false;
+      // Statement / 4-Pillar Category filter
+      if (statementFilter === 'BalanceSheet' && l.statement !== 'BalanceSheet') return false;
+      if (statementFilter === 'ProfitAndLoss' && l.statement !== 'ProfitAndLoss') return false;
+      if (
+        (statementFilter === 'Assets' ||
+          statementFilter === 'Liability' ||
+          statementFilter === 'Income' ||
+          statementFilter === 'Expenditures') &&
+        getLedgerFourCategory(l.noteNumber, l.nature) !== statementFilter
+      ) {
+        return false;
+      }
 
       // Note filter
       if (noteFilter !== 'ALL' && l.noteNumber !== Number(noteFilter)) return false;
 
       // Flag filter
       if (flagFilter === 'AUDIT_FLAG' && !l.auditFlag) return false;
-      if (flagFilter === 'LOW_CONFIDENCE' && l.confidence >= 0.7) return false;
+      if (flagFilter === 'LOW_CONFIDENCE' && (l.confidence ?? 1) >= 0.7) return false;
 
       return true;
     });
@@ -381,12 +417,34 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
 
   const stats = useMemo(() => {
     const totalCount = currentActiveLedgers.length;
-    const lowConfCount = currentActiveLedgers.filter((l) => l.confidence < 0.7).length;
+    const lowConfCount = currentActiveLedgers.filter((l) => (l.confidence ?? 1) < 0.7).length;
     const flaggedCount = currentActiveLedgers.filter((l) => !!l.auditFlag).length;
     const bsCount = currentActiveLedgers.filter((l) => l.statement === 'BalanceSheet').length;
     const plCount = currentActiveLedgers.filter((l) => l.statement === 'ProfitAndLoss').length;
+    const assetsCount = currentActiveLedgers.filter(
+      (l) => getLedgerFourCategory(l.noteNumber, l.nature) === 'Assets'
+    ).length;
+    const liabilityCount = currentActiveLedgers.filter(
+      (l) => getLedgerFourCategory(l.noteNumber, l.nature) === 'Liability'
+    ).length;
+    const incomeCount = currentActiveLedgers.filter(
+      (l) => getLedgerFourCategory(l.noteNumber, l.nature) === 'Income'
+    ).length;
+    const expendituresCount = currentActiveLedgers.filter(
+      (l) => getLedgerFourCategory(l.noteNumber, l.nature) === 'Expenditures'
+    ).length;
 
-    return { totalCount, lowConfCount, flaggedCount, bsCount, plCount };
+    return {
+      totalCount,
+      lowConfCount,
+      flaggedCount,
+      bsCount,
+      plCount,
+      assetsCount,
+      liabilityCount,
+      incomeCount,
+      expendituresCount,
+    };
   }, [currentActiveLedgers]);
 
   const handlePYDrop = (e: React.DragEvent) => {
@@ -572,13 +630,18 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                   {isViewingCY ? `FY ${cyYearLabel}` : `FY ${pyYearLabel}`}
                 </span>
               </div>
-              <div className="flex items-baseline justify-between mt-1">
+              <div className="flex items-baseline justify-between mt-1 gap-2 flex-wrap">
                 <span className="text-lg font-bold text-slate-900 font-mono">
                   {currentTotalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">
-                  Assets &amp; Expenses
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-200 font-bold">
+                    Assets
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-200 font-bold">
+                    Expenditures
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -592,13 +655,18 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                   {isViewingCY ? `FY ${cyYearLabel}` : `FY ${pyYearLabel}`}
                 </span>
               </div>
-              <div className="flex items-baseline justify-between mt-1">
+              <div className="flex items-baseline justify-between mt-1 gap-2 flex-wrap">
                 <span className="text-lg font-bold text-slate-900 font-mono">
                   {currentTotalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">
-                  Liabilities &amp; Income
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200 font-bold">
+                    Liability
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-200 font-bold">
+                    Income
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -636,54 +704,44 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
               </div>
             </div>
 
-            {/* Mapping Quality & Classification */}
+            {/* Mapping Quality & 4-Color Classification */}
             <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500 font-medium">Ledger Classifications</span>
+                <span className="text-xs text-slate-500 font-medium">4-Colour Classifications</span>
                 <span className="text-xs font-bold text-slate-900">{stats.totalCount} Ledgers</span>
               </div>
-              <div className="flex items-center gap-2 mt-2 text-xs flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setStatementFilter(statementFilter === 'BalanceSheet' ? 'ALL' : 'BalanceSheet')}
-                  className={`px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-                    statementFilter === 'BalanceSheet'
-                      ? 'bg-amber-400 text-slate-950 border-amber-500 ring-2 ring-amber-400/30'
-                      : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200/80'
-                  }`}
-                  title="Click to filter by Balance Sheet ledgers"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                  <span>{stats.bsCount} Balance Sheet</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStatementFilter(statementFilter === 'ProfitAndLoss' ? 'ALL' : 'ProfitAndLoss')}
-                  className={`px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-                    statementFilter === 'ProfitAndLoss'
-                      ? 'bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-400/30'
-                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80'
-                  }`}
-                  title="Click to filter by P & L ledgers"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>{stats.plCount} P & L</span>
-                </button>
-
-                {stats.flaggedCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setFlagFilter(flagFilter === 'AUDIT_FLAG' ? 'ALL' : 'AUDIT_FLAG')}
-                    className={`px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer shadow-2xs ${
-                      flagFilter === 'AUDIT_FLAG'
-                        ? 'bg-rose-600 text-white border-rose-500'
-                        : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200'
-                    }`}
-                  >
-                    {stats.flaggedCount} Flags
-                  </button>
-                )}
+              <div className="grid grid-cols-2 gap-1.5 mt-2 text-[11px]">
+                {(
+                  [
+                    { key: 'Assets', count: stats.assetsCount, theme: FOUR_CATEGORY_THEMES.Assets },
+                    { key: 'Liability', count: stats.liabilityCount, theme: FOUR_CATEGORY_THEMES.Liability },
+                    { key: 'Income', count: stats.incomeCount, theme: FOUR_CATEGORY_THEMES.Income },
+                    { key: 'Expenditures', count: stats.expendituresCount, theme: FOUR_CATEGORY_THEMES.Expenditures },
+                  ] as const
+                ).map(({ key, count, theme }) => {
+                  const isActive = statementFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setStatementFilter(isActive ? 'ALL' : key)}
+                      className={`px-2 py-1 rounded-lg font-bold border transition cursor-pointer flex items-center justify-between gap-1 shadow-2xs ${
+                        isActive ? theme.filterActiveClass : theme.filterInactiveClass
+                      }`}
+                      title={`Click to filter by ${theme.label} (${theme.noteRange})`}
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${
+                            isActive && key !== 'Liability' ? 'bg-white' : theme.dotClass
+                          }`}
+                        />
+                        <span className="truncate">{theme.label}</span>
+                      </span>
+                      <span className="font-mono text-[10px] font-black">{count}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -788,8 +846,8 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                 <span className="font-medium text-slate-600">Filters:</span>
               </div>
 
-              {/* Statement filter */}
-              <div className="flex items-center rounded-xl p-0.5 bg-slate-100/90 border border-slate-200 shadow-2xs gap-0.5">
+              {/* 4-Colour Category & Statement Filter */}
+              <div className="flex flex-wrap items-center rounded-xl p-1 bg-slate-100/90 border border-slate-200 shadow-2xs gap-1">
                 <button
                   type="button"
                   onClick={() => setStatementFilter('ALL')}
@@ -799,35 +857,64 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
                 >
-                  All Statements
+                  All ({stats.totalCount})
                 </button>
+
+                {(
+                  [
+                    { key: 'Assets', count: stats.assetsCount, theme: FOUR_CATEGORY_THEMES.Assets },
+                    { key: 'Liability', count: stats.liabilityCount, theme: FOUR_CATEGORY_THEMES.Liability },
+                    { key: 'Income', count: stats.incomeCount, theme: FOUR_CATEGORY_THEMES.Income },
+                    { key: 'Expenditures', count: stats.expendituresCount, theme: FOUR_CATEGORY_THEMES.Expenditures },
+                  ] as const
+                ).map(({ key, count, theme }) => {
+                  const isActive = statementFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setStatementFilter(isActive ? 'ALL' : key)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer border ${
+                        isActive ? theme.filterActiveClass : theme.filterInactiveClass
+                      }`}
+                      title={`Filter by ${theme.label} (${theme.noteRange})`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          isActive && key !== 'Liability' ? 'bg-white' : theme.dotClass
+                        }`}
+                      />
+                      <span>
+                        {theme.label} ({count})
+                      </span>
+                    </button>
+                  );
+                })}
 
                 <button
                   type="button"
-                  onClick={() => setStatementFilter('BalanceSheet')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer border ${
+                  onClick={() => setStatementFilter(statementFilter === 'BalanceSheet' ? 'ALL' : 'BalanceSheet')}
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer border ${
                     statementFilter === 'BalanceSheet'
-                      ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-xs ring-1 ring-amber-400/40'
-                      : 'bg-amber-50/80 hover:bg-amber-100 text-amber-900 border-amber-200/90'
+                      ? 'bg-slate-800 text-white border-slate-900 shadow-xs'
+                      : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200'
                   }`}
-                  title="Show only Balance Sheet ledgers (Notes 3 to 18)"
+                  title="Show all Balance Sheet ledgers (Assets + Liability, Notes 3 to 18)"
                 >
-                  <span className={`w-2 h-2 rounded-full ${statementFilter === 'BalanceSheet' ? 'bg-slate-950' : 'bg-amber-500'}`} />
-                  <span>Balance Sheet</span>
+                  BS ({stats.bsCount})
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setStatementFilter('ProfitAndLoss')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer border ${
+                  onClick={() => setStatementFilter(statementFilter === 'ProfitAndLoss' ? 'ALL' : 'ProfitAndLoss')}
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer border ${
                     statementFilter === 'ProfitAndLoss'
-                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs ring-1 ring-emerald-400/40'
-                      : 'bg-emerald-50/80 hover:bg-emerald-100 text-emerald-900 border-emerald-200/90'
+                      ? 'bg-slate-800 text-white border-slate-900 shadow-xs'
+                      : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200'
                   }`}
-                  title="Show only Profit and Loss ledgers (Notes 19 to 25)"
+                  title="Show all Profit and Loss ledgers (Income + Expenditures, Notes 19 to 25)"
                 >
-                  <span className={`w-2 h-2 rounded-full ${statementFilter === 'ProfitAndLoss' ? 'bg-white' : 'bg-emerald-500'}`} />
-                  <span>P & L</span>
+                  P &amp; L ({stats.plCount})
                 </button>
               </div>
 
@@ -838,27 +925,43 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                 className={`px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-2xs focus:outline-none focus:ring-2 transition cursor-pointer ${
                   noteFilter === 'ALL'
                     ? 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 focus:ring-slate-400'
-                    : Number(noteFilter) <= 18
-                    ? 'bg-amber-50/90 text-amber-950 border-amber-300 focus:ring-amber-400'
-                    : 'bg-emerald-50/90 text-emerald-950 border-emerald-300 focus:ring-emerald-400'
+                    : getNoteCategoryTheme(Number(noteFilter)).selectClass
                 }`}
               >
                 <option value="ALL">All Statutory Notes (3–25)</option>
-                <optgroup label="📋 Balance Sheet (Notes 3–18)">
+                <optgroup label="🏦 Assets (Notes 11–18)" className="bg-blue-50 text-blue-950 font-bold">
                   {selectableNotes
-                    .filter((n) => n.statement === 'BalanceSheet' || n.noteNumber <= 18)
+                    .filter((n) => n.noteNumber >= 11 && n.noteNumber <= 18)
                     .map((n) => (
-                      <option key={n.noteNumber} value={n.noteNumber}>
-                        Note {n.noteNumber}: {n.name} (Balance Sheet)
+                      <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                        Note {n.noteNumber}: {n.name} (Assets)
                       </option>
                     ))}
                 </optgroup>
-                <optgroup label="📈 Profit & Loss (Notes 19–25)">
+                <optgroup label="🏛️ Liability (Notes 3–10)" className="bg-amber-50 text-amber-950 font-bold">
                   {selectableNotes
-                    .filter((n) => n.statement === 'ProfitAndLoss' || n.noteNumber >= 19)
+                    .filter((n) => n.noteNumber >= 3 && n.noteNumber <= 10)
                     .map((n) => (
-                      <option key={n.noteNumber} value={n.noteNumber}>
-                        Note {n.noteNumber}: {n.name} (P & L)
+                      <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                        Note {n.noteNumber}: {n.name} (Liability)
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="📈 Income (Notes 19–20)" className="bg-emerald-50 text-emerald-950 font-bold">
+                  {selectableNotes
+                    .filter((n) => n.noteNumber >= 19 && n.noteNumber <= 20)
+                    .map((n) => (
+                      <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                        Note {n.noteNumber}: {n.name} (Income)
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="📉 Expenditures (Notes 21–25)" className="bg-rose-50 text-rose-950 font-bold">
+                  {selectableNotes
+                    .filter((n) => n.noteNumber >= 21 && n.noteNumber <= 25)
+                    .map((n) => (
+                      <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                        Note {n.noteNumber}: {n.name} (Expenditures)
                       </option>
                     ))}
                 </optgroup>
@@ -926,10 +1029,11 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                   ) : (
                     filteredLedgers.map((ledger) => {
                       const hasFlag = !!ledger.auditFlag;
+                      const catTheme = getNoteCategoryTheme(ledger.noteNumber, ledger.nature);
                       return (
                         <tr
                           key={ledger.id}
-                          className={`hover:bg-slate-50/70 transition-colors ${
+                          className={`hover:bg-slate-50/70 transition-colors ${catTheme.rowBorderClass} ${
                             hasFlag ? 'bg-amber-50/30' : ''
                           }`}
                         >
@@ -959,19 +1063,17 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                                 </button>
                               )}
                             </div>
-                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                {ledger.nature}
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {/* 4-Colour Category Badge (Assets / Liability / Income / Expenditures) */}
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${catTheme.badgeClass}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${catTheme.dotClass}`} />
+                                <span>{catTheme.label}</span>
                               </span>
                               <span className="text-slate-300">•</span>
-                              <span
-                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-sm border ${
-                                  ledger.statement === 'BalanceSheet'
-                                    ? 'bg-amber-50 text-amber-900 border-amber-200'
-                                    : 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                                }`}
-                              >
-                                {ledger.statement === 'BalanceSheet' ? 'Balance Sheet' : 'P & L'}
+                              <span className="text-[10px] text-slate-500 font-semibold">
+                                {catTheme.statementLabel}
                               </span>
 
                               {/* Abnormal Sign Badge */}
@@ -995,6 +1097,26 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                                 <span className="inline-flex items-center gap-1 text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-medium">
                                   <Link2 className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
                                   Linked: {ledger.linkedStatementItem}
+                                </span>
+                              )}
+
+                              {ledger.branchBreakdown && ledger.branchBreakdown.length > 0 && (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[10px] text-indigo-800 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-semibold"
+                                  title={ledger.branchBreakdown
+                                    .map(
+                                      (b) =>
+                                        `${b.branchName}: ₹${Math.abs(b.netBalance).toLocaleString('en-IN', {
+                                          maximumFractionDigits: 2,
+                                        })} ${b.debit >= b.credit ? 'Dr' : 'Cr'}`
+                                    )
+                                    .join(' | ')}
+                                >
+                                  {ledger.branchBreakdown.length > 1
+                                    ? `Consolidated (${ledger.branchBreakdown.length} Branches: ${ledger.branchBreakdown
+                                        .map((b) => b.branchName)
+                                        .join(', ')})`
+                                    : `Branch: ${ledger.branchBreakdown[0].branchName}`}
                                 </span>
                               )}
                             </div>
@@ -1026,58 +1148,63 @@ export const TrialBalanceMapping: React.FC<TrialBalanceMappingProps> = ({
                             })}
                           </td>
 
-                          {/* Statutory Note Selector (Allows Interactive CA Override) */}
+                          {/* Statutory Note Selector (Allows Interactive CA Override with 4-Colour Coding) */}
                           <td className="py-2.5 px-3 min-w-[270px] max-w-[340px]">
-                            {(() => {
-                              const isBS = ledger.noteNumber <= 18;
-                              return (
-                                <>
-                                  <select
-                                    value={ledger.noteNumber}
-                                    onChange={(e) => currentUpdateHandler(ledger.id, Number(e.target.value))}
-                                    className={`w-full text-xs py-1.5 px-2.5 rounded-xl border font-semibold transition cursor-pointer shadow-2xs focus:outline-none focus:ring-2 ${
-                                      isBS
-                                        ? 'bg-amber-50/90 hover:bg-amber-50 text-amber-950 border-amber-300/90 hover:border-amber-400 focus:ring-amber-400 focus:border-amber-400'
-                                        : 'bg-emerald-50/90 hover:bg-emerald-50 text-emerald-950 border-emerald-300/90 hover:border-emerald-400 focus:ring-emerald-400 focus:border-emerald-400'
-                                    }`}
-                                  >
-                                    <optgroup label="📋 Balance Sheet Schedules (Notes 3 to 18)" className="bg-amber-50 text-amber-950 font-bold">
-                                      {selectableNotes
-                                        .filter((n) => n.statement === 'BalanceSheet' || n.noteNumber <= 18)
-                                        .map((n) => (
-                                          <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800 py-1">
-                                            Note {n.noteNumber}: {n.name} (Balance Sheet)
-                                          </option>
-                                        ))}
-                                    </optgroup>
-                                    <optgroup label="📈 Profit & Loss Schedules (Notes 19 to 25)" className="bg-emerald-50 text-emerald-950 font-bold">
-                                      {selectableNotes
-                                        .filter((n) => n.statement === 'ProfitAndLoss' || n.noteNumber >= 19)
-                                        .map((n) => (
-                                          <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800 py-1">
-                                            Note {n.noteNumber}: {n.name} (P & L)
-                                          </option>
-                                        ))}
-                                    </optgroup>
-                                  </select>
-                                  <div className="flex items-center justify-between gap-1 text-[10px] mt-1 px-0.5 truncate">
-                                    <div className="flex items-center gap-1.5 truncate text-slate-600">
-                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isBS ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                                      <span className="truncate font-medium">{ledger.subCategory || (isBS ? 'Balance Sheet Schedule' : 'P & L Schedule')}</span>
-                                    </div>
-                                    <span
-                                      className={`shrink-0 font-bold px-1.5 py-0.2 rounded-full text-[9px] border ${
-                                        isBS
-                                          ? 'bg-amber-100/90 text-amber-900 border-amber-300/80'
-                                          : 'bg-emerald-100/90 text-emerald-900 border-emerald-300/80'
-                                      }`}
-                                    >
-                                      {isBS ? 'BS' : 'P & L'}
-                                    </span>
-                                  </div>
-                                </>
-                              );
-                            })()}
+                            <select
+                              value={ledger.noteNumber}
+                              onChange={(e) => currentUpdateHandler(ledger.id || ledger.accountName, Number(e.target.value))}
+                              className={`w-full text-xs py-1.5 px-2.5 rounded-xl border font-semibold transition cursor-pointer shadow-2xs focus:outline-none focus:ring-2 ${catTheme.selectClass}`}
+                            >
+                              <optgroup label="🏦 Assets Schedules (Notes 11 to 18)" className="bg-blue-50 text-blue-950 font-bold">
+                                {selectableNotes
+                                  .filter((n) => n.noteNumber >= 11 && n.noteNumber <= 18)
+                                  .map((n) => (
+                                    <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800 py-1">
+                                      Note {n.noteNumber}: {n.name} (Assets)
+                                    </option>
+                                  ))}
+                              </optgroup>
+                              <optgroup label="🏛️ Liability Schedules (Notes 3 to 10)" className="bg-amber-50 text-amber-950 font-bold">
+                                {selectableNotes
+                                  .filter((n) => n.noteNumber >= 3 && n.noteNumber <= 10)
+                                  .map((n) => (
+                                    <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800 py-1">
+                                      Note {n.noteNumber}: {n.name} (Liability)
+                                    </option>
+                                  ))}
+                              </optgroup>
+                              <optgroup label="📈 Income Schedules (Notes 19 to 20)" className="bg-emerald-50 text-emerald-950 font-bold">
+                                {selectableNotes
+                                  .filter((n) => n.noteNumber >= 19 && n.noteNumber <= 20)
+                                  .map((n) => (
+                                    <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800 py-1">
+                                      Note {n.noteNumber}: {n.name} (Income)
+                                    </option>
+                                  ))}
+                              </optgroup>
+                              <optgroup label="📉 Expenditures Schedules (Notes 21 to 25)" className="bg-rose-50 text-rose-950 font-bold">
+                                {selectableNotes
+                                  .filter((n) => n.noteNumber >= 21 && n.noteNumber <= 25)
+                                  .map((n) => (
+                                    <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800 py-1">
+                                      Note {n.noteNumber}: {n.name} (Expenditures)
+                                    </option>
+                                  ))}
+                              </optgroup>
+                            </select>
+                            <div className="flex items-center justify-between gap-1 text-[10px] mt-1 px-0.5 truncate">
+                              <div className="flex items-center gap-1.5 truncate text-slate-600">
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${catTheme.dotClass}`} />
+                                <span className="truncate font-medium">
+                                  {ledger.subCategory || `${catTheme.label} Schedule`}
+                                </span>
+                              </div>
+                              <span
+                                className={`shrink-0 font-bold px-1.5 py-0.2 rounded-full text-[9px] border ${catTheme.badgeClass}`}
+                              >
+                                {catTheme.label}
+                              </span>
+                            </div>
                           </td>
 
                           {/* Confidence */}

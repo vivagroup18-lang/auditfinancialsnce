@@ -15,9 +15,19 @@ import {
   LogIn,
   UserPlus,
   Gift,
+  AlertTriangle,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { authenticateUser, registerUser, authenticateGoogleUser } from '../utils/storageManager';
+import {
+  authenticateUser,
+  registerUser,
+  authenticateGoogleUser,
+  getPendingReferralCode,
+  clearPendingReferralCode,
+  loginAsGuest,
+} from '../utils/storageManager';
 import { googleSignIn, googleSignInStandard, isPopupBlockedOrUnauthorized } from '../firebase';
 
 interface AuthModalProps {
@@ -38,6 +48,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [tab, setTab] = useState<'signin' | 'register'>(initialTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [domainError, setDomainError] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   // Sign in fields
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -54,21 +66,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [referralCodeInput, setReferralCodeInput] = useState('');
   const [showReferralInput, setShowReferralInput] = useState(false);
 
-  // Check for pending referral code from URL param (?ref=...) or sessionStorage on modal open
+  // Check for pending referral code from URL param (?ref=...), sessionStorage, or localStorage on modal open
   useEffect(() => {
     if (isOpen) {
       try {
-        const params = new URLSearchParams(window.location.search);
-        const urlRef = params.get('ref');
-        const sessionRef = sessionStorage.getItem('ca_pending_referral_code');
-        const found = (urlRef || sessionRef || '').trim();
+        const found = getPendingReferralCode();
         if (found) {
           setReferralCodeInput(found);
           setShowReferralInput(true);
-          // If a referral code is present, default to the register tab
           if (initialTab !== 'signin') {
             setTab('register');
           }
+        } else {
+          setTab(initialTab);
         }
       } catch {}
     }
@@ -86,8 +96,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setLoading(true);
     try {
-      const res = authenticateUser(loginIdentifier, loginPassword || undefined);
+      const effectiveReferral = referralCodeInput.trim() || getPendingReferralCode() || undefined;
+      const res = authenticateUser(loginIdentifier, loginPassword || undefined, effectiveReferral);
       if (res.success && res.user) {
+        if (res.referralClaimed) {
+          clearPendingReferralCode();
+        }
         onAuthSuccess(res.user);
         onClose();
       } else {
@@ -128,13 +142,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setLoading(true);
     try {
-      const effectiveReferral = referralCodeInput.trim() || (() => {
-        try {
-          return sessionStorage.getItem('ca_pending_referral_code') || undefined;
-        } catch {
-          return undefined;
-        }
-      })();
+      const effectiveReferral = referralCodeInput.trim() || getPendingReferralCode() || undefined;
 
       const res = registerUser({
         id: 'USER_' + cleanUserHandle.toUpperCase(),
@@ -149,9 +157,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       });
 
       if (res.success && res.user) {
-        try {
-          sessionStorage.removeItem('ca_pending_referral_code');
-        } catch {}
+        clearPendingReferralCode();
         onAuthSuccess(res.user);
         onClose();
       } else {
@@ -166,19 +172,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleAuth = async () => {
     setError(null);
+    setDomainError(null);
     setLoading(true);
     try {
-      // Use standard Google Sign-In (profile + email) for 1-click authentication
+      // Standard safe Google Sign-In for app authentication
       const res = await googleSignInStandard();
 
       if (res.user && res.user.email) {
-        const effectiveReferral = referralCodeInput.trim() || (() => {
-          try {
-            return sessionStorage.getItem('ca_pending_referral_code') || undefined;
-          } catch {
-            return undefined;
-          }
-        })();
+        const effectiveReferral = referralCodeInput.trim() || getPendingReferralCode() || undefined;
 
         const authRes = authenticateGoogleUser({
           email: res.user.email,
@@ -188,9 +189,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         });
 
         if (authRes.success && authRes.user) {
-          try {
-            sessionStorage.removeItem('ca_pending_referral_code');
-          } catch {}
+          clearPendingReferralCode();
           if (onGoogleAuthSuccess) {
             onGoogleAuthSuccess(authRes.user, !!authRes.isNewUser, res.accessToken);
           } else {
@@ -203,6 +202,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (err: any) {
       console.warn('Google Sign-In notice:', err?.message || err);
+      const isDomain =
+        err?.isDomainError ||
+        String(err?.message || '').includes('unauthorized-domain') ||
+        String(err?.code || '').includes('unauthorized-domain') ||
+        String(err?.message || '').includes('not authorized');
+
+      if (isDomain) {
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'fintaxaudit.vivaproject.in';
+        setDomainError(hostname);
+      }
       setError(err?.message || 'Google Sign-In was cancelled or failed.');
     } finally {
       setLoading(false);
@@ -210,30 +219,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const handleGuestContinue = () => {
-    const guestUser: UserProfile = {
-      id: 'guest_ca_' + Math.random().toString(36).substring(2, 7),
-      userId: 'guest_ca',
-      fullName: 'Practicing CA (Guest)',
-      email: 'guest.ca@auditfinancials.local',
-      mobile: '',
-      firmName: 'Audit Practice Workspace',
-      planTier: 'free_trial',
-      subscriptionStatus: 'trial',
-      subscriptionExpiresAt: new Date(Date.now() + 14 * 86400000).toISOString(),
-      billingCycle: 'monthly',
-      credits: 100,
-      referralCode: 'REF-GUEST',
-      referralsCount: 0,
-      totalReferralCredits: 0,
-      creditTransactions: [],
-      usage: {
-        companiesCount: 0,
-        maxCompanies: 2,
-        aiMappingsUsed: 0,
-        maxAiMappings: 10,
-      },
-      invoices: [],
-    };
+    const guestUser = loginAsGuest();
     onAuthSuccess(guestUser);
     onClose();
   };
@@ -260,7 +246,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <p className="text-xs text-slate-300 mt-2">
               {tab === 'signin'
                 ? 'Sign in to access your audit clients, custom taxonomies & credit balance.'
-                : 'Create your CA practitioner account & claim 100 free credits (+500 with referral).'}
+                : 'Create your CA practitioner account & claim 555 welcome credit points (+500 with referral).'}
             </p>
           </div>
           <button
@@ -311,6 +297,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <span>{error}</span>
+            </div>
+          )}
+
+          {domainError && (
+            <div className="mb-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-slate-800 text-xs space-y-2.5 animate-in fade-in">
+              <div className="flex items-center gap-2 font-bold text-amber-900">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Domain Authorization Required in Firebase</span>
+              </div>
+              <p className="text-slate-700 leading-relaxed text-[11px]">
+                Your published domain <code className="px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded font-mono font-bold">{domainError}</code> must be authorized before Google can authenticate users:
+              </p>
+              <div className="bg-white/90 p-3 rounded-xl border border-amber-200 text-[11px] text-slate-700 space-y-1.5">
+                <div><strong>1.</strong> Open <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Firebase Console</a> &rarr; Project: <code className="font-mono text-slate-900 font-bold">gen-lang-client-0873724595</code></div>
+                <div><strong>2.</strong> Go to <strong>Authentication</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Authorized domains</strong></div>
+                <div><strong>3.</strong> Click <strong>Add domain</strong> &rarr; Paste: <code className="font-mono text-emerald-700 font-bold">{domainError}</code> &rarr; Save</div>
+                <div><strong>4.</strong> In Google Cloud Console &rarr; Credentials &rarr; OAuth 2.0 Client &rarr; Add <code className="font-mono text-emerald-700 font-bold">https://{domainError}</code> to Authorized JavaScript origins.</div>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(domainError);
+                    setCopiedDomain(true);
+                    setTimeout(() => setCopiedDomain(false), 3000);
+                  }}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
+                >
+                  {copiedDomain ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedDomain ? 'Copied to Clipboard!' : `Copy Domain (${domainError})`}</span>
+                </button>
+                <span className="text-[10px] text-slate-500">Takes effect in ~10 seconds!</span>
+              </div>
             </div>
           )}
 
@@ -387,6 +406,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                   />
                 </div>
+              </div>
+
+              {/* Referral Code input on Sign-In Tab as well */}
+              <div>
+                {!showReferralInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowReferralInput(true)}
+                    className="text-[11px] text-emerald-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Gift className="w-3 h-3 text-emerald-600" />
+                    <span>Logging in with a referral code or link? (+500 Free Credits)</span>
+                  </button>
+                ) : (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 animate-in fade-in">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-emerald-900">
+                      <span className="flex items-center gap-1">
+                        <Gift className="w-3 h-3 text-emerald-600" />
+                        Referral Code / Link Applied (+500 Credits)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowReferralInput(false);
+                          setReferralCodeInput('');
+                        }}
+                        className="text-slate-400 hover:text-slate-600 text-[10px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={referralCodeInput}
+                      onChange={(e) => setReferralCodeInput(e.target.value)}
+                      placeholder="e.g. REF-BALAJI100, @ca_balaji, or balaji@gmail.com"
+                      className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <p className="text-[10px] text-emerald-700">
+                      🎁 Both you and the sender of the referral receive +500 free credits upon login.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <button
@@ -551,7 +613,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl text-[11px] text-emerald-900 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Includes 100 free credits pool + 14-day full statutory features.</span>
+                <span>Includes 555 welcome credit points + 14-day full statutory features.</span>
               </div>
 
               <button
@@ -565,17 +627,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
-          {/* Guest / Demo Option */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500 text-[11px]">Just evaluating?</span>
-            <button
-              type="button"
-              onClick={handleGuestContinue}
-              className="text-emerald-700 hover:text-emerald-800 font-bold hover:underline flex items-center gap-1 text-[11px]"
-            >
-              <span>Continue as Guest</span>
-              <ArrowRight className="w-3 h-3" />
-            </button>
+          {/* Guest Login Option — Only triggered when user explicitly clicks this button */}
+          <div className="mt-5 pt-4 border-t border-slate-200">
+            <div className="rounded-2xl bg-slate-50 border border-slate-200/90 p-3.5 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Just exploring? Try Guest Mode</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  555 free credits • Offline local storage • No password needed
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleGuestContinue}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+              >
+                <span>Guest Login</span>
+                <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

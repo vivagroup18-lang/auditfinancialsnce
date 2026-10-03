@@ -33,7 +33,8 @@ import { Company, EntityConfig } from '../types';
 import { POPULAR_INDIAN_FY_PRESETS } from '../utils/financialYearUtils';
 import { SAMPLE_DATASETS } from '../data/sampleTrialBalances';
 import { PartnerConfigForm, PartnerConfigItem } from './PartnerConfigForm';
-import { exportTotalLocalBackup } from '../utils/storageManager';
+import { exportTotalLocalBackup, exportSingleCompanyBackup } from '../utils/storageManager';
+import { syncBranchesWithCount } from '../utils/branchConsolidation';
 
 interface CompaniesWindowProps {
   companies: Company[];
@@ -55,6 +56,8 @@ interface CompaniesWindowProps {
   onManualDriveSync?: () => void;
   onConnectDrive?: () => void;
   onExportTotalLocalBackup?: () => void;
+  onExportSingleCompanyBackup?: (companyId: string) => void;
+  driveApiDisabledUrl?: string | null;
 }
 
 export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
@@ -73,6 +76,8 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   onManualDriveSync,
   onConnectDrive,
   onExportTotalLocalBackup,
+  onExportSingleCompanyBackup,
+  driveApiDisabledUrl,
 }) => {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,6 +105,20 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   const [newDateOfSigning, setNewDateOfSigning] = useState('');
   const [newProprietorName, setNewProprietorName] = useState('');
   const [newSigningPartnerName, setNewSigningPartnerName] = useState('');
+  const [newNumberOfBranches, setNewNumberOfBranches] = useState<number>(0);
+  const [newBranchNames, setNewBranchNames] = useState<string[]>([]);
+
+  const handleNewBranchCountChange = (count: number) => {
+    const clamped = Math.max(0, Math.min(50, Math.floor(Number(count) || 0)));
+    setNewNumberOfBranches(clamped);
+    setNewBranchNames((prev) => {
+      const next: string[] = [];
+      for (let i = 0; i < clamped; i++) {
+        next.push(prev[i] || (i === 0 ? 'Head Office / Branch 1' : `Branch ${i + 1}`));
+      }
+      return next;
+    });
+  };
 
   // Partners configured during Companies Stage
   const [newPartners, setNewPartners] = useState<PartnerConfigItem[]>([
@@ -110,6 +129,9 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
   // Edit Modal/Inline State
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [editConfig, setEditConfig] = useState<EntityConfig | null>(null);
+
+  // New Company Creation Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Deletion Confirmation State (Bypasses window.confirm for iframe safety)
   const [deletingCompany, setDeletingCompany] = useState<{ id: string; name: string } | null>(null);
@@ -168,12 +190,23 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       firmRegistrationNo: newFirmRegNo.trim() || undefined,
       udin: newUdin.trim() || undefined,
       partners: isFirmOrLLP && newPartners.length > 0 ? newPartners : undefined,
+      numberOfBranches: newNumberOfBranches > 0 ? newNumberOfBranches : 0,
+      branches:
+        newNumberOfBranches > 0
+          ? syncBranchesWithCount(undefined, newNumberOfBranches).map((b, idx) => ({
+              ...b,
+              branchName: newBranchNames[idx]?.trim() || b.branchName,
+            }))
+          : [],
+      consolidateIdenticalLedgers: true,
     };
 
     onCreateCompany(createdConfig, newStarterType, newCloneSourceId);
 
     // Reset form fields
     setNewEntityName('');
+    setNewNumberOfBranches(0);
+    setNewBranchNames([]);
     setNewPan('');
     setNewGstin('');
     setNewRegisteredAddress('');
@@ -192,6 +225,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       { name: 'Partner 1', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
       { name: 'Partner 2', profitSharePercent: 50, remunerationSharePercent: 50, isWorkingPartner: true, isDesignatedPartner: true, openingBalance: 0 },
     ]);
+    setShowCreateModal(false);
 
     // Immediately open working windows for newly created entity
     onOpenWorkingWindows();
@@ -254,6 +288,7 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
         'sample_proprietorship'
       );
     }
+    setShowCreateModal(false);
     onOpenWorkingWindows();
   };
 
@@ -307,7 +342,19 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
       try {
         exportTotalLocalBackup(companies, activeCompanyId);
       } catch (e: any) {
-        alert(e.message || 'Failed to generate local backup');
+        console.warn(e.message || 'Failed to generate local backup');
+      }
+    }
+  };
+
+  const handleTriggerSingleCompanyBackup = (company: Company) => {
+    if (onExportSingleCompanyBackup) {
+      onExportSingleCompanyBackup(company.id);
+    } else {
+      try {
+        exportSingleCompanyBackup(company);
+      } catch (e: any) {
+        console.warn(e.message || 'Failed to generate single company backup');
       }
     }
   };
@@ -426,12 +473,14 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
               {driveSyncStatus === 'error' && (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-400/20 text-rose-300 border border-rose-400/30 flex items-center gap-1">
                   <AlertTriangle className="w-2.5 h-2.5" />
-                  <span>Session Expired</span>
+                  <span>{driveApiDisabledUrl ? 'Drive API Disabled' : 'Session Expired'}</span>
                 </span>
               )}
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              {driveSyncStatus === 'error'
+              {driveApiDisabledUrl
+                ? 'Google Drive API is not yet enabled in your Google Cloud Project. Enable it once to activate auto-sync.'
+                : driveSyncStatus === 'error'
                 ? 'Your Google Workspace session has expired. Click "Reconnect & Sync Drive" to refresh your session.'
                 : userEmail
                 ? 'Your companies, ledger mappings, and financial statements are automatically backed up in Google Drive and accessible on any computer upon login.'
@@ -451,7 +500,18 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
             <span className="hidden md:inline">Total Local Backup ({companies.length})</span>
             <span className="md:hidden">Local Backup</span>
           </button>
-          {driveSyncStatus === 'error' ? (
+          {driveApiDisabledUrl ? (
+            <a
+              href={driveApiDisabledUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Open Google Cloud Console to enable Google Drive API"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Enable Drive API in GCP ↗</span>
+            </a>
+          ) : driveSyncStatus === 'error' ? (
             <button
               type="button"
               onClick={onConnectDrive || onManualDriveSync}
@@ -484,56 +544,65 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
         </div>
       </div>
 
-      {/* Main Content Area: 2-Column Responsive Window */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ========================================================================= */}
-        {/* LEFT / MAIN COLUMN (7 cols): SAVED COMPANIES DISPLAY & SELECTION         */}
-        {/* ========================================================================= */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5">
-            {/* Account Workspace Context Badge */}
-            <div className="mb-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${userEmail ? 'bg-emerald-500' : 'bg-amber-500'} shrink-0`} />
-                <span className="text-slate-600 font-medium text-[11px] sm:text-xs">
-                  {userEmail ? (
-                    <>
-                      Workspace Account: <strong className="text-slate-900 font-bold">{userEmail}</strong> <span className="text-emerald-700 font-semibold hidden md:inline">• Private User Workspace</span>
-                    </>
-                  ) : (
-                    <>
-                      <strong className="text-slate-800 font-semibold">Offline Guest Workspace</strong> • Sign in with Google to auto-sync &amp; isolate cloud companies
-                    </>
-                  )}
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-500 font-mono">
-                {companies.length} {companies.length === 1 ? 'entity' : 'entities'}
+      {/* Main Content Area: Full-Width Companies List */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs">
+        {/* Account Workspace Context Badge */}
+        <div className="px-5 pt-5 pb-0">
+          <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs flex-wrap gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${userEmail ? 'bg-emerald-500' : 'bg-amber-500'} shrink-0`} />
+              <span className="text-slate-600 font-medium text-[11px] sm:text-xs">
+                {userEmail ? (
+                  <>
+                    Workspace Account: <strong className="text-slate-900 font-bold">{userEmail}</strong>{' '}
+                    <span className="text-emerald-700 font-semibold hidden md:inline">• Private User Workspace</span>
+                  </>
+                ) : (
+                  <>
+                    <strong className="text-slate-800 font-semibold">Offline Guest Workspace</strong> • Sign in with Google to auto-sync &amp; isolate cloud companies
+                  </>
+                )}
               </span>
             </div>
+            <span className="text-[11px] text-slate-500 font-mono">
+              {companies.length} {companies.length === 1 ? 'entity' : 'entities'}
+            </span>
+          </div>
 
-            {/* Search & Filter Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-emerald-700" />
-                  <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                    Saved Client Companies ({filteredCompanies.length})
-                  </h2>
-                </div>
+          {/* Search & Filter Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-emerald-700" />
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Saved Client Companies ({filteredCompanies.length})
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={handleTriggerTotalLocalBackup}
+                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                title={`Download total offline backup .json of all ${companies.length} companies`}
+              >
+                <Download className="w-3 h-3 text-emerald-600" />
+                <span>Backup All ({companies.length})</span>
+              </button>
+              {onOpenBackupRestore && (
                 <button
                   type="button"
-                  onClick={handleTriggerTotalLocalBackup}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition flex items-center gap-1.5 shrink-0 cursor-pointer"
-                  title={`Download total offline backup .json of all ${companies.length} companies`}
+                  onClick={onOpenBackupRestore}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-semibold transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  title="Restore single file or total backup and add to working files"
                 >
-                  <Download className="w-3 h-3 text-emerald-600" />
-                  <span>Backup All ({companies.length})</span>
+                  <Database className="w-3 h-3 text-indigo-600" />
+                  <span>Single / Total Restore</span>
                 </button>
-              </div>
+              )}
+            </div>
 
+            <div className="flex items-center gap-2 flex-wrap">
               {/* Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto text-xs pb-1 sm:pb-0">
+              <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
                 {(['all', 'Partnership Firm', 'Sole Proprietorship', 'LLP'] as const).map((type) => (
                   <button
                     key={type}
@@ -549,591 +618,681 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                   </button>
                 ))}
               </div>
+
+              {/* ── NEW ENTITY BUTTON ── */}
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                New Client Entity
+              </button>
             </div>
+          </div>
 
-            {/* Search Bar */}
-            <div className="mt-3 relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search saved companies by name, PAN, or financial year..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* Companies List / Cards */}
-            <div className="mt-4 space-y-3">
-              {filteredCompanies.length === 0 ? (
-                <div className="text-center py-10 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                  <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                  <h3 className="text-sm font-semibold text-slate-700">
-                    {searchQuery
-                      ? 'No matching companies found'
-                      : userEmail
-                      ? `No client companies created yet for ${userEmail}`
-                      : 'No client companies created yet'}
-                  </h3>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                    {searchQuery
-                      ? 'Try adjusting your search keywords or filter.'
-                      : userEmail
-                      ? 'Create your first entity using the form on the right, or click Quick Sample to start drafting.'
-                      : 'Use the registration form on the right to add your first client entity, or click one of the quick starter samples.'}
-                  </p>
-                  {!searchQuery && (
-                    <div className="mt-4 flex justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleCreateSample('sample_partnership')}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold transition"
-                      >
-                        ⚡ Quick Sample Partnership
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                filteredCompanies.map((company) => {
-                  const isSelected = company.id === activeCompanyId;
-                  const tbCount = company.mappedLedgers?.length || company.rawRows?.length || 0;
-                  const pyCount = company.pyMappedLedgers?.length || company.pyRawRows?.length || 0;
-                  const hasTB = tbCount > 0;
-
-                  return (
-                    <div
-                      key={company.id}
-                      className={`p-4 rounded-xl border transition-all duration-150 ${
-                        isSelected
-                          ? 'bg-emerald-50/50 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
-                          : 'bg-white border-slate-200/90 hover:border-slate-300 hover:shadow-xs'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          {/* Title & Badges */}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-sm sm:text-base text-slate-900 tracking-tight truncate">
-                              {company.config.entityName || 'Unnamed Entity'}
-                            </span>
-                            {isSelected && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-2xs">
-                                <Check className="w-3 h-3" />
-                                Active
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Entity Metas */}
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs text-slate-600">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 font-medium text-slate-700">
-                              <Briefcase className="w-3 h-3 text-slate-500" />
-                              {company.config.entityType}
-                            </span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 font-medium text-slate-700">
-                              <Calendar className="w-3 h-3 text-slate-500" />
-                              FY {company.config.financialYear}
-                            </span>
-                            {company.config.pan && (
-                              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600">
-                                PAN: {company.config.pan}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Partners Summary Chip for Partnership Firms & LLPs */}
-                          {company.config.partners && company.config.partners.length > 0 && (
-                            <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1">
-                              <Users className="w-3 h-3 text-emerald-700 shrink-0" />
-                              <span className="font-semibold text-slate-700">
-                                {company.config.entityType === 'LLP' ? 'Designated Partners:' : 'Partners:'}
-                              </span>
-                              {company.config.partners.map((p, pIdx) => (
-                                <span
-                                  key={pIdx}
-                                  className="inline-flex items-center gap-1 font-mono text-[10px] bg-white px-1.5 py-0.5 rounded border border-slate-200"
-                                >
-                                  <span className="font-sans font-medium text-slate-800">{p.name}</span>
-                                  <span className="text-emerald-700 font-bold">({p.profitSharePercent || 0}% PSR)</span>
-                                  {p.remunerationSharePercent !== undefined && p.remunerationSharePercent !== p.profitSharePercent && (
-                                    <span className="text-indigo-700 font-semibold">({p.remunerationSharePercent}% Remun)</span>
-                                  )}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Audit Status Indicators */}
-                          <div className="mt-3 flex items-center gap-2.5 flex-wrap text-[11px]">
-                            {hasTB ? (
-                              <span className="inline-flex items-center gap-1 text-emerald-700 font-medium bg-emerald-100/60 px-2 py-0.5 rounded">
-                                <CheckCircle2 className="w-3 h-3" />
-                                TB: {tbCount} Ledgers
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                                <FileSpreadsheet className="w-3 h-3 text-slate-400" />
-                                Pending TB Upload
-                              </span>
-                            )}
-
-                            {pyCount > 0 && (
-                              <span className="inline-flex items-center gap-1 text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
-                                PY TB: {pyCount} Ledgers
-                              </span>
-                            )}
-
-                            <span className="text-slate-400 text-[10px]">
-                              Updated {new Date(company.updatedAt || company.createdAt || Date.now()).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-2 sm:self-center shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                          <button
-                            type="button"
-                            onClick={() => handleSelectAndWork(company.id)}
-                            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs ${
-                              isSelected
-                                ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                                : 'bg-slate-900 hover:bg-slate-800 text-white'
-                            }`}
-                            title="Select this company and open working windows"
-                          >
-                            <span>{isSelected ? 'Open Workspace' : 'Select & Work'}</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(company)}
-                            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-                            title="Edit company parameters"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => onDuplicateCompany(company.id)}
-                            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-                            title="Clone/Duplicate this company"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setDeletingCompany({ id: company.id, name: company.config.entityName })}
-                            className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition"
-                            title="Delete this company"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+          {/* Search Bar */}
+          <div className="mt-3 relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search saved companies by name, PAN, or financial year..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* RIGHT COLUMN (5 cols): CREATE NEW CLIENT COMPANY FORM                      */}
-        {/* ========================================================================= */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                  <Plus className="w-4 h-4 text-emerald-700" />
-                </div>
-                <h2 className="text-base font-bold text-slate-900">
-                  Register New Client Entity
-                </h2>
-              </div>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                ICAI NCE
-              </span>
-            </div>
-
-            {/* Quick 1-Click Starter Buttons */}
-            <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                ⚡ 1-Click Starter Presets:
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleCreateSample('sample_partnership')}
-                  className="p-2 rounded-lg bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 text-left transition"
-                >
-                  <span className="text-xs font-semibold text-slate-800 block">
-                    Partnership Firm
-                  </span>
-                  <span className="text-[10px] text-slate-500 block">
-                    Sample TB + P & L
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleCreateSample('sample_proprietorship')}
-                  className="p-2 rounded-lg bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 text-left transition"
-                >
-                  <span className="text-xs font-semibold text-slate-800 block">
-                    Sole Proprietor
-                  </span>
-                  <span className="text-[10px] text-slate-500 block">
-                    Retail Trader TB
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Creation Form */}
-            <form onSubmit={handleCreateSubmit} className="mt-4 space-y-4 text-xs">
-              {/* Entity Name */}
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700 block">
-                  Entity / Trade Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Shree Balaji Traders, Apex Associates"
-                  value={newEntityName}
-                  onChange={(e) => setNewEntityName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-xs font-medium transition"
-                />
-              </div>
-
-              {/* Entity Type & Financial Year Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 block">
-                    Entity Type <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={newEntityType}
-                    onChange={(e) => setNewEntityType(e.target.value as EntityConfig['entityType'])}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-xs font-medium transition"
+        {/* Companies List / Cards */}
+        <div className="p-5 space-y-3">
+          {filteredCompanies.length === 0 ? (
+            <div className="text-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+              <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-sm font-semibold text-slate-700">
+                {searchQuery
+                  ? 'No matching companies found'
+                  : userEmail
+                  ? `No client companies created yet for ${userEmail}`
+                  : 'No client companies created yet'}
+              </h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1.5">
+                {searchQuery
+                  ? 'Try adjusting your search keywords or filter.'
+                  : 'Create your first entity or load a quick sample to get started.'}
+              </p>
+              {!searchQuery && (
+                <div className="mt-5 flex justify-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(true)}
+                    className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                   >
-                    <option value="Partnership Firm">Partnership Firm</option>
-                    <option value="Sole Proprietorship">Sole Proprietorship</option>
-                    <option value="LLP">Limited Liability Partnership (LLP)</option>
-                    <option value="AOP/BOI">AOP / BOI / Trust</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 block">
-                    Financial Year <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={newFY}
-                    onChange={(e) => setNewFY(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-xs font-medium transition"
+                    <Plus className="w-4 h-4" />
+                    Create New Entity
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateSample('sample_partnership')}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
                   >
-                    {POPULAR_INDIAN_FY_PRESETS.map((p) => (
-                      <option key={p.cyYear} value={p.cyYear}>
-                        FY {p.cyYear} (AY {p.assessmentYear}){p.isCurrentActive ? ' ★ Active Audit Year' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Starter Dataset Selection */}
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700 block">
-                  Starter Template Setup
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {[
-                    { id: 'blank', label: '📄 Fresh Blank', desc: 'Upload own TB' },
-                    { id: 'sample_partnership', label: '⚡ Sample Partnership', desc: 'Standard ledger set' },
-                    { id: 'sample_proprietorship', label: '⚡ Sample Proprietor', desc: 'Retail trader set' },
-                    { id: 'clone', label: '📋 Clone Existing', desc: 'Copy from saved' },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setNewStarterType(item.id as any)}
-                      className={`p-2.5 rounded-xl border text-left transition ${
-                        newStarterType === item.id
-                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-semibold'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="block">{item.label}</span>
-                      <span className="text-[10px] text-slate-500 block font-normal">{item.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Clone source selector */}
-              {newStarterType === 'clone' && companies.length > 0 && (
-                <div className="space-y-1 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-semibold text-slate-700 block">Select Source Entity to Clone:</label>
-                  <select
-                    value={newCloneSourceId}
-                    onChange={(e) => setNewCloneSourceId(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-medium"
-                  >
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.config.entityName} ({c.config.entityType})
-                      </option>
-                    ))}
-                  </select>
+                    ⚡ Quick Sample Partnership
+                  </button>
                 </div>
               )}
+            </div>
+          ) : (
+            filteredCompanies.map((company) => {
+              const isSelected = company.id === activeCompanyId;
+              const tbCount = company.mappedLedgers?.length || company.rawRows?.length || 0;
+              const pyCount = company.pyMappedLedgers?.length || company.pyRawRows?.length || 0;
+              const hasTB = tbCount > 0;
 
-              {/* Name of Proprietor for Sole Proprietorship */}
-              {newEntityType === 'Sole Proprietorship' && (
-                <div className="space-y-1 p-3 rounded-xl bg-amber-50/70 border border-amber-200">
-                  <label className="font-semibold text-amber-950 block text-xs">
-                    Name of Proprietor <span className="text-rose-500">*</span>
+              return (
+                <div
+                  key={company.id}
+                  className={`p-4 rounded-xl border transition-all duration-150 ${
+                    isSelected
+                      ? 'bg-emerald-50/50 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
+                      : 'bg-white border-slate-200/90 hover:border-slate-300 hover:shadow-xs'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      {/* Title & Badges */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm sm:text-base text-slate-900 tracking-tight truncate">
+                          {company.config.entityName || 'Unnamed Entity'}
+                        </span>
+                        {isSelected && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-2xs">
+                            <Check className="w-3 h-3" />
+                            Active
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Entity Metas */}
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs text-slate-600">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 font-medium text-slate-700">
+                          <Briefcase className="w-3 h-3 text-slate-500" />
+                          {company.config.entityType}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 font-medium text-slate-700">
+                          <Calendar className="w-3 h-3 text-slate-500" />
+                          FY {company.config.financialYear}
+                        </span>
+                        {company.config.pan && (
+                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600">
+                            PAN: {company.config.pan}
+                          </span>
+                        )}
+                        {(company.config.numberOfBranches ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-800 font-semibold text-[11px]">
+                            <Layers className="w-3 h-3 text-indigo-600" />
+                            {company.config.numberOfBranches} {company.config.numberOfBranches === 1 ? 'Branch' : 'Branches'} • Consolidated TB
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Partners Summary Chip for Partnership Firms & LLPs */}
+                      {company.config.partners && company.config.partners.length > 0 && (
+                        <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1">
+                          <Users className="w-3 h-3 text-emerald-700 shrink-0" />
+                          <span className="font-semibold text-slate-700">
+                            {company.config.entityType === 'LLP' ? 'Designated Partners:' : 'Partners:'}
+                          </span>
+                          {company.config.partners.map((p, pIdx) => (
+                            <span
+                              key={pIdx}
+                              className="inline-flex items-center gap-1 font-mono text-[10px] bg-white px-1.5 py-0.5 rounded border border-slate-200"
+                            >
+                              <span className="font-sans font-medium text-slate-800">{p.name}</span>
+                              <span className="text-emerald-700 font-bold">({p.profitSharePercent || 0}% PSR)</span>
+                              {p.remunerationSharePercent !== undefined && p.remunerationSharePercent !== p.profitSharePercent && (
+                                <span className="text-indigo-700 font-semibold">({p.remunerationSharePercent}% Remun)</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Audit Status Indicators */}
+                      <div className="mt-3 flex items-center gap-2.5 flex-wrap text-[11px]">
+                        {hasTB ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 font-medium bg-emerald-100/60 px-2 py-0.5 rounded">
+                            <CheckCircle2 className="w-3 h-3" />
+                            TB: {tbCount} Ledgers
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                            <FileSpreadsheet className="w-3 h-3 text-slate-400" />
+                            Pending TB Upload
+                          </span>
+                        )}
+
+                        {pyCount > 0 && (
+                          <span className="inline-flex items-center gap-1 text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
+                            PY TB: {pyCount} Ledgers
+                          </span>
+                        )}
+
+                        <span className="text-slate-400 text-[10px]">
+                          Updated {new Date(company.updatedAt || company.createdAt || Date.now()).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 sm:self-center shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAndWork(company.id)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs ${
+                          isSelected
+                            ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                            : 'bg-slate-900 hover:bg-slate-800 text-white'
+                        }`}
+                        title="Select this company and open working windows"
+                      >
+                        <span>{isSelected ? 'Open Workspace' : 'Select & Work'}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleTriggerSingleCompanyBackup(company)}
+                        className="px-2.5 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                        title={`Download single file backup (.json) for ${company.config.entityName}`}
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-700" />
+                        <span className="hidden xl:inline">Backup File</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(company)}
+                        className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                        title="Edit company parameters"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onDuplicateCompany(company.id)}
+                        className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                        title="Clone/Duplicate this company"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setDeletingCompany({ id: company.id, name: company.config.entityName })}
+                        className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition"
+                        title="Delete this company"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* NEW CLIENT ENTITY — DEDICATED MODAL WINDOW                        */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6">
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
+
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-emerald-800 to-emerald-700 text-white px-6 py-5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight">Register New Client Entity</h2>
+                  <p className="text-xs text-emerald-200">ICAI Non-Corporate Entity · Financial Statement Automation</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body — Scrollable */}
+            <div className="overflow-y-auto flex-1 p-6">
+
+              {/* Quick 1-Click Starter Buttons */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 mb-5">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-3">
+                  ⚡ Quick Starter — Load a pre-filled sample:
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleCreateSample('sample_partnership')}
+                    className="p-3 rounded-xl bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/40 text-left transition cursor-pointer group"
+                  >
+                    <div className="font-semibold text-slate-800 text-sm group-hover:text-emerald-800">Partnership Firm</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Full Sample TB + P&L + Partners</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateSample('sample_proprietorship')}
+                    className="p-3 rounded-xl bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/40 text-left transition cursor-pointer group"
+                  >
+                    <div className="font-semibold text-slate-800 text-sm group-hover:text-emerald-800">Sole Proprietor</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Retail Trader Trial Balance</div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-xs text-slate-400 font-semibold">OR FILL THE FORM BELOW</span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+
+              {/* Creation Form */}
+              <form onSubmit={handleCreateSubmit} id="new-entity-form" className="space-y-4 text-xs">
+                {/* Entity Name */}
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">
+                    Entity / Trade Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Shri Ramesh Kumar / Proprietor Legal Name"
-                    value={newProprietorName}
-                    onChange={(e) => setNewProprietorName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                    placeholder="e.g. Shree Balaji Traders, Apex Associates"
+                    value={newEntityName}
+                    onChange={(e) => setNewEntityName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-xs font-medium transition"
                   />
-                  <span className="text-[10px] text-amber-800 block">
-                    Disclosed in Note 3 (Proprietor's Capital Account), Balance Sheet, and Statutory Sign-off
-                  </span>
                 </div>
-              )}
 
-              {/* Toggle Optional Additional Details */}
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowAdditionalDetails((prev) => !prev)}
-                  className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1"
-                >
-                  <span>{showAdditionalDetails ? '− Hide' : '+ Additional Details:'} Address, Signing Details, PAN, GSTIN &amp; Auditor</span>
-                </button>
+                {/* Entity Type & Financial Year Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 block">
+                      Entity Type <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={newEntityType}
+                      onChange={(e) => setNewEntityType(e.target.value as EntityConfig['entityType'])}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-xs font-medium transition"
+                    >
+                      <option value="Partnership Firm">Partnership Firm</option>
+                      <option value="Sole Proprietorship">Sole Proprietorship</option>
+                      <option value="LLP">Limited Liability Partnership (LLP)</option>
+                      <option value="AOP/BOI">AOP / BOI / Trust</option>
+                    </select>
+                  </div>
 
-                {showAdditionalDetails && (
-                  <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 block">
+                      Financial Year <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={newFY}
+                      onChange={(e) => setNewFY(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-xs font-medium transition"
+                    >
+                      {POPULAR_INDIAN_FY_PRESETS.map((p) => (
+                        <option key={p.cyYear} value={p.cyYear}>
+                          FY {p.cyYear} (AY {p.assessmentYear}){p.isCurrentActive ? ' ★ Active Audit Year' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Number of Branches */}
+                <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200/80 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block">Registered Office / Principal Place of Business</label>
+                      <label className="font-bold text-indigo-950 flex items-center gap-1.5 text-xs">
+                        <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>No. of Branches (Branch-wise TB Consolidation)</span>
+                      </label>
+                      <span className="text-[10px] text-indigo-700 block mt-0.5">
+                        Set number of branches to import separate CY &amp; PY Trial Balances branch-wise
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleNewBranchCountChange(newNumberOfBranches - 1)}
+                        className="w-7 h-7 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center justify-center cursor-pointer"
+                      >
+                        -
+                      </button>
                       <input
-                        type="text"
-                        placeholder="e.g. Shop No. 4, Market Yard, Pune - 411037"
-                        value={newRegisteredAddress}
-                        onChange={(e) => setNewRegisteredAddress(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={newNumberOfBranches}
+                        onChange={(e) => handleNewBranchCountChange(parseInt(e.target.value, 10) || 0)}
+                        className="w-14 px-2 py-1 rounded-lg bg-white border border-indigo-300 text-center font-mono font-bold text-xs text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
+                      <button
+                        type="button"
+                        onClick={() => handleNewBranchCountChange(newNumberOfBranches + 1)}
+                        className="w-7 h-7 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center justify-center cursor-pointer"
+                      >
+                        +
+                      </button>
                     </div>
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block">Place of Signing</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Pune / Mumbai"
-                          value={newPlaceOfSigning}
-                          onChange={(e) => setNewPlaceOfSigning(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block">Date of Signing</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. March 31, 2025"
-                          value={newDateOfSigning}
-                          onChange={(e) => setNewDateOfSigning(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block">PAN Number</label>
-                        <input
-                          type="text"
-                          maxLength={10}
-                          placeholder="e.g. AAAPB1234C"
-                          value={newPan}
-                          onChange={(e) => setNewPan(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs uppercase"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block">GSTIN</label>
-                        <input
-                          type="text"
-                          maxLength={15}
-                          placeholder="e.g. 27AAAPB1234C1Z5"
-                          value={newGstin}
-                          onChange={(e) => setNewGstin(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs uppercase"
-                        />
+                  {newNumberOfBranches > 0 && (
+                    <div className="pt-2 border-t border-indigo-200/60 space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 block">
+                        Branch Names ({newNumberOfBranches} {newNumberOfBranches === 1 ? 'Branch' : 'Branches'} Configured):
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                        {newBranchNames.map((bName, bIdx) => (
+                          <div key={bIdx} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-indigo-200">
+                            <span className="text-[10px] font-mono font-bold text-indigo-600 shrink-0">
+                              #{bIdx + 1}
+                            </span>
+                            <input
+                              type="text"
+                              value={bName}
+                              onChange={(e) => {
+                                const copy = [...newBranchNames];
+                                copy[bIdx] = e.target.value;
+                                setNewBranchNames(copy);
+                              }}
+                              placeholder={bIdx === 0 ? 'Head Office / Branch 1' : `Branch ${bIdx + 1}`}
+                              className="w-full text-[11px] font-medium text-slate-800 focus:outline-none"
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
+                  )}
+                </div>
 
-                    {/* Auditor / CA Firm Credentials */}
-                    <div className="pt-2 border-t border-slate-200/80 space-y-2">
-                      <div className="flex items-center gap-1.5 text-slate-700 font-semibold text-[11px]">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Statutory Auditor &amp; CA Firm Credentials</span>
+                {/* Starter Dataset Selection */}
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">
+                    Starter Template Setup
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {[
+                      { id: 'blank', label: '📄 Fresh Blank', desc: 'Upload own TB' },
+                      { id: 'sample_partnership', label: '⚡ Sample Partnership', desc: 'Standard ledger set' },
+                      { id: 'sample_proprietorship', label: '⚡ Sample Proprietor', desc: 'Retail trader set' },
+                      { id: 'clone', label: '📋 Clone Existing', desc: 'Copy from saved' },
+                    ].map((tmpl) => (
+                      <button
+                        key={tmpl.id}
+                        type="button"
+                        onClick={() => setNewStarterType(tmpl.id as any)}
+                        className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                          newStarterType === tmpl.id
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-semibold'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className="block">{tmpl.label}</span>
+                        <span className="text-[10px] text-slate-500 block font-normal">{tmpl.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Clone source selector */}
+                {newStarterType === 'clone' && companies.length > 0 && (
+                  <div className="space-y-1 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <label className="font-semibold text-slate-700 block">Select Source Entity to Clone:</label>
+                    <select
+                      value={newCloneSourceId}
+                      onChange={(e) => setNewCloneSourceId(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-medium"
+                    >
+                      {companies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.config.entityName} ({c.config.entityType})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Name of Proprietor */}
+                {newEntityType === 'Sole Proprietorship' && (
+                  <div className="space-y-1 p-3 rounded-xl bg-amber-50/70 border border-amber-200">
+                    <label className="font-semibold text-amber-950 block text-xs">
+                      Name of Proprietor <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Shri Ramesh Kumar / Proprietor Legal Name"
+                      value={newProprietorName}
+                      onChange={(e) => setNewProprietorName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-900 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <span className="text-[10px] text-amber-800 block">
+                      Disclosed in Note 3 (Proprietor's Capital Account), Balance Sheet, and Statutory Sign-off
+                    </span>
+                  </div>
+                )}
+
+                {/* Toggle Optional Additional Details */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdditionalDetails((prev) => !prev)}
+                    className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{showAdditionalDetails ? '− Hide' : '+ Additional Details:'} Address, Signing Details, PAN, GSTIN &amp; Auditor</span>
+                  </button>
+
+                  {showAdditionalDetails && (
+                    <div className="mt-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block">Registered Office / Principal Place of Business</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Shop No. 4, Market Yard, Pune - 411037"
+                          value={newRegisteredAddress}
+                          onChange={(e) => setNewRegisteredAddress(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs mt-1"
+                        />
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[11px] font-semibold text-slate-600 block">CA / Audit Firm Name</label>
+                          <label className="text-[11px] font-semibold text-slate-600 block">Place of Signing</label>
                           <input
                             type="text"
-                            placeholder="e.g. M/s Viva & Associates"
-                            value={newAuditorFirmName}
-                            onChange={(e) => setNewAuditorFirmName(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                            placeholder="e.g. Pune / Mumbai"
+                            value={newPlaceOfSigning}
+                            onChange={(e) => setNewPlaceOfSigning(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs mt-1"
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] font-semibold text-slate-600 block">Chartered Accountant Name</label>
+                          <label className="text-[11px] font-semibold text-slate-600 block">Date of Signing</label>
                           <input
                             type="text"
-                            placeholder="e.g. CA Balaji Rao"
-                            value={newAuditorName}
-                            onChange={(e) => setNewAuditorName(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-600 block">Role / Designation</label>
-                          <select
-                            value={newAuditorRole}
-                            onChange={(e) => setNewAuditorRole(e.target.value as 'Partner' | 'Proprietor')}
-                            className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
-                          >
-                            <option value="Partner">Partner</option>
-                            <option value="Proprietor">Proprietor</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-600 block">Membership No.</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 142536"
-                            value={newMembershipNo}
-                            onChange={(e) => setNewMembershipNo(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-semibold text-slate-600 block">Firm Reg. No. (FRN)</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 109876W"
-                            value={newFirmRegNo}
-                            onChange={(e) => setNewFirmRegNo(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                            placeholder="e.g. March 31, 2025"
+                            value={newDateOfSigning}
+                            onChange={(e) => setNewDateOfSigning(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs mt-1"
                           />
                         </div>
                       </div>
 
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block">UDIN (Unique Document Identification Number)</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 25142536AAAAAA1234 (optional)"
-                          value={newUdin}
-                          onChange={(e) => setNewUdin(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs uppercase"
-                        />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block">PAN Number</label>
+                          <input
+                            type="text"
+                            maxLength={10}
+                            placeholder="e.g. AAAPB1234C"
+                            value={newPan}
+                            onChange={(e) => setNewPan(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs uppercase mt-1"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block">GSTIN</label>
+                          <input
+                            type="text"
+                            maxLength={15}
+                            placeholder="e.g. 27AAAPB1234C1Z5"
+                            value={newGstin}
+                            onChange={(e) => setNewGstin(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs uppercase mt-1"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Auditor / CA Firm Credentials */}
+                      <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                        <div className="flex items-center gap-1.5 text-slate-700 font-semibold text-[11px]">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Statutory Auditor &amp; CA Firm Credentials</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 block">CA / Audit Firm Name</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. M/s Viva & Associates"
+                              value={newAuditorFirmName}
+                              onChange={(e) => setNewAuditorFirmName(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 block">Chartered Accountant Name</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. CA Balaji Rao"
+                              value={newAuditorName}
+                              onChange={(e) => setNewAuditorName(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs mt-1"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 block">Role / Designation</label>
+                            <select
+                              value={newAuditorRole}
+                              onChange={(e) => setNewAuditorRole(e.target.value as 'Partner' | 'Proprietor')}
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium mt-1"
+                            >
+                              <option value="Partner">Partner</option>
+                              <option value="Proprietor">Proprietor</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 block">Membership No.</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 142536"
+                              value={newMembershipNo}
+                              onChange={(e) => setNewMembershipNo(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-semibold text-slate-600 block">Firm Reg. No. (FRN)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 109876W"
+                              value={newFirmRegNo}
+                              onChange={(e) => setNewFirmRegNo(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs mt-1"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block">UDIN (Unique Document Identification Number)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 25142536AAAAAA1234 (optional)"
+                            value={newUdin}
+                            onChange={(e) => setNewUdin(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs uppercase mt-1"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+                </div>
+
+                {/* Partners and Sharing Ratios */}
+                {(newEntityType === 'Partnership Firm' || newEntityType === 'LLP') && (
+                  <PartnerConfigForm
+                    entityType={newEntityType}
+                    partners={newPartners}
+                    onChange={setNewPartners}
+                    signingPartnerName={newSigningPartnerName}
+                    onSigningPartnerChange={setNewSigningPartnerName}
+                  />
                 )}
-              </div>
+              </form>
+            </div>
 
-              {/* Partners and Sharing Ratios for Partnership Firm and LLP */}
-              {(newEntityType === 'Partnership Firm' || newEntityType === 'LLP') && (
-                <PartnerConfigForm
-                  entityType={newEntityType}
-                  partners={newPartners}
-                  onChange={setNewPartners}
-                  signingPartnerName={newSigningPartnerName}
-                  onSigningPartnerChange={setNewSigningPartnerName}
-                />
-              )}
-
-              {/* Submit Button */}
+            {/* Modal Footer / Submit */}
+            <div className="shrink-0 px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-sm font-semibold transition cursor-pointer"
+              >
+                Cancel
+              </button>
               <button
                 type="submit"
+                form="new-entity-form"
                 disabled={!newEntityName.trim()}
-                className="w-full py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-sm transition flex items-center gap-2 shadow-sm cursor-pointer"
               >
-                <span>Save &amp; Open Working Windows</span>
+                <Building2 className="w-4 h-4" />
+                Save &amp; Open Working Windows
                 <ArrowRight className="w-4 h-4" />
               </button>
-            </form>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Compliance & Legal Footer for Google Verification */}
-      <footer className="mt-8 pt-6 pb-4 border-t border-slate-200/80 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-slate-600">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>ICAI Non-Corporate Entity (NCE) Audit &amp; Financial Reporting Platform</span>
-        </div>
-        <div className="flex items-center gap-4 text-xs font-medium text-slate-600">
-          <a
-            href="/privacy.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-emerald-700 underline flex items-center gap-1"
-          >
-            <span>Privacy Policy</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
-          <span>&bull;</span>
-          <a
-            href="/terms.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-emerald-700 underline flex items-center gap-1"
-          >
-            <span>Terms of Service</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
-          <span>&bull;</span>
-          <span className="text-slate-400">Google API Limited Use Compliant</span>
-        </div>
-      </footer>
+      )}
 
       {/* Edit Company Modal */}
       {editingCompany && editConfig && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl max-h-[90vh] overflow-y-auto w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" onClick={() => setEditingCompany(null)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            {/* Sticky header — never scrolls */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-emerald-700" />
                 <h3 className="font-bold text-sm text-slate-900">
@@ -1149,7 +1308,9 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="mt-4 space-y-3 text-xs">
+            {/* Scrollable body */}
+            <div className="overflow-y-auto flex-1 px-5 py-4">
+            <form id="editCompanyForm" onSubmit={handleSaveEdit} className="space-y-3 text-xs">
               <div className="space-y-1">
                 <label className="font-semibold text-slate-700 block">Entity Name</label>
                 <input
@@ -1196,6 +1357,57 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Edit Number of Branches */}
+              <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <label className="font-bold text-indigo-950 flex items-center gap-1.5 text-xs">
+                      <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>No. of Branches (Branch-wise TB Import &amp; Consolidation)</span>
+                    </label>
+                    <span className="text-[10px] text-indigo-700 block">
+                      Set 0 for single Trial Balance, or enter number of branches to upload branch-wise CY &amp; PY Trial Balances
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    max={50}
+                    value={editConfig.numberOfBranches ?? (editConfig.branches?.length || 0)}
+                    onChange={(e) => {
+                      const count = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0));
+                      const synced = syncBranchesWithCount(editConfig.branches, count);
+                      setEditConfig({
+                        ...editConfig,
+                        numberOfBranches: count,
+                        branches: synced,
+                      });
+                    }}
+                    className="w-20 px-2.5 py-1.5 rounded-lg bg-white border border-indigo-300 text-center font-mono font-bold text-xs text-indigo-950"
+                  />
+                </div>
+                {(editConfig.numberOfBranches ?? 0) > 0 && editConfig.branches && editConfig.branches.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-indigo-200/60 max-h-36 overflow-y-auto">
+                    {editConfig.branches.map((b, idx) => (
+                      <div key={b.branchId} className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-indigo-200">
+                        <span className="text-[10px] font-mono font-bold text-indigo-600">#{idx + 1}</span>
+                        <input
+                          type="text"
+                          value={b.branchName}
+                          onChange={(e) => {
+                            const updatedBranches = (editConfig.branches || []).map((item) =>
+                              item.branchId === b.branchId ? { ...item, branchName: e.target.value } : item
+                            );
+                            setEditConfig({ ...editConfig, branches: updatedBranches });
+                          }}
+                          className="w-full text-[11px] font-medium text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -1366,22 +1578,26 @@ export const CompaniesWindow: React.FC<CompaniesWindowProps> = ({
                 />
               )}
 
-              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setEditingCompany(null)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-xs"
-                >
-                  Save Changes
-                </button>
-              </div>
             </form>
+            </div>{/* end overflow-y-auto scrollable body */}
+
+            {/* Sticky footer — always visible at bottom */}
+            <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 shrink-0 bg-white rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setEditingCompany(null)}
+                className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="editCompanyForm"
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-xs text-xs"
+              >
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}

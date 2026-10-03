@@ -11,7 +11,13 @@ import {
   Building2,
 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { updateUserProfile, applyReferralRewardAsync, loadUsersFromStorage } from '../utils/storageManager';
+import {
+  updateUserProfile,
+  applyReferralRewardAsync,
+  loadUsersFromStorage,
+  getPendingReferralCode,
+  clearPendingReferralCode,
+} from '../utils/storageManager';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -34,14 +40,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Check for pending referral code from URL or sessionStorage on mount
+  // Check for pending referral code from URL or storage on mount
   useEffect(() => {
     if (isOpen && !currentUser.referredBy) {
       try {
-        const params = new URLSearchParams(window.location.search);
-        const urlRef = params.get('ref');
-        const sessionRef = sessionStorage.getItem('ca_pending_referral_code');
-        const found = (urlRef || sessionRef || '').trim();
+        const found = getPendingReferralCode();
         if (found) {
           setReferralCodeInput(found);
           setShowReferralField(true);
@@ -90,16 +93,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       };
 
       // Apply referral code if provided
-      if (referralCodeInput.trim()) {
-        const refRes = await applyReferralRewardAsync(currentUser.id, referralCodeInput.trim());
-        if (!refRes.success) {
+      const effectiveRef = referralCodeInput.trim() || getPendingReferralCode();
+      if (effectiveRef) {
+        const refRes = await applyReferralRewardAsync(currentUser.id, effectiveRef);
+        if (!refRes.success && !currentUser.referredBy) {
           setError(refRes.error || 'Invalid referral code or user ID entered.');
           setLoading(false);
           return;
         }
-        try {
-          sessionStorage.removeItem('ca_pending_referral_code');
-        } catch {}
+        clearPendingReferralCode();
       }
 
       // Reload fresh profile from storage if referral updated it, else update directly
@@ -149,7 +151,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
           <div className="mt-3.5 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-900/40 border border-emerald-700/50 text-[11px] text-emerald-200 font-medium">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>100 Welcome Credits activated • ICAI NCE Compliance ready</span>
+            <span>555 Welcome Credit Points activated • ICAI NCE Compliance ready</span>
           </div>
         </div>
 

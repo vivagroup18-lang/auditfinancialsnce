@@ -21,7 +21,12 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { NoteScheduleData, EntityConfig, ProfitAndLossData, MappedLedger } from '../types';
-import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
+import {
+  NCE_NOTE_DEFINITIONS,
+  FOUR_CATEGORY_THEMES,
+  getLedgerFourCategory,
+  getNoteCategoryTheme,
+} from '../data/nceTaxonomy';
 import { isPartnersRemunerationItem, formatINR } from '../utils/financialCalculations';
 import { PartnerCapitalModal } from './PartnerCapitalModal';
 import { TradePayablesMsmeModal } from './TradePayablesMsmeModal';
@@ -207,54 +212,70 @@ const EditNoteMappingModal: React.FC<EditNoteMappingModalProps> = ({
             />
           </div>
 
-          {/* Statutory ICAI Note Schedule Dropdown with Color Coding */}
+          {/* Statutory ICAI Note Schedule Dropdown with 4-Color Coding */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="font-bold text-slate-800">
-                Statutory ICAI Note Schedule <span className="text-rose-600">*</span>
-              </label>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                  isBalanceSheet
-                    ? 'bg-amber-100 text-amber-900 border-amber-300'
-                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                }`}
-              >
-                {isBalanceSheet ? '📋 Balance Sheet Schedule' : '📈 P & L Schedule'}
-              </span>
-            </div>
+            {(() => {
+              const modalCatTheme = getNoteCategoryTheme(noteNumber);
+              return (
+                <>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-bold text-slate-800">
+                      Statutory ICAI Note Schedule <span className="text-rose-600">*</span>
+                    </label>
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1.5 ${modalCatTheme.badgeClass}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${modalCatTheme.dotClass}`} />
+                      <span>
+                        {modalCatTheme.label} ({modalCatTheme.statementLabel})
+                      </span>
+                    </span>
+                  </div>
 
-            <select
-              value={noteNumber}
-              onChange={(e) => {
-                const num = Number(e.target.value);
-                setNoteNumber(num);
-                const nDef = NCE_NOTE_DEFINITIONS.find((n) => n.noteNumber === num);
-                const firstSub = nDef?.subCategories?.[0] || 'General Schedule';
-                setSubCategory(firstSub);
-                setIsCustomSubCat(false);
-              }}
-              className={`w-full px-3 py-2.5 border rounded-xl font-bold text-xs transition focus:outline-none focus:ring-2 ${
-                isBalanceSheet
-                  ? 'bg-amber-50/80 text-amber-950 border-amber-300 focus:ring-amber-400'
-                  : 'bg-emerald-50/80 text-emerald-950 border-emerald-300 focus:ring-emerald-400'
-              }`}
-            >
-              <optgroup label="📋 Balance Sheet Schedules (Notes 3 to 18)">
-                {NCE_NOTE_DEFINITIONS.filter((n) => n.noteNumber >= 3 && n.noteNumber <= 18).map((n) => (
-                  <option key={n.noteNumber} value={n.noteNumber}>
-                    Note {n.noteNumber}: {n.name} (Balance Sheet)
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="📈 Profit and Loss Schedules (Notes 19 to 25)">
-                {NCE_NOTE_DEFINITIONS.filter((n) => n.noteNumber >= 19 && n.noteNumber <= 25).map((n) => (
-                  <option key={n.noteNumber} value={n.noteNumber}>
-                    Note {n.noteNumber}: {n.name} (P &amp; L)
-                  </option>
-                ))}
-              </optgroup>
-            </select>
+                  <select
+                    value={noteNumber}
+                    onChange={(e) => {
+                      const num = Number(e.target.value);
+                      setNoteNumber(num);
+                      const nDef = NCE_NOTE_DEFINITIONS.find((n) => n.noteNumber === num);
+                      const firstSub = nDef?.subCategories?.[0] || 'General Schedule';
+                      setSubCategory(firstSub);
+                      setIsCustomSubCat(false);
+                    }}
+                    className={`w-full px-3 py-2.5 border rounded-xl font-bold text-xs transition focus:outline-none focus:ring-2 ${modalCatTheme.selectClass}`}
+                  >
+                    <optgroup label="🏦 Assets Schedules (Notes 11 to 18)" className="bg-blue-50 text-blue-950 font-bold">
+                      {NCE_NOTE_DEFINITIONS.filter((n) => n.noteNumber >= 11 && n.noteNumber <= 18).map((n) => (
+                        <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                          Note {n.noteNumber}: {n.name} (Assets)
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="🏛️ Liability Schedules (Notes 3 to 10)" className="bg-amber-50 text-amber-950 font-bold">
+                      {NCE_NOTE_DEFINITIONS.filter((n) => n.noteNumber >= 3 && n.noteNumber <= 10).map((n) => (
+                        <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                          Note {n.noteNumber}: {n.name} (Liability)
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="📈 Income Schedules (Notes 19 to 20)" className="bg-emerald-50 text-emerald-950 font-bold">
+                      {NCE_NOTE_DEFINITIONS.filter((n) => n.noteNumber >= 19 && n.noteNumber <= 20).map((n) => (
+                        <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                          Note {n.noteNumber}: {n.name} (Income)
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="📉 Expenditures Schedules (Notes 21 to 25)" className="bg-rose-50 text-rose-950 font-bold">
+                      {NCE_NOTE_DEFINITIONS.filter((n) => n.noteNumber >= 21 && n.noteNumber <= 25).map((n) => (
+                        <option key={n.noteNumber} value={n.noteNumber} className="bg-white text-slate-800">
+                          Note {n.noteNumber}: {n.name} (Expenditures)
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </>
+              );
+            })()}
           </div>
 
           {/* Sub-Schedule Classification */}
@@ -434,7 +455,17 @@ export const NotesView: React.FC<NotesViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
   const [isTradePayablesModalOpen, setIsTradePayablesModalOpen] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'WITH_BALANCE' | 'BALANCE_SHEET' | 'PROFIT_LOSS' | 'POLICIES'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<
+    | 'ALL'
+    | 'WITH_BALANCE'
+    | 'ASSETS'
+    | 'LIABILITY'
+    | 'INCOME'
+    | 'EXPENDITURES'
+    | 'BALANCE_SHEET'
+    | 'PROFIT_LOSS'
+    | 'POLICIES'
+  >('ALL');
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
   const [editingLedger, setEditingLedger] = useState<MappedLedger | null>(null);
 
@@ -600,6 +631,10 @@ export const NotesView: React.FC<NotesViewProps> = ({
       const hasBalance = sched && sched.items.length > 0;
 
       if (categoryFilter === 'WITH_BALANCE' && !hasBalance && def.noteNumber >= 3) return false;
+      if (categoryFilter === 'ASSETS' && (def.noteNumber < 11 || def.noteNumber > 18)) return false;
+      if (categoryFilter === 'LIABILITY' && (def.noteNumber < 3 || def.noteNumber > 10)) return false;
+      if (categoryFilter === 'INCOME' && (def.noteNumber < 19 || def.noteNumber > 20)) return false;
+      if (categoryFilter === 'EXPENDITURES' && (def.noteNumber < 21 || def.noteNumber > 25)) return false;
       if (categoryFilter === 'BALANCE_SHEET' && (def.statement !== 'BalanceSheet' || def.noteNumber < 3)) return false;
       if (categoryFilter === 'PROFIT_LOSS' && (def.statement !== 'ProfitAndLoss' || def.noteNumber < 3)) return false;
       if (categoryFilter === 'POLICIES' && def.noteNumber > 2) return false;
@@ -662,41 +697,43 @@ export const NotesView: React.FC<NotesViewProps> = ({
           </div>
         </div>
 
-        {/* Quick Filter Pills */}
+        {/* Quick Filter Pills with 4-Colour Identification */}
         <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-slate-100 text-xs">
           <span className="text-[11px] font-medium text-slate-400 mr-1">Show:</span>
           {(
             [
               { id: 'ALL', label: 'All Notes (1–25)' },
               { id: 'WITH_BALANCE', label: 'Active with Balances' },
-              { id: 'BALANCE_SHEET', label: 'Balance Sheet (Notes 3–18)' },
-              { id: 'PROFIT_LOSS', label: 'P & L (Notes 19–25)' },
-              { id: 'POLICIES', label: 'Mandatory Policies (Notes 1–2)' },
+              { id: 'ASSETS', label: 'Assets (Notes 11–18)', theme: FOUR_CATEGORY_THEMES.Assets },
+              { id: 'LIABILITY', label: 'Liability (Notes 3–10)', theme: FOUR_CATEGORY_THEMES.Liability },
+              { id: 'INCOME', label: 'Income (Notes 19–20)', theme: FOUR_CATEGORY_THEMES.Income },
+              { id: 'EXPENDITURES', label: 'Expenditures (Notes 21–25)', theme: FOUR_CATEGORY_THEMES.Expenditures },
+              { id: 'POLICIES', label: 'Policies (Notes 1–2)' },
             ] as const
           ).map((tab) => {
             const isSelected = categoryFilter === tab.id;
-            let btnClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-transparent';
-            if (isSelected) {
-              if (tab.id === 'BALANCE_SHEET') {
-                btnClass = 'bg-amber-400 text-slate-950 font-bold border-amber-500 shadow-xs ring-1 ring-amber-400/40';
-              } else if (tab.id === 'PROFIT_LOSS') {
-                btnClass = 'bg-emerald-600 text-white font-bold border-emerald-500 shadow-xs ring-1 ring-emerald-400/40';
-              } else {
-                btnClass = 'bg-slate-900 text-white shadow-2xs font-bold border-slate-900';
-              }
-            } else if (tab.id === 'BALANCE_SHEET') {
-              btnClass = 'bg-amber-50/80 hover:bg-amber-100 text-amber-900 border-amber-200/80 font-medium';
-            } else if (tab.id === 'PROFIT_LOSS') {
-              btnClass = 'bg-emerald-50/80 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80 font-medium';
+            const theme = 'theme' in tab ? tab.theme : undefined;
+            let btnClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-transparent font-medium';
+            if (theme) {
+              btnClass = isSelected ? `${theme.filterActiveClass} font-bold` : `${theme.filterInactiveClass} font-bold`;
+            } else if (isSelected) {
+              btnClass = 'bg-slate-900 text-white shadow-2xs font-bold border-slate-900';
             }
 
             return (
               <button
                 key={tab.id}
                 onClick={() => setCategoryFilter(tab.id)}
-                className={`px-3 py-1 rounded-lg border whitespace-nowrap transition cursor-pointer ${btnClass}`}
+                className={`px-3 py-1 rounded-lg border whitespace-nowrap transition cursor-pointer inline-flex items-center gap-1.5 ${btnClass}`}
               >
-                {tab.label}
+                {theme && (
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isSelected && tab.id !== 'LIABILITY' ? 'bg-white' : theme.dotClass
+                    }`}
+                  />
+                )}
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -710,20 +747,21 @@ export const NotesView: React.FC<NotesViewProps> = ({
           const schedule = noteSchedules[def.noteNumber];
           const hasItems = schedule && schedule.items.length > 0;
           const totalAmt = schedule?.totalAmount || 0;
-          const isBS = def.statement === 'BalanceSheet' || def.noteNumber <= 18;
+          const isPolicy = def.noteNumber <= 2;
+          const catTheme = getNoteCategoryTheme(def.noteNumber, def.nature);
 
           return (
             <div
               key={def.noteNumber}
               id={`note-anchor-${def.noteNumber}`}
-              className={`bg-white rounded-xl border transition-shadow shadow-xs overflow-hidden ${
+              className={`scroll-mt-32 bg-white rounded-xl border transition-shadow shadow-xs overflow-hidden ${
+                !isPolicy ? catTheme.rowBorderClass : ''
+              } ${
                 selectedNoteNumber === def.noteNumber
-                  ? isBS
-                    ? 'border-amber-400 ring-2 ring-amber-400/30'
-                    : 'border-emerald-500 ring-2 ring-emerald-500/20'
-                  : isBS
-                  ? 'border-slate-200 hover:border-amber-300/80'
-                  : 'border-slate-200 hover:border-emerald-300/80'
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/20'
+                  : isPolicy
+                  ? 'border-slate-200 hover:border-slate-300'
+                  : catTheme.cardBorderClass
               }`}
             >
               {/* Note Header Accordion Toggle */}
@@ -738,15 +776,13 @@ export const NotesView: React.FC<NotesViewProps> = ({
                   }
                 }}
                 className={`w-full text-left p-4 transition flex items-center justify-between border-b cursor-pointer ${
-                  isBS ? 'bg-amber-50/30 hover:bg-amber-50/60 border-slate-200' : 'bg-emerald-50/30 hover:bg-emerald-50/60 border-slate-200'
+                  isPolicy ? 'bg-slate-50/60 hover:bg-slate-100/70 border-slate-200' : catTheme.cardHeaderBgClass
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
                   <span
                     className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs border ${
-                      isBS
-                        ? 'bg-amber-100 text-amber-900 border-amber-300'
-                        : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                      isPolicy ? 'bg-slate-200 text-slate-800 border-slate-300' : catTheme.numberBadgeClass
                     }`}
                   >
                     {def.noteNumber}
@@ -754,15 +790,20 @@ export const NotesView: React.FC<NotesViewProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-bold text-slate-900 text-sm">{def.name}</h3>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap border ${
-                          isBS
-                            ? 'bg-amber-100/90 text-amber-900 border-amber-300/80'
-                            : 'bg-emerald-100/90 text-emerald-900 border-emerald-300/80'
-                        }`}
-                      >
-                        {isBS ? 'Balance Sheet' : 'P & L'}
-                      </span>
+                      {isPolicy ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap border bg-slate-100 text-slate-700 border-slate-300">
+                          Accounting Policy
+                        </span>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap border ${catTheme.badgeClass}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${catTheme.dotClass}`} />
+                          <span>
+                            {catTheme.label} • {catTheme.statementLabel}
+                          </span>
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{def.description}</p>
                   </div>

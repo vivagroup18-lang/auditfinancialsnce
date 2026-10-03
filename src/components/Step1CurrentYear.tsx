@@ -28,6 +28,7 @@ import { TrialBalanceMapping } from './TrialBalanceMapping';
 import { BalanceSheetView } from './BalanceSheetView';
 import { ProfitLossView } from './ProfitLossView';
 import { NotesView } from './NotesView';
+import { BranchTrialBalanceManager } from './BranchTrialBalanceManager';
 
 interface Step1CurrentYearProps {
   config: EntityConfig;
@@ -57,6 +58,11 @@ interface Step1CurrentYearProps {
   onSelectNote?: (noteNumber: number) => void;
   onOpenTradePayables?: () => void;
   onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
+  onUploadBranchTB?: (branchId: string, file: File, period: 'CY' | 'PY') => void;
+  onBulkUploadBranchTBs?: (files: File[], period: 'CY' | 'PY') => void;
+  onClearBranchTB?: (branchId: string, period: 'CY' | 'PY') => void;
+  onLoadSampleBranches?: (period: 'CY' | 'PY') => void;
+  onUpdateBranchClosingStock?: (branchId: string, stockAmount: number | undefined, period: 'CY' | 'PY') => void;
 }
 
 export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
@@ -82,8 +88,20 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
   onSelectNote = () => {},
   onOpenTradePayables = () => {},
   onUpdateConfig,
+  onUploadBranchTB,
+  onBulkUploadBranchTBs,
+  onClearBranchTB,
+  onLoadSampleBranches,
+  onUpdateBranchClosingStock,
 }) => {
+  const hasUploadedBranches = Boolean(
+    (config.numberOfBranches ?? 0) > 0 &&
+      config.branches?.some((b) => (b.cyMappedLedgers?.length || 0) > 0)
+  );
   const [activeSubTab, setActiveSubTab] = useState<'upload' | 'mapping' | 'statements'>(() => {
+    if ((config.numberOfBranches ?? 0) > 0 && !hasUploadedBranches) {
+      return 'upload';
+    }
     return mappedLedgers && mappedLedgers.length > 0 ? 'mapping' : 'upload';
   });
   const [statementSubView, setStatementSubView] = useState<'bs' | 'pl' | 'notes'>('bs');
@@ -272,6 +290,21 @@ export const Step1CurrentYear: React.FC<Step1CurrentYearProps> = ({
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Branch-wise Trial Balance Import & Consolidation Manager */}
+          {onUpdateConfig && onUploadBranchTB && onClearBranchTB && (
+            <BranchTrialBalanceManager
+              config={config}
+              period="CY"
+              onUpdateConfig={onUpdateConfig}
+              onUploadBranchTB={onUploadBranchTB}
+              onBulkUploadBranchTBs={onBulkUploadBranchTBs}
+              onClearBranchTB={onClearBranchTB}
+              onLoadSampleBranches={onLoadSampleBranches}
+              onUpdateBranchClosingStock={onUpdateBranchClosingStock}
+              onReviewConsolidatedMappings={() => setActiveSubTab('mapping')}
+            />
           )}
 
           {/* Upload Drop Zone & Sample Starter Grid */}

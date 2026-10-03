@@ -426,7 +426,7 @@ export const SAMPLE_DATASETS: SampleDataset[] = [
 ];
 
 export const sampleBalanceSheetDoc: UploadedStatementDoc = {
-  fileName: "RRK_Audited_Balance_Sheet_FY24_25.xlsx",
+  fileName: "Viva_Group_Audited_Balance_Sheet_FY24_25.xlsx",
   fileType: "BalanceSheet",
   uploadedAt: new Date().toISOString(),
   detectedTotal: 25740000,
@@ -554,7 +554,7 @@ export const sampleBalanceSheetDoc: UploadedStatementDoc = {
 };
 
 export const sampleProfitAndLossDoc: UploadedStatementDoc = {
-  fileName: "RRK_Audited_Profit_and_Loss_FY24_25.xlsx",
+  fileName: "Viva_Group_Audited_Profit_and_Loss_FY24_25.xlsx",
   fileType: "ProfitAndLoss",
   uploadedAt: new Date().toISOString(),
   detectedTotal: 39990000,
@@ -655,7 +655,7 @@ export const sampleProfitAndLossDoc: UploadedStatementDoc = {
 };
 
 export const samplePYBalanceSheetDoc: UploadedStatementDoc = {
-  fileName: "RRK_Audited_Balance_Sheet_FY24_25_PY.xlsx",
+  fileName: "Viva_Group_Audited_Balance_Sheet_FY24_25_PY.xlsx",
   fileType: "PYBalanceSheet",
   period: "PY",
   financialYear: "2024-25",
@@ -771,7 +771,7 @@ export const samplePYBalanceSheetDoc: UploadedStatementDoc = {
 };
 
 export const samplePYProfitAndLossDoc: UploadedStatementDoc = {
-  fileName: "RRK_Audited_Profit_and_Loss_FY24_25_PY.xlsx",
+  fileName: "Viva_Group_Audited_Profit_and_Loss_FY24_25_PY.xlsx",
   fileType: "PYProfitAndLoss",
   period: "PY",
   financialYear: "2024-25",

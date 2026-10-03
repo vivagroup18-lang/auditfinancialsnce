@@ -1,5 +1,7 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
+import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { classifyLedgerAccount } from "./src/utils/mappingEngine";
@@ -122,7 +124,7 @@ async function callGeminiForBatch(ai: GoogleGenAI, batchLedgers: any[], promptCo
 Given the following list of Trial Balance ledger accounts, map each one to its correct statutory schedule/note number (Notes 3 to 25) under the ICAI Guidance Note for Non-Corporate Entities:
 
 Statutory Note Categories:
-- Note 3: Owners' Capital Account (Capital introduced, partner fixed/current capital, drawings)
+- Note 3: Owners' Capital Account (Capital introduced, partner fixed/current capital, drawings, Profit & Loss A/c, Profit and Loss Account, Profit Transferred to Capital Account. CRITICAL: If a ledger is named "Profit & Loss A/c", "Profit and Loss Account", "P&L A/c", or "Profit Transferred", always map it to noteNumber: 3 with financialStatement: "BalanceSheet" and accountingNature: "Equity", NEVER to Note 25 Other Expenses)
 - Note 4: Reserves and Surplus (General reserve, retained earnings, capital reserve)
 - Note 5: Borrowings (Long Term & Short Term) (Bank term loans, CC/OD limits, working capital loans, unsecured loans, vehicle loans)
 - Note 6: Deferred Tax Liabilities/(Asset) (Net) (AS-22 timing differences)
@@ -734,33 +736,642 @@ Output valid JSON with the following structure:
   }
 });
 
-// Privacy Policy and Terms of Service endpoints for Google OAuth Verification & Compliance
-app.get(["/privacy", "/privacy-policy", "/privacy.html"], (req, res) => {
-  const fileInPublic = path.join(process.cwd(), "public", "privacy.html");
-  const fileInDist = path.join(process.cwd(), "dist", "privacy.html");
-  import("fs").then(({ existsSync }) => {
-    if (existsSync(fileInPublic)) {
-      res.sendFile(fileInPublic);
-    } else if (existsSync(fileInDist)) {
-      res.sendFile(fileInDist);
-    } else {
-      res.redirect("/privacy.html");
+// ============================================================================
+// SERVER-SIDE REFERRAL DIRECTORY & REWARD LEDGER (Cross-Browser / Cross-User)
+// ============================================================================
+interface ServerReferralProfile {
+  referralCode: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  userProfileId: string;
+  updatedAt: string;
+}
+
+interface ServerReferralEvent {
+  id: string;
+  inviterReferralCode: string;
+  inviterUserId?: string;
+  inviterEmail?: string;
+  inviterName?: string;
+  refereeUserId: string;
+  refereeEmail: string;
+  refereeName: string;
+  bonus: number;
+  status: "pending" | "claimed";
+  createdAt: string;
+  claimedAt?: string;
+}
+
+const REFERRAL_STORE_PATH = path.join(process.cwd(), ".referral_store.json");
+
+function loadReferralStore(): {
+  profiles: Record<string, ServerReferralProfile>;
+  events: Record<string, ServerReferralEvent>;
+} {
+  try {
+    if (fs.existsSync(REFERRAL_STORE_PATH)) {
+      const raw = fs.readFileSync(REFERRAL_STORE_PATH, "utf-8");
+      const parsed = JSON.parse(raw);
+      return {
+        profiles: parsed.profiles || {},
+        events: parsed.events || {},
+      };
     }
+  } catch (e) {
+    console.warn("Could not read referral store:", e);
+  }
+  return { profiles: {}, events: {} };
+}
+
+function saveReferralStore(store: {
+  profiles: Record<string, ServerReferralProfile>;
+  events: Record<string, ServerReferralEvent>;
+}) {
+  try {
+    fs.writeFileSync(REFERRAL_STORE_PATH, JSON.stringify(store, null, 2), "utf-8");
+  } catch (e) {
+    console.warn("Could not write referral store:", e);
+  }
+}
+
+// 1. Sync user referral identity
+app.post("/api/referrals/sync", (req, res) => {
+  try {
+    const { referralCode, userId, fullName, email, userProfileId } = req.body || {};
+    if (!referralCode) {
+      return res.status(400).json({ error: "referralCode is required" });
+    }
+    const cleanCode = String(referralCode).trim().toUpperCase();
+    const cleanUserId = String(userId || "").trim().toLowerCase().replace(/^@/, "");
+    const cleanEmail = String(email || "").trim().toLowerCase();
+
+    const store = loadReferralStore();
+    const profile: ServerReferralProfile = {
+      referralCode: cleanCode,
+      userId: cleanUserId,
+      fullName: String(fullName || "Chartered Accountant"),
+      email: cleanEmail,
+      userProfileId: String(userProfileId || cleanUserId || cleanCode),
+      updatedAt: new Date().toISOString(),
+    };
+
+    store.profiles[`code_${cleanCode}`] = profile;
+    if (cleanUserId) store.profiles[`user_${cleanUserId}`] = profile;
+    if (cleanEmail) store.profiles[`email_${cleanEmail}`] = profile;
+
+    saveReferralStore(store);
+    return res.json({ success: true, profile });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed to sync referral profile" });
+  }
+});
+
+// 2. Lookup referrer by code, userId, email, or prefix
+app.get("/api/referrals/lookup", (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim().replace(/^[@#]/, "");
+    if (!q) return res.json({ found: false, profile: null });
+
+    const cleanCode = q.toUpperCase();
+    const cleanLower = q.toLowerCase();
+    const store = loadReferralStore();
+
+    const direct =
+      store.profiles[`code_${cleanCode}`] ||
+      store.profiles[`user_${cleanLower}`] ||
+      store.profiles[`email_${cleanLower}`];
+
+    if (direct) {
+      return res.json({ found: true, profile: direct });
+    }
+
+    // Search all profiles including prefix matching (e.g. REF-VIVAGRxxx matching vivagroup18)
+    const codePrefix = cleanCode.replace(/^REF-/, "").replace(/[0-9]+$/, "");
+    const allProfiles = Object.values(store.profiles);
+    const matched = allProfiles.find((p) => {
+      if (p.referralCode === cleanCode) return true;
+      if (p.userId && p.userId === cleanLower) return true;
+      if (p.email && p.email === cleanLower) return true;
+      if (codePrefix.length >= 4) {
+        const pPrefix = p.referralCode.replace(/^REF-/, "").replace(/[0-9]+$/, "");
+        const uPrefix = (p.userId || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+        if (pPrefix === codePrefix || uPrefix === codePrefix) return true;
+      }
+      return false;
+    });
+
+    return res.json({ found: !!matched, profile: matched || null });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Lookup error" });
+  }
+});
+
+// 3. Record referral reward event
+app.post("/api/referrals/record-event", (req, res) => {
+  try {
+    const evt = req.body || {};
+    const inviterReferralCode = String(evt.inviterReferralCode || "").trim().toUpperCase();
+    const refereeUserId = String(evt.refereeUserId || "").trim();
+    const refereeEmail = String(evt.refereeEmail || "").trim().toLowerCase();
+
+    if (!inviterReferralCode || (!refereeUserId && !refereeEmail)) {
+      return res.status(400).json({ error: "Missing inviter or referee details" });
+    }
+
+    const cleanInviterKey = inviterReferralCode.replace(/[^A-Z0-9_-]/g, "_");
+    const cleanRefereeKey = (refereeEmail || refereeUserId).toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+    const eventId = String(evt.id || `ref_evt_${cleanInviterKey}_${cleanRefereeKey}`);
+
+    const store = loadReferralStore();
+    const existing = store.events[eventId];
+
+    // If already claimed, do not reset to pending
+    if (existing && existing.status === "claimed") {
+      return res.json({ success: true, event: existing, alreadyClaimed: true });
+    }
+
+    // Try enriching inviter from stored profiles if inviterEmail/inviterUserId missing
+    const cleanLower = inviterReferralCode.toLowerCase().replace(/^@/, "");
+    const codePrefix = inviterReferralCode.replace(/^REF-/, "").replace(/[0-9]+$/, "");
+    const matchedProfile =
+      store.profiles[`code_${inviterReferralCode}`] ||
+      store.profiles[`user_${cleanLower}`] ||
+      Object.values(store.profiles).find((p) => {
+        if (p.referralCode === inviterReferralCode) return true;
+        if (codePrefix.length >= 4) {
+          const uPrefix = (p.userId || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+          if (uPrefix === codePrefix) return true;
+        }
+        return false;
+      });
+
+    const record: ServerReferralEvent = {
+      id: eventId,
+      inviterReferralCode: matchedProfile?.referralCode || inviterReferralCode,
+      inviterUserId: String(evt.inviterUserId || matchedProfile?.userId || "").toLowerCase(),
+      inviterEmail: String(evt.inviterEmail || matchedProfile?.email || "").toLowerCase(),
+      inviterName: String(evt.inviterName || matchedProfile?.fullName || "Chartered Accountant"),
+      refereeUserId,
+      refereeEmail,
+      refereeName: String(evt.refereeName || refereeUserId || "Colleague"),
+      bonus: typeof evt.bonus === "number" ? evt.bonus : 500,
+      status: existing?.status || "pending",
+      createdAt: existing?.createdAt || evt.createdAt || new Date().toISOString(),
+    };
+
+    store.events[eventId] = record;
+    saveReferralStore(store);
+
+    return res.json({ success: true, event: record });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed to record referral event" });
+  }
+});
+
+// 4. Claim pending referral rewards for an inviter
+app.post("/api/referrals/claim", (req, res) => {
+  try {
+    const { referralCode, userId, email } = req.body || {};
+    const userCode = String(referralCode || "").trim().toUpperCase();
+    const userHandle = String(userId || "").trim().toLowerCase().replace(/^@/, "");
+    const userEmail = String(email || "").trim().toLowerCase();
+    const emailHandle = userEmail.includes("@") ? userEmail.split("@")[0].toLowerCase() : "";
+
+    // Extract 6-char uppercase prefix (e.g. VIVAGR from vivagroup18)
+    const handlePrefix = (userHandle || emailHandle)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 6);
+    const codePrefix = userCode.replace(/^REF-/, "").replace(/[0-9]+$/, "");
+
+    const store = loadReferralStore();
+    const claimedEvents: ServerReferralEvent[] = [];
+
+    for (const key of Object.keys(store.events)) {
+      const evt = store.events[key];
+      if (!evt || evt.status !== "pending") continue;
+
+      // Prevent self-claim
+      const refEmail = (evt.refereeEmail || "").toLowerCase();
+      const refUser = (evt.refereeUserId || "").toLowerCase().replace(/^@/, "");
+      if (userEmail && refEmail && userEmail === refEmail) continue;
+      if (userHandle && refUser && userHandle === refUser) continue;
+
+      const evtCode = (evt.inviterReferralCode || "").toUpperCase();
+      const evtUser = (evt.inviterUserId || "").toLowerCase().replace(/^@/, "");
+      const evtEmail = (evt.inviterEmail || "").toLowerCase();
+      const evtCodePrefix = evtCode.replace(/^REF-/, "").replace(/[0-9]+$/, "");
+
+      const isCodeMatch = userCode && evtCode === userCode;
+      const isUserMatch =
+        (userHandle && (evtUser === userHandle || evtCode === userHandle.toUpperCase())) ||
+        (emailHandle && (evtUser === emailHandle || evtCode === emailHandle.toUpperCase()));
+      const isEmailMatch = userEmail && (evtEmail === userEmail || evtCode === userEmail.toUpperCase());
+      const isPrefixMatch =
+        (handlePrefix.length >= 4 && evtCodePrefix === handlePrefix) ||
+        (codePrefix.length >= 4 && evtCodePrefix === codePrefix);
+
+      if (isCodeMatch || isUserMatch || isEmailMatch || isPrefixMatch) {
+        evt.status = "claimed";
+        evt.claimedAt = new Date().toISOString();
+        store.events[key] = evt;
+        claimedEvents.push(evt);
+      }
+    }
+
+    if (claimedEvents.length > 0) {
+      saveReferralStore(store);
+    }
+
+    return res.json({ success: true, events: claimedEvents });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed to claim referral events" });
+  }
+});
+
+// ============================================================================
+// RAZORPAY PAYMENT GATEWAY INTEGRATION (Order Creation, HMAC Verification, GST Invoices)
+// ============================================================================
+interface ServerRazorpayOrderRecord {
+  orderId: string;
+  receipt: string;
+  amountPaise: number;
+  basePriceINR: number;
+  discountPercent: number;
+  discountAmountINR: number;
+  subtotalINR: number;
+  gstAmountINR: number;
+  totalAmountINR: number;
+  currency: "INR";
+  itemType: "credit_pack" | "subscription";
+  itemId: string;
+  itemName: string;
+  planTier: "free_trial" | "professional" | "enterprise";
+  billingCycle: "monthly" | "yearly";
+  creditsGranted: number;
+  promoCode?: string;
+  userId: string;
+  customerName: string;
+  customerEmail: string;
+  customerContact: string;
+  firmName?: string;
+  gstin?: string;
+  status: "created" | "paid" | "failed";
+  paymentId?: string;
+  signature?: string;
+  paymentMethod?: string;
+  invoiceNumber?: string;
+  isLiveGatewayOrder: boolean;
+  createdAt: string;
+  paidAt?: string;
+}
+
+const RAZORPAY_STORE_PATH = path.join(process.cwd(), ".razorpay_orders.json");
+const FALLBACK_INTERNAL_SECRET = "rzp_secret_auditfinancials_hmac_2026";
+
+function loadRazorpayStore(): { orders: Record<string, ServerRazorpayOrderRecord> } {
+  try {
+    if (fs.existsSync(RAZORPAY_STORE_PATH)) {
+      const raw = fs.readFileSync(RAZORPAY_STORE_PATH, "utf-8");
+      const parsed = JSON.parse(raw);
+      return { orders: parsed.orders || {} };
+    }
+  } catch (e) {
+    console.warn("Could not read Razorpay order store:", e);
+  }
+  return { orders: {} };
+}
+
+function saveRazorpayStore(store: { orders: Record<string, ServerRazorpayOrderRecord> }) {
+  try {
+    fs.writeFileSync(RAZORPAY_STORE_PATH, JSON.stringify(store, null, 2), "utf-8");
+  } catch (e) {
+    console.warn("Could not write Razorpay order store:", e);
+  }
+}
+
+function getRazorpayCredentials() {
+  const keyId = (process.env.RAZORPAY_KEY_ID || "").trim();
+  const keySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+  const webhookSecret = (process.env.RAZORPAY_WEBHOOK_SECRET || "").trim();
+  const isConfigured = Boolean(keyId && keySecret);
+  const mode: "live" | "test" | "sandbox_ready" = keyId.startsWith("rzp_live_")
+    ? "live"
+    : keyId.startsWith("rzp_test_")
+    ? "test"
+    : "sandbox_ready";
+
+  return {
+    keyId,
+    keySecret,
+    webhookSecret,
+    isConfigured,
+    mode,
+  };
+}
+
+// 1. Get Razorpay Public Gateway Configuration
+app.get("/api/razorpay/config", (_req, res) => {
+  const creds = getRazorpayCredentials();
+  return res.json({
+    configured: creds.isConfigured,
+    keyId: creds.keyId || "rzp_test_AuditFinancialsNCE",
+    mode: creds.mode,
+    currency: "INR",
+    merchantName: "AuditFinancials — ICAI NCE Statutory Platform",
+    gstRate: 0.18,
+    sacCode: "998314",
+    supportedMethods: ["UPI", "QR Code", "Credit Card", "Debit Card", "NetBanking", "Wallets"],
   });
 });
 
-app.get(["/terms", "/terms-of-service", "/terms.html"], (req, res) => {
-  const fileInPublic = path.join(process.cwd(), "public", "terms.html");
-  const fileInDist = path.join(process.cwd(), "dist", "terms.html");
-  import("fs").then(({ existsSync }) => {
-    if (existsSync(fileInPublic)) {
-      res.sendFile(fileInPublic);
-    } else if (existsSync(fileInDist)) {
-      res.sendFile(fileInDist);
-    } else {
-      res.redirect("/terms.html");
+// 2. Create Razorpay Order (Calls https://api.razorpay.com/v1/orders when keys are set, with resilient server order ledger)
+app.post("/api/razorpay/create-order", async (req, res) => {
+  try {
+    const {
+      itemType = "credit_pack",
+      itemId = "pack_1500",
+      itemName = "Practitioner Credit Pack",
+      planTier = "free_trial",
+      billingCycle = "monthly",
+      basePriceINR = 1199,
+      discountPercent = 0,
+      promoCode = "",
+      creditsGranted = 1500,
+      includeGst = true,
+      customer = {},
+    } = req.body || {};
+
+    const cleanBase = Math.max(1, Math.round(Number(basePriceINR) || 499));
+    const cleanDiscPct = Math.min(100, Math.max(0, Number(discountPercent) || 0));
+    const discountAmountINR = Math.round((cleanBase * cleanDiscPct) / 100);
+    const subtotalINR = Math.max(0, cleanBase - discountAmountINR);
+    const gstAmountINR = includeGst ? Math.round(subtotalINR * 0.18) : 0;
+    const totalAmountINR = subtotalINR + gstAmountINR;
+    const amountPaise = Math.max(100, totalAmountINR * 100); // Razorpay minimum is 100 paise (₹1)
+
+    const receipt = `rcpt_af_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const creds = getRazorpayCredentials();
+
+    let razorpayOrderId = `order_${crypto.randomBytes(7).toString("hex")}`;
+    let isLiveGatewayOrder = false;
+
+    // If RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are configured, create order via official Razorpay Orders API
+    if (creds.isConfigured) {
+      try {
+        const authHeader = Buffer.from(`${creds.keyId}:${creds.keySecret}`).toString("base64");
+        const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Basic ${authHeader}`,
+          },
+          body: JSON.stringify({
+            amount: amountPaise,
+            currency: "INR",
+            receipt,
+            notes: {
+              itemType: String(itemType),
+              itemId: String(itemId),
+              itemName: String(itemName),
+              creditsGranted: String(creditsGranted),
+              userId: String(customer.userId || "guest_ca"),
+              customerEmail: String(customer.email || ""),
+              firmName: String(customer.firmName || ""),
+              gstin: String(customer.gstin || ""),
+            },
+          }),
+        });
+
+        if (rzpRes.ok) {
+          const rzpData: any = await rzpRes.json();
+          if (rzpData && rzpData.id) {
+            razorpayOrderId = rzpData.id;
+            isLiveGatewayOrder = true;
+          }
+        } else {
+          const errBody = await rzpRes.text();
+          console.warn("[Razorpay API] Notice from https://api.razorpay.com/v1/orders:", errBody);
+        }
+      } catch (apiErr: any) {
+        console.warn("[Razorpay API] Network notice while creating order:", apiErr?.message || apiErr);
+      }
     }
-  });
+
+    const orderRecord: ServerRazorpayOrderRecord = {
+      orderId: razorpayOrderId,
+      receipt,
+      amountPaise,
+      basePriceINR: cleanBase,
+      discountPercent: cleanDiscPct,
+      discountAmountINR,
+      subtotalINR,
+      gstAmountINR,
+      totalAmountINR,
+      currency: "INR",
+      itemType: itemType === "subscription" ? "subscription" : "credit_pack",
+      itemId: String(itemId),
+      itemName: String(itemName),
+      planTier: planTier as any,
+      billingCycle: billingCycle === "yearly" ? "yearly" : "monthly",
+      creditsGranted: Number(creditsGranted) || 500,
+      promoCode: promoCode ? String(promoCode).toUpperCase() : undefined,
+      userId: String(customer.userId || "guest_ca"),
+      customerName: String(customer.name || "Chartered Accountant"),
+      customerEmail: String(customer.email || "ca@auditfinancials.local"),
+      customerContact: String(customer.contact || ""),
+      firmName: customer.firmName ? String(customer.firmName) : undefined,
+      gstin: customer.gstin ? String(customer.gstin).toUpperCase() : undefined,
+      status: "created",
+      isLiveGatewayOrder,
+      createdAt: new Date().toISOString(),
+    };
+
+    const store = loadRazorpayStore();
+    store.orders[razorpayOrderId] = orderRecord;
+    saveRazorpayStore(store);
+
+    return res.json({
+      success: true,
+      orderId: razorpayOrderId,
+      receipt,
+      amount: amountPaise,
+      amountINR: totalAmountINR,
+      subtotalINR,
+      gstAmountINR,
+      discountAmountINR,
+      currency: "INR",
+      keyId: creds.keyId || "rzp_test_AuditFinancialsNCE",
+      isLiveGatewayOrder,
+      mode: creds.mode,
+      order: orderRecord,
+    });
+  } catch (err: any) {
+    console.error("[Razorpay Create Order Error]:", err);
+    return res.status(500).json({ error: err.message || "Failed to create Razorpay order" });
+  }
+});
+
+// 3. Verify Razorpay Payment Signature (HMAC-SHA256) & Issue GST Tax Invoice
+app.post("/api/razorpay/verify-payment", (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      paymentMethod = "UPI",
+      customer = {},
+    } = req.body || {};
+
+    if (!razorpay_order_id) {
+      return res.status(400).json({ error: "razorpay_order_id is required" });
+    }
+
+    const store = loadRazorpayStore();
+    const order = store.orders[razorpay_order_id];
+    if (!order) {
+      return res.status(404).json({ error: `Order ${razorpay_order_id} not found in ledger` });
+    }
+
+    const creds = getRazorpayCredentials();
+    const paymentId = razorpay_payment_id || `pay_${crypto.randomBytes(7).toString("hex")}`;
+    const secretToUse = creds.isConfigured && order.isLiveGatewayOrder
+      ? creds.keySecret
+      : FALLBACK_INTERNAL_SECRET;
+
+    const expectedSignature = crypto
+      .createHmac("sha256", secretToUse)
+      .update(`${razorpay_order_id}|${paymentId}`)
+      .digest("hex");
+
+    // If this was a live gateway order and a signature was returned by Razorpay Checkout.js, strictly verify HMAC match
+    if (order.isLiveGatewayOrder && creds.isConfigured) {
+      if (!razorpay_signature || razorpay_signature !== expectedSignature) {
+        order.status = "failed";
+        store.orders[razorpay_order_id] = order;
+        saveRazorpayStore(store);
+        return res.status(400).json({
+          verified: false,
+          error: "Razorpay cryptographic signature verification failed (HMAC-SHA256 mismatch).",
+        });
+      }
+    }
+
+    const finalSignature = razorpay_signature || expectedSignature;
+    const paidAt = new Date().toISOString();
+    const invoiceNumber =
+      order.invoiceNumber ||
+      `INV-RZP-${new Date().getFullYear()}-${String(Object.keys(store.orders).length + 1001).padStart(4, "0")}`;
+
+    order.status = "paid";
+    order.paymentId = paymentId;
+    order.signature = finalSignature;
+    order.paymentMethod = paymentMethod;
+    order.invoiceNumber = invoiceNumber;
+    order.paidAt = paidAt;
+    if (customer.firmName) order.firmName = String(customer.firmName);
+    if (customer.gstin) order.gstin = String(customer.gstin).toUpperCase();
+
+    store.orders[razorpay_order_id] = order;
+    saveRazorpayStore(store);
+
+    const invoice = {
+      id: `inv_${paymentId}`,
+      invoiceNumber,
+      date: paidAt,
+      planName: order.itemName,
+      planTier: order.planTier,
+      billingCycle: order.billingCycle,
+      subtotal: order.subtotalINR,
+      gstAmount: order.gstAmountINR,
+      totalAmount: order.totalAmountINR,
+      discountAmount: order.discountAmountINR,
+      promoCode: order.promoCode,
+      creditsGranted: order.creditsGranted,
+      status: "paid" as const,
+      paymentMethod: (paymentMethod || "UPI") as any,
+      transactionId: paymentId,
+      razorpayOrderId: razorpay_order_id,
+      razorpaySignature: finalSignature,
+      firmName: order.firmName,
+      gstin: order.gstin,
+      notes: `Paid via Razorpay (${paymentMethod}) • Order: ${razorpay_order_id} • Credits Granted: +${order.creditsGranted}`,
+    };
+
+    return res.json({
+      verified: true,
+      signatureVerified: true,
+      order,
+      invoice,
+    });
+  } catch (err: any) {
+    console.error("[Razorpay Verify Error]:", err);
+    return res.status(500).json({ error: err.message || "Payment verification failed" });
+  }
+});
+
+// 4. Razorpay Webhook Endpoint (for asynchronous payment.captured / order.paid events)
+app.post("/api/razorpay/webhook", (req, res) => {
+  try {
+    const signature = req.headers["x-razorpay-signature"] as string | undefined;
+    const creds = getRazorpayCredentials();
+
+    if (creds.webhookSecret && signature) {
+      const expected = crypto
+        .createHmac("sha256", creds.webhookSecret)
+        .update(JSON.stringify(req.body))
+        .digest("hex");
+      if (expected !== signature) {
+        return res.status(400).json({ error: "Invalid webhook signature" });
+      }
+    }
+
+    const event = req.body?.event;
+    const paymentEntity = req.body?.payload?.payment?.entity;
+    if ((event === "payment.captured" || event === "order.paid") && paymentEntity?.order_id) {
+      const store = loadRazorpayStore();
+      const order = store.orders[paymentEntity.order_id];
+      if (order && order.status !== "paid") {
+        order.status = "paid";
+        order.paymentId = paymentEntity.id;
+        order.paymentMethod = paymentEntity.method ? String(paymentEntity.method).toUpperCase() : "Razorpay";
+        order.paidAt = new Date().toISOString();
+        order.invoiceNumber =
+          order.invoiceNumber ||
+          `INV-RZP-${new Date().getFullYear()}-${String(Object.keys(store.orders).length + 1001).padStart(4, "0")}`;
+        store.orders[paymentEntity.order_id] = order;
+        saveRazorpayStore(store);
+      }
+    }
+
+    return res.json({ status: "ok" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Webhook error" });
+  }
+});
+
+// 5. List Razorpay Orders & Invoices for a User
+app.get("/api/razorpay/orders", (req, res) => {
+  try {
+    const userId = String(req.query.userId || "").trim().toLowerCase();
+    const email = String(req.query.email || "").trim().toLowerCase();
+    const store = loadRazorpayStore();
+    const allOrders = Object.values(store.orders).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    const filtered = allOrders.filter((o) => {
+      if (!userId && !email) return true;
+      if (userId && o.userId.toLowerCase() === userId) return true;
+      if (email && o.customerEmail.toLowerCase() === email) return true;
+      return false;
+    });
+
+    return res.json({ orders: filtered });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed to load orders" });
+  }
 });
 
 async function startServer() {

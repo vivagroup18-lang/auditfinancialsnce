@@ -23,7 +23,13 @@ import {
   CheckCheck
 } from 'lucide-react';
 import { MappedLedger, UploadedStatementDoc } from '../types';
-import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
+import {
+  NCE_NOTE_DEFINITIONS,
+  FOUR_CATEGORY_THEMES,
+  FourPillarCategory,
+  getLedgerFourCategory,
+  getNoteCategoryTheme,
+} from '../data/nceTaxonomy';
 import { classifyLedgerAccount } from '../utils/mappingEngine';
 
 export interface AIMappingAgentModalProps {
@@ -92,7 +98,9 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressStatus, setProgressStatus] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'changesOnly' | 'lowConfidence' | 'bs' | 'pl'>('all');
+  const [filterType, setFilterType] = useState<
+    'all' | 'changesOnly' | 'lowConfidence' | 'bs' | 'pl' | FourPillarCategory
+  >('all');
   const [proposals, setProposals] = useState<AIProposal[]>([]);
   const [selectedNoteFilter, setSelectedNoteFilter] = useState<number | 'all'>('all');
 
@@ -171,6 +179,14 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
     if (filterType === 'lowConfidence') return p.confidence < 0.85;
     if (filterType === 'bs') return p.statement === 'BalanceSheet';
     if (filterType === 'pl') return p.statement === 'ProfitAndLoss';
+    if (
+      filterType === 'Assets' ||
+      filterType === 'Liability' ||
+      filterType === 'Income' ||
+      filterType === 'Expenditures'
+    ) {
+      return getLedgerFourCategory(p.suggestedNoteNumber, p.accountingNature) === filterType;
+    }
 
     return true;
   });
@@ -613,8 +629,8 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
                     />
                   </div>
 
-                  {/* Filter Pills */}
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                  {/* Filter Pills with 4-Colour Identification */}
+                  <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-lg">
                     <button
                       onClick={() => setFilterType('all')}
                       className={`px-2.5 py-1 rounded text-xs transition ${
@@ -639,26 +655,32 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
                     >
                       Low Conf ({lowConfidenceCount})
                     </button>
-                    <button
-                      onClick={() => setFilterType('bs')}
-                      className={`px-2.5 py-1 rounded text-xs transition font-semibold ${
-                        filterType === 'bs'
-                          ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Balance Sheet (Notes 3–18)
-                    </button>
-                    <button
-                      onClick={() => setFilterType('pl')}
-                      className={`px-2.5 py-1 rounded text-xs transition font-semibold ${
-                        filterType === 'pl'
-                          ? 'bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      P & L (Notes 19–25)
-                    </button>
+                    {(
+                      [
+                        { key: 'Assets', theme: FOUR_CATEGORY_THEMES.Assets },
+                        { key: 'Liability', theme: FOUR_CATEGORY_THEMES.Liability },
+                        { key: 'Income', theme: FOUR_CATEGORY_THEMES.Income },
+                        { key: 'Expenditures', theme: FOUR_CATEGORY_THEMES.Expenditures },
+                      ] as const
+                    ).map(({ key, theme }) => {
+                      const isActive = filterType === key;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setFilterType(isActive ? 'all' : key)}
+                          className={`px-2.5 py-1 rounded text-xs transition font-bold border inline-flex items-center gap-1.5 ${
+                            isActive ? theme.filterActiveClass : theme.filterInactiveClass
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isActive && key !== 'Liability' ? 'bg-white' : theme.dotClass
+                            }`}
+                          />
+                          <span>{theme.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -757,26 +779,28 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
 
                               {/* AI Recommended Note */}
                               <td className="py-3 px-4">
-                                <div className="flex items-center gap-1.5">
-                                  <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
-                                      isDifferent
-                                        ? 'bg-indigo-100 text-indigo-800 border-indigo-300 ring-1 ring-indigo-400'
-                                        : 'bg-slate-100 text-slate-800 border-slate-200'
-                                    }`}
-                                  >
-                                    Note {item.suggestedNoteNumber}: {item.suggestedNoteName.replace(/^Note \d+:\s*/, '')}
-                                  </span>
-                                  <span
-                                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
-                                      item.statement === 'BalanceSheet'
-                                        ? 'bg-amber-50 text-amber-900 border-amber-200'
-                                        : 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                                    }`}
-                                  >
-                                    {item.statement === 'BalanceSheet' ? 'Balance Sheet' : 'P & L'}
-                                  </span>
-                                </div>
+                                {(() => {
+                                  const catTheme = getNoteCategoryTheme(item.suggestedNoteNumber, item.accountingNature);
+                                  return (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span
+                                        className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                                          isDifferent
+                                            ? 'bg-indigo-100 text-indigo-800 border-indigo-300 ring-1 ring-indigo-400'
+                                            : catTheme.badgeClass
+                                        }`}
+                                      >
+                                        Note {item.suggestedNoteNumber}: {item.suggestedNoteName.replace(/^Note \d+:\s*/, '')}
+                                      </span>
+                                      <span
+                                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${catTheme.badgeClass}`}
+                                      >
+                                        <span className={`w-1.5 h-1.5 rounded-full ${catTheme.dotClass}`} />
+                                        <span>{catTheme.label}</span>
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
                               </td>
 
                               {/* Confidence */}
@@ -968,22 +992,31 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {NCE_NOTE_DEFINITIONS.map((note) => (
-                  <div key={note.noteNumber} className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 text-xs">
-                        Note {note.noteNumber}: {note.name}
-                      </span>
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          note.statement === 'BalanceSheet'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        }`}
-                      >
-                        {note.statement === 'BalanceSheet' ? 'Balance Sheet' : 'Profit & Loss'} &middot; {note.nature}
-                      </span>
-                    </div>
+                {NCE_NOTE_DEFINITIONS.map((note) => {
+                  const isPolicy = note.noteNumber <= 2;
+                  const catTheme = getNoteCategoryTheme(note.noteNumber, note.nature);
+                  return (
+                    <div
+                      key={note.noteNumber}
+                      className={`bg-white p-4 rounded-xl border border-slate-200 shadow-2xs ${
+                        !isPolicy ? catTheme.rowBorderClass : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-900 text-xs">
+                          Note {note.noteNumber}: {note.name}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 shrink-0 ${
+                            isPolicy
+                              ? 'bg-slate-100 text-slate-700 border-slate-300'
+                              : catTheme.badgeClass
+                          }`}
+                        >
+                          {!isPolicy && <span className={`w-1.5 h-1.5 rounded-full ${catTheme.dotClass}`} />}
+                          <span>{isPolicy ? 'Accounting Policy' : `${catTheme.label} • ${catTheme.statementLabel}`}</span>
+                        </span>
+                      </div>
                     <p className="text-xs text-slate-600 mt-2 leading-relaxed">{note.description}</p>
                     {note.subCategories && note.subCategories.length > 0 && (
                       <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap gap-1">
@@ -1002,8 +1035,9 @@ export const AIMappingAgentModal: React.FC<AIMappingAgentModalProps> = ({
                         )}
                       </div>
                     )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

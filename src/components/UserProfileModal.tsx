@@ -20,6 +20,7 @@ import {
   Check,
   Coins,
   Scale,
+  LogOut,
 } from 'lucide-react';
 import { UserProfile, UserInvoice } from '../types';
 import { SUBSCRIPTION_PLANS, formatCurrencyINR } from '../data/subscriptionPlans';
@@ -33,6 +34,7 @@ interface UserProfileModalProps {
   onOpenSubscriptionModal: () => void;
   onOpenReferralModal?: () => void;
   onOpenTermsModal?: () => void;
+  onLogout?: () => void;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -43,8 +45,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onOpenSubscriptionModal,
   onOpenReferralModal,
   onOpenTermsModal,
+  onLogout,
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'credits' | 'billing'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'credits'>('profile');
 
   // Form state
   const [fullName, setFullName] = useState(currentUser?.fullName || '');
@@ -183,28 +186,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             }`}
           >
             <Coins className="w-3.5 h-3.5 text-amber-500" />
-            <span>Credits & Referrals</span>
+            <span>Credits &amp; Referrals</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
               ⚡ {currentUser.credits}
             </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('billing')}
-            className={`pb-2.5 transition border-b-2 flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'billing'
-                ? 'border-emerald-600 text-emerald-700 font-bold'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Receipt className="w-3.5 h-3.5" />
-            <span>Subscription & Tax Invoices</span>
-            {currentUser.invoices && currentUser.invoices.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-                {currentUser.invoices.length}
-              </span>
-            )}
           </button>
         </div>
 
@@ -323,7 +308,22 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end">
+              <div className="pt-2 flex items-center justify-between gap-3">
+                {onLogout ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onLogout();
+                    }}
+                    className="py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Sign Out</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
                 <button
                   type="submit"
                   className="py-2.5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
@@ -363,7 +363,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     ⚡ {currentUser.credits.toLocaleString()} Credits
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Active on plan: <strong className="text-white">{currentPlan.name}</strong>
+                    Active on plan: <strong className="text-white">Credits</strong>
                   </p>
                 </div>
 
@@ -374,12 +374,54 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       onClose();
                       onOpenSubscriptionModal();
                     }}
-                    className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                    className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                   >
-                    Top-Up Credits
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Top-Up via Razorpay</span>
                   </button>
                 </div>
               </div>
+
+              {/* Razorpay GST Invoices Summary */}
+              {currentUser.invoices && currentUser.invoices.length > 0 && (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                      <Receipt className="w-4 h-4 text-sky-600" />
+                      <span>Razorpay GST Invoices ({currentUser.invoices.length})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenSubscriptionModal();
+                      }}
+                      className="text-xs font-semibold text-sky-700 hover:underline cursor-pointer"
+                    >
+                      View All Invoices →
+                    </button>
+                  </div>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {currentUser.invoices.slice(0, 4).map((inv) => (
+                      <div
+                        key={inv.id}
+                        className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs font-mono tabular-nums"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-900">{inv.invoiceNumber}</span>
+                          <span className="font-sans text-slate-500 ml-2">· {inv.planName}</span>
+                          <div className="text-[10px] text-slate-400">
+                            Payment ID: {inv.transactionId}
+                          </div>
+                        </div>
+                        <div className="font-bold text-emerald-700">
+                          ₹{inv.totalAmount.toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Referral Box */}
               <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-3">
@@ -463,79 +505,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   </div>
                 ) : (
                   <p className="text-xs text-slate-400">No credit activity logged yet.</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'billing' && (
-            <div className="space-y-6">
-              {/* Active Plan Overview */}
-              <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Current Plan:</span>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold uppercase border border-emerald-500/40">
-                      {currentPlan.name}
-                    </span>
-                  </div>
-                  <h4 className="text-base font-bold text-white mt-1">
-                    {formatCurrencyINR(
-                      currentUser.billingCycle === 'yearly'
-                        ? currentPlan.yearlyPrice
-                        : currentPlan.monthlyPrice
-                    )}
-                    {currentPlan.monthlyPrice > 0 && ` / ${currentUser.billingCycle || 'month'}`}
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>
-                      {currentUser.planTier === 'free_trial'
-                        ? `Trial expires on ${new Date(currentUser.subscriptionExpiresAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
-                        : `Renews on ${new Date(currentUser.subscriptionExpiresAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
-                    </span>
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenSubscriptionModal();
-                  }}
-                  className="py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>{currentUser.planTier === 'enterprise' ? 'Manage Plan' : 'Upgrade Plan'}</span>
-                </button>
-              </div>
-
-              {/* Invoices List */}
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
-                  Tax Invoices & Receipts
-                </h4>
-                {currentUser.invoices && currentUser.invoices.length > 0 ? (
-                  <div className="space-y-2">
-                    {currentUser.invoices.map((inv) => (
-                      <div
-                        key={inv.id}
-                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <div className="font-bold text-slate-800">{inv.invoiceNumber}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {inv.date} • {inv.planName} ({inv.billingCycle})
-                          </div>
-                        </div>
-                        <div className="text-right font-bold text-emerald-700">
-                          {formatCurrencyINR(inv.totalAmount)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400">No invoices yet.</p>
                 )}
               </div>
             </div>

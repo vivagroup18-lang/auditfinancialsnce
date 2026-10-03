@@ -101,25 +101,56 @@ standardGoogleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
-// Configure Google Auth Provider with Drive Scopes (Only used for Drive Backup & Sync)
+// Configure Google Auth Provider with Google Drive (file-scoped) and Gmail send
 export const googleProvider = new GoogleAuthProvider();
+// Google Drive - Only access files created or opened by this application (Safe, does not require restricted security assessment)
 googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
-googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
+// Gmail - Sending audit reports and client transmittals directly from the app
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
 
 googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
 const SESSION_TOKEN_KEY = 'ca_google_drive_token_session';
+const SESSION_TOKEN_EXPIRY_KEY = 'ca_google_drive_token_expiry';
+const TOKEN_TTL_MS = 50 * 60 * 1000; // 50 minutes safe TTL for 1-hour Google OAuth tokens
 
-// In-session token cache (persists during active browser tab, cleared on logout/tab close)
-let cachedAccessToken: string | null = (() => {
+function readValidSessionToken(): string | null {
   try {
-    return sessionStorage.getItem(SESSION_TOKEN_KEY);
+    const token = sessionStorage.getItem(SESSION_TOKEN_KEY);
+    const expiryStr = sessionStorage.getItem(SESSION_TOKEN_EXPIRY_KEY);
+    if (!token || !expiryStr) {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      sessionStorage.removeItem(SESSION_TOKEN_EXPIRY_KEY);
+      return null;
+    }
+    const expiry = Number(expiryStr);
+    if (!Number.isFinite(expiry) || Date.now() > expiry) {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      sessionStorage.removeItem(SESSION_TOKEN_EXPIRY_KEY);
+      return null;
+    }
+    return token;
   } catch {
     return null;
   }
-})();
+}
+
+function writeSessionToken(token: string | null): void {
+  try {
+    if (token) {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+      sessionStorage.setItem(SESSION_TOKEN_EXPIRY_KEY, String(Date.now() + TOKEN_TTL_MS));
+    } else {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      sessionStorage.removeItem(SESSION_TOKEN_EXPIRY_KEY);
+    }
+  } catch {}
+}
+
+// In-session token cache (persists during active browser tab while valid, cleared on expiry/logout)
+let cachedAccessToken: string | null = readValidSessionToken();
 let isSigningIn = false;
 
 export const initAuth = (
@@ -128,46 +159,57 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (!cachedAccessToken) {
-        try {
-          cachedAccessToken = sessionStorage.getItem(SESSION_TOKEN_KEY);
-        } catch {}
-      }
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
+      const validToken = readValidSessionToken();
+      cachedAccessToken = validToken;
+      if (validToken) {
+        if (onAuthSuccess) onAuthSuccess(user, validToken);
       } else if (!isSigningIn) {
-        // User is signed in with Firebase, but Drive token is not yet connected or expired
+        // User is signed in with Firebase, but Drive token is not yet connected or has expired
         if (onAuthFailure) onAuthFailure();
       }
     } else {
       cachedAccessToken = null;
-      try {
-        sessionStorage.removeItem(SESSION_TOKEN_KEY);
-      } catch {}
+      writeSessionToken(null);
       if (onAuthFailure) onAuthFailure();
     }
   });
 };
 
-export const isSandboxEnvironment = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  const host = window.location.hostname;
-  // If running on custom production domain or Cloud Run/Hosting, it is NEVER a sandbox
-  if (
-    host === 'fintaxaudit.vivaproject.in' ||
-    host.includes('vivaproject.in') ||
-    host.includes('run.app') ||
-    host.includes('web.app') ||
-    host.includes('firebaseapp.com')
-  ) {
-    return false;
+export const getReadableAuthErrorMessage = (err: any): { message: string; isDomainError: boolean; domain?: string } => {
+  if (!err) return { message: 'Authentication failed.', isDomainError: false };
+  const code = err.code || '';
+  const msg = String(err.message || err);
+  const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+
+  if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
+    return {
+      message: `Domain '${currentDomain}' is not authorized for Google Sign-In. Add '${currentDomain}' to Authorized Domains in Firebase Console (Authentication > Settings > Authorized domains) and GCP OAuth Client settings.`,
+      isDomainError: true,
+      domain: currentDomain,
+    };
   }
-  // Only fallback if embedded in an iframe preview environment
-  try {
-    return window.self !== window.top && (host.includes('webcontainer') || host.includes('stackblitz'));
-  } catch {
-    return false;
+  if (code === 'auth/popup-blocked' || msg.includes('popup-blocked')) {
+    return {
+      message: `Google Sign-In popup was blocked by your browser. Please allow popups for ${currentDomain} and try again.`,
+      isDomainError: false,
+    };
   }
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || msg.includes('popup-closed-by-user')) {
+    return {
+      message: 'Google Sign-In window was closed before completion. Please try again.',
+      isDomainError: false,
+    };
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return {
+      message: 'Google Sign-In provider is not enabled in Firebase Console. Please enable Google under Authentication > Sign-in method.',
+      isDomainError: false,
+    };
+  }
+  return {
+    message: err.message || 'Google authentication failed. Please check your credentials.',
+    isDomainError: false,
+  };
 };
 
 export const isPopupBlockedOrUnauthorized = (err: any): boolean => {
@@ -188,50 +230,6 @@ export const isPopupBlockedOrUnauthorized = (err: any): boolean => {
   );
 };
 
-export const createSandboxGoogleUser = (email?: string, name?: string): User => {
-  const effectiveEmail = email || 'vishalsutar7@gmail.com';
-  const effectiveName = name || 'Vishal Sutar';
-  return {
-    uid: 'google_sandbox_' + effectiveEmail.replace(/[^a-zA-Z0-9]/g, '_'),
-    email: effectiveEmail,
-    displayName: effectiveName,
-    emailVerified: true,
-    isAnonymous: false,
-    photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(effectiveName)}&background=0D8ABC&color=fff`,
-    phoneNumber: null,
-    providerId: 'google.com',
-    tenantId: null,
-    providerData: [
-      {
-        providerId: 'google.com',
-        uid: effectiveEmail,
-        displayName: effectiveName,
-        email: effectiveEmail,
-        phoneNumber: null,
-        photoURL: '',
-      },
-    ],
-    metadata: {
-      creationTime: new Date().toISOString(),
-      lastSignInTime: new Date().toISOString(),
-    },
-    refreshToken: 'sandbox_refresh_token',
-    delete: async () => {},
-    getIdToken: async () => 'sandbox_id_token',
-    getIdTokenResult: async () => ({
-      token: 'sandbox_id_token',
-      authTime: new Date().toISOString(),
-      issuedAtTime: new Date().toISOString(),
-      expirationTime: new Date(Date.now() + 3600000).toISOString(),
-      signInProvider: 'google.com',
-      signInSecondFactor: null,
-      claims: {},
-    }),
-    reload: async () => {},
-    toJSON: () => ({ email: effectiveEmail, displayName: effectiveName }),
-  } as unknown as User;
-};
-
 /**
  * Standard 1-click Google Sign-In for User Authentication (lightweight & safe)
  */
@@ -239,39 +237,24 @@ export const googleSignInStandard = async (): Promise<{ user: User; accessToken?
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, standardGoogleProvider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (credential?.accessToken) {
-      cachedAccessToken = credential.accessToken;
-      try {
-        sessionStorage.setItem(SESSION_TOKEN_KEY, credential.accessToken);
-      } catch {}
-    }
-    return { user: result.user, accessToken: cachedAccessToken || undefined };
+    // Do not overwrite Drive-scoped token with a standard identity-only token
+    const existingValidDriveToken = readValidSessionToken();
+    return { user: result.user, accessToken: existingValidDriveToken || undefined };
   } catch (error: any) {
-    if (isSandboxEnvironment() && isPopupBlockedOrUnauthorized(error)) {
-      console.warn('[Firebase Auth] Sandbox environment detected. Falling back to sandbox user.');
-      const fallbackUser = createSandboxGoogleUser();
-      return { user: fallbackUser, accessToken: undefined };
-    }
-    if (error?.code === 'auth/popup-closed-by-user') {
-      throw new Error('Google Sign-In was cancelled.');
-    }
-    if (error?.code === 'auth/popup-blocked') {
-      throw new Error('Sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
-    }
-    if (error?.code === 'auth/unauthorized-domain') {
-      const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
-      throw new Error(`Domain "${currentDomain}" is not authorized in Firebase Authentication.`);
-    }
-    console.error('Google Sign In Error:', error);
-    throw error;
+    const parsed = getReadableAuthErrorMessage(error);
+    const enhancedError = new Error(parsed.message);
+    (enhancedError as any).code = error.code;
+    (enhancedError as any).isDomainError = parsed.isDomainError;
+    (enhancedError as any).domain = parsed.domain;
+    console.warn('[Firebase Auth] Google Sign In Notice:', error);
+    throw enhancedError;
   } finally {
     isSigningIn = false;
   }
 };
 
 /**
- * Full Workspace Google Sign-In with Drive backup scopes
+ * Full Workspace Google Sign-In with Gmail & Drive scopes
  */
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string }> => {
   try {
@@ -280,61 +263,38 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
       cachedAccessToken = credential.accessToken;
-      try {
-        sessionStorage.setItem(SESSION_TOKEN_KEY, credential.accessToken);
-      } catch {}
+      writeSessionToken(credential.accessToken);
     }
-    return { user: result.user, accessToken: cachedAccessToken || '' };
+    if (!cachedAccessToken) {
+      throw new Error('Google Workspace authorization did not return an access token. Please grant the requested permissions.');
+    }
+    return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
-    if (error?.code === 'auth/unauthorized-domain') {
-      const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
-      throw new Error(
-        `Google Sign-In is blocked because "${currentDomain}" is not an authorized domain in Firebase. ` +
-        `Please add "${currentDomain}" to Authorized Domains in Firebase Console.`
-      );
-    }
-    if (isSandboxEnvironment() && isPopupBlockedOrUnauthorized(error)) {
-      console.warn('[Firebase Auth] Sandbox environment detected. Falling back to sandbox session.');
-      const fallbackUser = createSandboxGoogleUser();
-      const fallbackToken = 'sandbox_workspace_token_' + Math.random().toString(36).substring(2, 9);
-      cachedAccessToken = fallbackToken;
-      try {
-        sessionStorage.setItem(SESSION_TOKEN_KEY, fallbackToken);
-      } catch {}
-      return { user: fallbackUser, accessToken: fallbackToken };
-    }
-    if (error?.code === 'auth/popup-closed-by-user') {
-      throw new Error('Google Drive connection was cancelled.');
-    }
-    if (error?.code === 'auth/popup-blocked') {
-      throw new Error('Popup was blocked by your browser. Please allow popups for this site and try again.');
-    }
-    console.error('Google Sign In Error:', error);
-    throw error;
+    const parsed = getReadableAuthErrorMessage(error);
+    const enhancedError = new Error(parsed.message);
+    (enhancedError as any).code = error.code;
+    (enhancedError as any).isDomainError = parsed.isDomainError;
+    (enhancedError as any).domain = parsed.domain;
+    console.warn('[Firebase Auth] Google Workspace Sign-In Notice:', error);
+    throw enhancedError;
   } finally {
     isSigningIn = false;
   }
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  const valid = readValidSessionToken();
+  cachedAccessToken = valid;
+  return valid;
 };
 
 export const setAccessTokenInMemory = (token: string | null) => {
   cachedAccessToken = token;
-  try {
-    if (token) {
-      sessionStorage.setItem(SESSION_TOKEN_KEY, token);
-    } else {
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
-    }
-  } catch {}
+  writeSessionToken(token);
 };
 
 export const googleLogout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
-  try {
-    sessionStorage.removeItem(SESSION_TOKEN_KEY);
-  } catch {}
+  writeSessionToken(null);
 };

@@ -24,6 +24,9 @@ import { UserManualModal } from './components/UserManualModal';
 import { AIFinancialsCopilotModal } from './components/AIFinancialsCopilotModal';
 import { CompaniesWindow } from './components/CompaniesWindow';
 import { StepByStepWorkspace } from './components/StepByStepWorkspace';
+import { VivaSidebar, VivaNavId } from './components/VivaSidebar';
+import { VivaHomeDashboard } from './components/VivaHomeDashboard';
+import { TradePayablesMsmeModal } from './components/TradePayablesMsmeModal';
 import { initAuth, googleSignIn, googleLogout, setAccessTokenInMemory } from './firebase';
 import type { User } from 'firebase/auth';
 import {
@@ -47,8 +50,13 @@ import {
   samplePYProfitAndLossDoc,
 } from './data/sampleTrialBalances';
 import { CREDIT_COSTS } from './data/subscriptionPlans';
-import { mapTrialBalanceLedgers } from './utils/mappingEngine';
+import { mapTrialBalanceLedgers, normalizeProfitAndLossLedgers } from './utils/mappingEngine';
 import { computeFinancialStatements } from './utils/financialCalculations';
+import {
+  ensureBranchesInitialized,
+  consolidateBranchTrialBalances,
+  generateSampleBranchTrialBalance,
+} from './utils/branchConsolidation';
 import {
   parseTrialBalanceFile,
   parseTrialBalanceExcelOrCsv,
@@ -73,27 +81,45 @@ import {
   recordUserUsage,
   deductCredits,
   exportTotalLocalBackup,
+  exportSingleCompanyBackup,
+  importWorkspaceBackup,
+  mergeRestoredCompanies,
   hasAcceptedTerms,
   recordTermsAccepted,
+  setPendingReferralCode,
+  clearPendingReferralCode,
+  applyReferralRewardAsync,
+  deriveUserIdentityFromLoginId,
+  saveActiveUserIdToStorage,
 } from './utils/storageManager';
 import { NCE_NOTE_DEFINITIONS } from './data/nceTaxonomy';
-import { CheckCircle2, AlertTriangle, Info, X, FileSpreadsheet, ArrowRight, RefreshCw, BookOpen, Bot } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Info, X, FileSpreadsheet, ArrowRight, RefreshCw, BookOpen, Bot, Zap, Plus } from 'lucide-react';
 import { FinancialYearChangeModal } from './components/FinancialYearChangeModal';
 import {
   checkAndRestoreFromDrive,
   saveWorkspaceToDriveSync,
 } from './services/driveSyncService';
-import { isGoogleAuthExpired } from './services/driveService';
+import {
+  isGoogleAuthExpired,
+  isGoogleDriveApiDisabled,
+  extractDriveActivationUrl,
+} from './services/driveService';
 import {
   claimPendingReferralRewards,
   syncUserReferralToCloud,
+  subscribeToReferralRewards,
 } from './services/referralCloudService';
 
 export default function App() {
   // Authenticated User & SaaS Subscription State
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     try {
-      return loadActiveUserFromStorage();
+      const u = loadActiveUserFromStorage();
+      if (u && (u.email === 'vishalsutar7@gmail.com' || u.userId === 'vishalsutar7')) {
+        logoutActiveUser();
+        return null;
+      }
+      return u;
     } catch {
       return null;
     }
@@ -144,7 +170,7 @@ export default function App() {
   // Active Company State Variables
   const [config, setConfig] = useState<EntityConfig>(() => {
     return initialCompany?.config || {
-      entityName: '',
+      entityName: 'Viva Group',
       entityType: 'Partnership Firm',
       financialYear: '2025-26',
       reportingPeriod: 'March 31, 2026',
@@ -155,11 +181,11 @@ export default function App() {
     };
   });
   const [rawRows, setRawRows] = useState<TrialBalanceRow[]>(() => initialCompany?.rawRows || []);
-  const [mappedLedgers, setMappedLedgers] = useState<MappedLedger[]>(() => initialCompany?.mappedLedgers || []);
+  const [mappedLedgers, setMappedLedgers] = useState<MappedLedger[]>(() => normalizeProfitAndLossLedgers(initialCompany?.mappedLedgers || []));
   const [mappingExceptions, setMappingExceptions] = useState<AuditException[]>(() => initialCompany?.mappingExceptions || []);
 
   const [pyRawRows, setPyRawRows] = useState<TrialBalanceRow[]>(() => initialCompany?.pyRawRows || []);
-  const [pyMappedLedgers, setPyMappedLedgers] = useState<MappedLedger[]>(() => initialCompany?.pyMappedLedgers || []);
+  const [pyMappedLedgers, setPyMappedLedgers] = useState<MappedLedger[]>(() => normalizeProfitAndLossLedgers(initialCompany?.pyMappedLedgers || []));
   const [pyMappingExceptions, setPyMappingExceptions] = useState<AuditException[]>(() => initialCompany?.pyMappingExceptions || []);
 
   const [tbFileName, setTbFileName] = useState<string>(() => initialCompany?.tbFileName || '');
@@ -174,13 +200,10 @@ export default function App() {
 
   // Navigation & Modals
   const [activeTab, setActiveTab] = useState<string>('ingestion');
-  const [dashboardView, setDashboardView] = useState<'companies' | 'workspace'>(() => {
-    const activeUser = loadActiveUserFromStorage();
-    const saved = loadCompaniesForUserSession(activeUser);
-    return saved && saved.length > 0 ? 'workspace' : 'companies';
-  });
+  const [dashboardView, setDashboardView] = useState<'home' | 'companies' | 'workspace'>('home');
   const [workspaceStep, setWorkspaceStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [selectedNoteNumber, setSelectedNoteNumber] = useState<number | undefined>(undefined);
+  const [isTradePayablesOpen, setIsTradePayablesOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isYearModalOpen, setIsYearModalOpen] = useState(false);
   const [isYearEndAdjustmentsOpen, setIsYearEndAdjustmentsOpen] = useState(false);
@@ -214,7 +237,7 @@ export default function App() {
   } | null>(null);
 
   // Authenticated User Modal & Subscription State
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => !loadActiveUserFromStorage());
   const [authModalTab, setAuthModalTab] = useState<'signin' | 'register'>('signin');
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [isUserProfileModalOpen, setIsUserProfileModalOpen] = useState(false);
@@ -229,15 +252,9 @@ export default function App() {
   const [isAICopilotOpen, setIsAICopilotOpen] = useState(false);
   const [aiCopilotPrompt, setAiCopilotPrompt] = useState<string | undefined>(undefined);
 
-  // Terms & Conditions Acceptance State (mandatory before accessing workspace)
-  const [hasAcceptedTermsState, setHasAcceptedTermsState] = useState<boolean>(() => {
-    try {
-      return hasAcceptedTerms();
-    } catch {
-      return false;
-    }
-  });
-  const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(() => !hasAcceptedTerms());
+  // Terms & Conditions Acceptance State (compulsory popup before accessing/using workspace)
+  const [hasAcceptedTermsState, setHasAcceptedTermsState] = useState<boolean>(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(true);
 
   const handleAcceptTerms = useCallback(() => {
     recordTermsAccepted();
@@ -256,28 +273,52 @@ export default function App() {
 
   // Google Drive Cloud Auto-Sync State
   const [driveSyncStatus, setDriveSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [driveApiDisabledUrl, setDriveApiDisabledUrl] = useState<string | null>(null);
   const [lastDriveSyncTime, setLastDriveSyncTime] = useState<Date | null>(null);
   const isInitialDriveSyncDoneRef = useRef<boolean>(false);
   const driveSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeDriveFileIdRef = useRef<string | undefined>(undefined);
 
-  // Check URL query param for ?ref=... on mount and persist in session
+  // Check URL query param for ?ref=... on mount and persist in session & local storage
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const refParam = params.get('ref');
       if (refParam && refParam.trim()) {
         const cleanRef = refParam.trim();
-        sessionStorage.setItem('ca_pending_referral_code', cleanRef);
+        setPendingReferralCode(cleanRef);
 
         const isGuestOrLoggedOut = !currentUser || currentUser.id.startsWith('guest_ca');
-        if (isGuestOrLoggedOut) {
+        const isSelfCode =
+          currentUser &&
+          ((currentUser.referralCode || '').toUpperCase() === cleanRef.toUpperCase() ||
+            (currentUser.userId || '').toLowerCase() === cleanRef.toLowerCase().replace(/^@/, '') ||
+            (currentUser.email || '').toLowerCase() === cleanRef.toLowerCase());
+
+        if (isGuestOrLoggedOut || isSelfCode) {
           setAuthModalTab('register');
           setIsAuthModalOpen(true);
           setNotification({
             type: 'info',
-            message: `🎉 Referral code "${cleanRef}" detected! Complete registration or Google Sign-In to receive +500 free credits!`,
+            message: isSelfCode
+              ? `🎉 Referral link "${cleanRef}" active! Sign in or create an account as the referred colleague to award +500 credits to both accounts.`
+              : `🎉 Referral code "${cleanRef}" detected! Sign in or create an account to award +500 free credits to both you and your colleague!`,
           });
+        } else if (currentUser && !currentUser.referredBy) {
+          // Logged-in colleague clicked referral link directly -> apply reward immediately!
+          applyReferralRewardAsync(currentUser.id, cleanRef)
+            .then((res) => {
+              if (res.success) {
+                clearPendingReferralCode();
+                const fresh = loadActiveUserFromStorage();
+                if (fresh) setCurrentUser(fresh);
+                setNotification({
+                  type: 'success',
+                  message: `🎁 Referral claimed! You and ${res.inviterName || 'your colleague'} each received +${res.bonusGranted} Credits!`,
+                });
+              }
+            })
+            .catch(() => {});
         }
       }
     } catch (e) {
@@ -285,31 +326,75 @@ export default function App() {
     }
   }, []);
 
-  // Sync user referral identity to cloud & claim any offline pending rewards
+  // Sync user referral identity to cloud & subscribe to real-time referral rewards
   useEffect(() => {
-    if (currentUser && !currentUser.id.startsWith('guest_ca')) {
-      // Keep cloud directory up to date
-      syncUserReferralToCloud(currentUser).catch(() => {});
+    if (!currentUser) return;
 
-      // Claim pending referral rewards earned from colleagues who registered using this user's code/ID
-      claimPendingReferralRewards(currentUser)
-        .then((claimRes) => {
-          if (claimRes && claimRes.claimedCount > 0) {
-            if (claimRes.updatedUser) {
-              setCurrentUser(claimRes.updatedUser);
-            }
-            const names = claimRes.refereeNames.slice(0, 3).join(', ');
+    // Keep cloud & server directory up to date
+    syncUserReferralToCloud(currentUser).catch(() => {});
+
+    // Immediate check for pending referral rewards earned from colleagues
+    claimPendingReferralRewards(currentUser)
+      .then((claimRes) => {
+        if (claimRes && claimRes.claimedCount > 0) {
+          if (claimRes.updatedUser) {
+            setCurrentUser(claimRes.updatedUser);
+          }
+          const names = claimRes.refereeNames.slice(0, 3).join(', ');
+          setNotification({
+            type: 'success',
+            message: `🎁 Referral Bonus! You received +${claimRes.totalAwarded} Credits! Colleague(s) (${names}) logged in using your referral.`,
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('Pending referral processing error:', err);
+      });
+
+    // Real-time subscription (Firestore onSnapshot + server poll) so sender gets credits live
+    const unsubscribeRewards = subscribeToReferralRewards(currentUser, (claimRes) => {
+      setCurrentUser(claimRes.updatedUser);
+      const names = claimRes.refereeNames.slice(0, 3).join(', ');
+      setNotification({
+        type: 'success',
+        message: `🎁 Referral Bonus! You received +${claimRes.totalAwarded} Credits! Colleague(s) (${names}) logged in using your referral.`,
+      });
+    });
+
+    // Cross-tab storage & window focus listener (handles same-browser multi-tab referral login)
+    const handleStorageOrFocus = () => {
+      const reloaded = loadActiveUserFromStorage();
+      if (reloaded && reloaded.id === currentUser.id) {
+        if (
+          reloaded.credits !== currentUser.credits ||
+          reloaded.referralsCount !== currentUser.referralsCount
+        ) {
+          setCurrentUser(reloaded);
+        }
+      }
+      claimPendingReferralRewards(reloaded || currentUser)
+        .then((res) => {
+          if (res.claimedCount > 0 && res.updatedUser) {
+            setCurrentUser(res.updatedUser);
+            const names = res.refereeNames.slice(0, 3).join(', ');
             setNotification({
               type: 'success',
-              message: `🎁 Referral Bonus! You received +${claimRes.totalAwarded} Credits! Colleague(s) (${names}) joined using your referral.`,
+              message: `🎁 Referral Bonus! You received +${res.totalAwarded} Credits! Colleague(s) (${names}) logged in using your referral.`,
             });
           }
         })
-        .catch((err) => {
-          console.warn('Pending referral processing error:', err);
-        });
-    }
-  }, [currentUser?.id]);
+        .catch(() => {});
+    };
+
+    window.addEventListener('storage', handleStorageOrFocus);
+    window.addEventListener('focus', handleStorageOrFocus);
+
+    return () => {
+      unsubscribeRewards();
+      window.removeEventListener('storage', handleStorageOrFocus);
+      window.removeEventListener('focus', handleStorageOrFocus);
+    };
+  }, [currentUser?.id, currentUser?.referralCode, user?.uid]);
 
   // Sync active company count with current user profile usage
   useEffect(() => {
@@ -335,10 +420,10 @@ export default function App() {
       const activeComp = userCompanies.find((c) => c.id === targetActiveId) || userCompanies[0];
       setConfig({ ...activeComp.config });
       setRawRows([...(activeComp.rawRows || [])]);
-      setMappedLedgers([...(activeComp.mappedLedgers || [])]);
+      setMappedLedgers(normalizeProfitAndLossLedgers([...(activeComp.mappedLedgers || [])]));
       setMappingExceptions([...(activeComp.mappingExceptions || [])]);
       setPyRawRows([...(activeComp.pyRawRows || [])]);
-      setPyMappedLedgers([...(activeComp.pyMappedLedgers || [])]);
+      setPyMappedLedgers(normalizeProfitAndLossLedgers([...(activeComp.pyMappedLedgers || [])]));
       setPyMappingExceptions([...(activeComp.pyMappingExceptions || [])]);
       setTbFileName(activeComp.tbFileName || '');
       setPyFileName(activeComp.pyFileName || '');
@@ -349,7 +434,7 @@ export default function App() {
       setDashboardView('workspace');
     } else {
       setConfig({
-        entityName: '',
+        entityName: 'Viva Group',
         entityType: 'Partnership Firm',
         financialYear: '2025-26',
         reportingPeriod: 'March 31, 2026',
@@ -379,30 +464,54 @@ export default function App() {
   }, []);
 
   const handleAuthSuccess = useCallback((authedUser: UserProfile) => {
-    setCurrentUser(authedUser);
-    switchSessionToUser(authedUser);
+    // Automatically regenerate / ensure clean username and display name based on login identifier
+    const loginId = authedUser.email || authedUser.userId || authedUser.id;
+    const derived = deriveUserIdentityFromLoginId(loginId, authedUser.fullName);
+
+    const finalUser: UserProfile = {
+      ...authedUser,
+      userId:
+        authedUser.userId && authedUser.userId !== 'guest_ca' && !authedUser.userId.startsWith('user_')
+          ? authedUser.userId
+          : derived.userId,
+      fullName: authedUser.id === 'guest_ca' ? 'Guest CA' : (derived.fullName || authedUser.fullName),
+    };
+
+    saveActiveUserIdToStorage(finalUser.id);
+    setCurrentUser(finalUser);
+    switchSessionToUser(finalUser);
     isInitialDriveSyncDoneRef.current = false;
     activeDriveFileIdRef.current = undefined;
     setNotification({
       type: 'success',
-      message: `Signed in as ${authedUser.fullName} (${authedUser.email})`,
+      message: finalUser.id === 'guest_ca'
+        ? `Logged in as Guest (Trial Mode • 555 credits)`
+        : `Welcome, ${finalUser.fullName}! (@${finalUser.userId})`,
     });
   }, [switchSessionToUser]);
 
   const handleGoogleAuthSuccess = useCallback((authedUser: UserProfile, isNewUser: boolean, token?: string) => {
-    setCurrentUser(authedUser);
-    switchSessionToUser(authedUser);
+    const derived = deriveUserIdentityFromLoginId(authedUser.email, authedUser.fullName);
+    const finalUser: UserProfile = {
+      ...authedUser,
+      userId: authedUser.userId && authedUser.userId !== 'guest_ca' ? authedUser.userId : derived.userId,
+      fullName: authedUser.fullName || derived.fullName,
+    };
+
+    saveActiveUserIdToStorage(finalUser.id);
+    setCurrentUser(finalUser);
+    switchSessionToUser(finalUser);
     isInitialDriveSyncDoneRef.current = false;
     activeDriveFileIdRef.current = undefined;
     if (token) {
       setAccessToken(token);
     }
-    if (isNewUser || !authedUser.mobile) {
+    if (isNewUser || !finalUser.mobile) {
       setIsOnboardingModalOpen(true);
     } else {
       setNotification({
         type: 'success',
-        message: `Welcome back, ${authedUser.fullName}! (${authedUser.email})`,
+        message: `Welcome back, ${finalUser.fullName}! (@${finalUser.userId})`,
       });
     }
   }, [switchSessionToUser]);
@@ -412,18 +521,25 @@ export default function App() {
       await googleLogout();
     } catch {}
     logoutActiveUser();
-    setCurrentUser(null);
+    setAccessTokenInMemory(null);
+    setCurrentUser(loadActiveUserFromStorage());
     setUser(null);
     setAccessToken(null);
     isInitialDriveSyncDoneRef.current = false;
     activeDriveFileIdRef.current = undefined;
     setDriveSyncStatus('idle');
     setLastDriveSyncTime(null);
+    setIsUserProfileModalOpen(false);
+    setIsSubscriptionModalOpen(false);
+    setIsReferralModalOpen(false);
+    setIsOnboardingModalOpen(false);
     switchSessionToUser(null);
-    setDashboardView('companies');
+    setDashboardView('home');
+    setAuthModalTab('signin');
+    setIsAuthModalOpen(true);
     setNotification({
       type: 'info',
-      message: 'Signed out. Switched to offline guest workspace.',
+      message: 'Signed out successfully. Sign in to another account or continue in Guest Mode.',
     });
   }, [switchSessionToUser]);
 
@@ -469,12 +585,17 @@ export default function App() {
     const storedActiveId = loadActiveCompanyIdForUserSession(currentUser, savedCompanies);
 
     if (savedCompanies && savedCompanies.length > 0) {
-      setCompanies(savedCompanies);
-      const targetId = storedActiveId && savedCompanies.some((c) => c.id === storedActiveId)
+      const normalizedCompanies = savedCompanies.map((c) => ({
+        ...c,
+        mappedLedgers: normalizeProfitAndLossLedgers(c.mappedLedgers || []),
+        pyMappedLedgers: normalizeProfitAndLossLedgers(c.pyMappedLedgers || []),
+      }));
+      setCompanies(normalizedCompanies);
+      const targetId = storedActiveId && normalizedCompanies.some((c) => c.id === storedActiveId)
         ? storedActiveId
-        : savedCompanies[0].id;
+        : normalizedCompanies[0].id;
 
-      const activeComp = savedCompanies.find((c) => c.id === targetId) || savedCompanies[0];
+      const activeComp = normalizedCompanies.find((c) => c.id === targetId) || normalizedCompanies[0];
       setActiveCompanyId(activeComp.id);
       setConfig({ ...activeComp.config });
       setRawRows([...(activeComp.rawRows || [])]);
@@ -535,7 +656,7 @@ export default function App() {
             message: `Google Drive connected & synced! All ${companies.length} company entity/entities backed up securely.`,
           });
         } catch (syncErr: any) {
-          console.error('Post-connect sync error:', syncErr);
+          console.warn('Post-connect sync notice:', syncErr);
           setDriveSyncStatus('error');
           setNotification({
             type: 'error',
@@ -583,7 +704,7 @@ export default function App() {
         message: `Google Drive workspace synced successfully (${companies.length} company entity/entities backed up).`,
       });
     } catch (err: any) {
-      console.error('Manual Drive sync error:', err);
+      console.warn('Manual Drive sync notice:', err?.message || err);
       setDriveSyncStatus('error');
 
       if (isGoogleAuthExpired(err)) {
@@ -632,6 +753,20 @@ export default function App() {
         return;
       }
 
+      if (isGoogleDriveApiDisabled(err)) {
+        const activationUrl = extractDriveActivationUrl(err);
+        setDriveApiDisabledUrl(activationUrl);
+        setNotification({
+          type: 'error',
+          message: 'Google Drive API is disabled in your Google Cloud Project. Please enable it in Google Cloud Console.',
+          action: {
+            label: 'Enable Drive API ↗',
+            onClick: () => window.open(activationUrl, '_blank', 'noopener,noreferrer'),
+          },
+        });
+        return;
+      }
+
       setNotification({
         type: 'error',
         message: `Google Drive sync failed: ${err.message || 'Check network or permissions'}`,
@@ -659,13 +794,185 @@ export default function App() {
         message: `Total Local Backup complete! Downloaded "${res.fileName}" with all ${res.totalCompanies} companies.`,
       });
     } catch (err: any) {
-      console.error('Local backup export error:', err);
+      console.warn('Local backup export error:', err);
       setNotification({
         type: 'error',
         message: `Failed to download local backup: ${err.message || 'Unknown error'}`,
       });
     }
   }, [companies, activeCompanyId, currentUser]);
+
+  // Single File Backup of a specific company (or active working company by default)
+  const handleExportSingleCompanyBackup = useCallback(
+    (companyId?: string) => {
+      try {
+        const targetId = companyId || activeCompanyId;
+        // Ensure latest active working state is included if backing up the currently open company
+        const snapshotCompanies = companies.map((c) =>
+          c.id === activeCompanyId
+            ? {
+                ...c,
+                config,
+                rawRows,
+                mappedLedgers,
+                mappingExceptions,
+                pyRawRows,
+                pyMappedLedgers,
+                pyMappingExceptions,
+                tbFileName,
+                pyFileName,
+                uploadedBalanceSheet,
+                uploadedProfitAndLoss,
+                uploadedPYBalanceSheet,
+                uploadedPYProfitAndLoss,
+                updatedAt: new Date().toISOString(),
+              }
+            : c
+        );
+        const targetComp = snapshotCompanies.find((c) => c.id === targetId) || snapshotCompanies[0];
+        if (!targetComp) {
+          setNotification({
+            type: 'info',
+            message: 'No working company file found to back up. Please create a company first.',
+          });
+          return;
+        }
+        const res = exportSingleCompanyBackup(targetComp, currentUser || undefined);
+        setNotification({
+          type: 'success',
+          message: `Single File Backup complete! Downloaded "${res.fileName}" for "${res.entityName}".`,
+        });
+      } catch (err: any) {
+        console.warn('Single file backup export error:', err);
+        setNotification({
+          type: 'error',
+          message: `Failed to download single file backup: ${err.message || 'Unknown error'}`,
+        });
+      }
+    },
+    [
+      companies,
+      activeCompanyId,
+      currentUser,
+      config,
+      rawRows,
+      mappedLedgers,
+      mappingExceptions,
+      pyRawRows,
+      pyMappedLedgers,
+      pyMappingExceptions,
+      tbFileName,
+      pyFileName,
+      uploadedBalanceSheet,
+      uploadedProfitAndLoss,
+      uploadedPYBalanceSheet,
+      uploadedPYProfitAndLoss,
+    ]
+  );
+
+  // Non-destructive Restore Handler (Single File Restore adds to working files; Total Restore merges without removing working files)
+  const handleRestoreCompanies = useCallback(
+    (
+      restoredCompanies: Company[],
+      preferredActiveId?: string,
+      restoreOptions?: {
+        backupType?: 'single' | 'total';
+        duplicateStrategy?: 'add_as_new' | 'update_matching';
+        sourceName?: string;
+      }
+    ) => {
+      const userEmail = currentUser?.email?.trim().toLowerCase() || user?.email?.trim().toLowerCase() || undefined;
+      const userId = currentUser?.id || user?.uid || undefined;
+
+      // Snapshot current active company edits so the currently open working file is preserved
+      const currentWorkingSnapshot = companies.map((c) =>
+        c.id === activeCompanyId
+          ? {
+              ...c,
+              config,
+              rawRows,
+              mappedLedgers,
+              mappingExceptions,
+              pyRawRows,
+              pyMappedLedgers,
+              pyMappingExceptions,
+              tbFileName,
+              pyFileName,
+              uploadedBalanceSheet,
+              uploadedProfitAndLoss,
+              uploadedPYBalanceSheet,
+              uploadedPYProfitAndLoss,
+            }
+          : c
+      );
+
+      const mergeResult = mergeRestoredCompanies(currentWorkingSnapshot, restoredCompanies, {
+        backupType: restoreOptions?.backupType,
+        duplicateStrategy: restoreOptions?.duplicateStrategy,
+        preferredActiveId,
+        userEmail,
+        userId,
+      });
+
+      const mergedList = mergeResult.companies;
+      const targetId = mergeResult.activeCompanyId;
+      const activeTarget = mergedList.find((c) => c.id === targetId) || mergedList[mergedList.length - 1] || mergedList[0];
+
+      isSwitchingCompanyRef.current = true;
+      setCompanies(mergedList);
+      saveCompaniesForUserSession(mergedList, currentUser);
+
+      if (activeTarget) {
+        setActiveCompanyId(activeTarget.id);
+        saveActiveCompanyIdForUserSession(activeTarget.id, currentUser);
+
+        setConfig({ ...activeTarget.config });
+        setRawRows([...(activeTarget.rawRows || [])]);
+        setMappedLedgers([...(activeTarget.mappedLedgers || [])]);
+        setMappingExceptions([...(activeTarget.mappingExceptions || [])]);
+        setPyRawRows([...(activeTarget.pyRawRows || [])]);
+        setPyMappedLedgers([...(activeTarget.pyMappedLedgers || [])]);
+        setPyMappingExceptions([...(activeTarget.pyMappingExceptions || [])]);
+        setTbFileName(activeTarget.tbFileName || '');
+        setPyFileName(activeTarget.pyFileName || '');
+        setUploadedBalanceSheet(activeTarget.uploadedBalanceSheet);
+        setUploadedProfitAndLoss(activeTarget.uploadedProfitAndLoss);
+        setUploadedPYBalanceSheet(activeTarget.uploadedPYBalanceSheet);
+        setUploadedPYProfitAndLoss(activeTarget.uploadedPYProfitAndLoss);
+      }
+
+      setTimeout(() => {
+        isSwitchingCompanyRef.current = false;
+      }, 120);
+
+      const isSingle = restoreOptions?.backupType === 'single' || restoredCompanies.length === 1;
+      setNotification({
+        type: 'success',
+        message: isSingle
+          ? `Single file "${activeTarget?.config.entityName || 'Entity'}" restored and added to your working files (${mergedList.length} working files in app).`
+          : `Backup restored! Added ${mergeResult.addedCount} new file(s) and updated ${mergeResult.updatedCount} matching file(s). All ${mergedList.length} working files are active in the app.`,
+      });
+    },
+    [
+      companies,
+      activeCompanyId,
+      currentUser,
+      user,
+      config,
+      rawRows,
+      mappedLedgers,
+      mappingExceptions,
+      pyRawRows,
+      pyMappedLedgers,
+      pyMappingExceptions,
+      tbFileName,
+      pyFileName,
+      uploadedBalanceSheet,
+      uploadedProfitAndLoss,
+      uploadedPYBalanceSheet,
+      uploadedPYProfitAndLoss,
+    ]
+  );
 
   // Initial restore/sync from Google Drive upon sign-in with access token
   useEffect(() => {
@@ -726,17 +1033,24 @@ export default function App() {
         }
       } catch (err: any) {
         if (!isMounted) return;
-        console.error('Initial Google Drive sync failed:', err);
-        setDriveSyncStatus('error');
         if (isGoogleAuthExpired(err)) {
+          // Silently clear expired session token and return Drive status to idle
           setAccessToken(null);
           setAccessTokenInMemory(null);
+          setDriveSyncStatus('idle');
+          return;
+        }
+        console.warn('Initial Google Drive sync notice:', err?.message || err);
+        setDriveSyncStatus('error');
+        if (isGoogleDriveApiDisabled(err)) {
+          const activationUrl = extractDriveActivationUrl(err);
+          setDriveApiDisabledUrl(activationUrl);
           setNotification({
             type: 'error',
-            message: 'Your Google Workspace session has expired. Click to reconnect Google Drive.',
+            message: 'Google Drive API is disabled in your Google Cloud Project. Click below to enable it in Cloud Console.',
             action: {
-              label: 'Reconnect Google Drive',
-              onClick: () => handleConnectGoogleDrive(),
+              label: 'Enable Drive API ↗',
+              onClick: () => window.open(activationUrl, '_blank', 'noopener,noreferrer'),
             },
           });
         }
@@ -774,19 +1088,17 @@ export default function App() {
         setDriveSyncStatus('synced');
         setLastDriveSyncTime(new Date(saveRes.lastSyncedAt));
       } catch (err: any) {
-        console.error('Drive auto-save error:', err);
-        setDriveSyncStatus('error');
         if (isGoogleAuthExpired(err)) {
           setAccessToken(null);
           setAccessTokenInMemory(null);
-          setNotification({
-            type: 'error',
-            message: 'Google Workspace access token expired. Reconnect Google Drive to keep backups synchronized.',
-            action: {
-              label: 'Reconnect Google Drive',
-              onClick: () => handleConnectGoogleDrive(),
-            },
-          });
+          setDriveSyncStatus('idle');
+          return;
+        }
+        console.warn('Drive auto-save notice:', err?.message || err);
+        setDriveSyncStatus('error');
+        if (isGoogleDriveApiDisabled(err)) {
+          const activationUrl = extractDriveActivationUrl(err);
+          setDriveApiDisabledUrl(activationUrl);
         }
       }
     }, 3500);
@@ -895,23 +1207,30 @@ export default function App() {
       starterType: 'blank' | 'sample_partnership' | 'sample_proprietorship' | 'clone',
       cloneFromCompanyId?: string
     ) => {
-      // Check active subscription quota before adding new company
+      // Under the Credits plan, always allow creating a company if the user has credits (> 0),
+      // even if the base number of companies is exceeded.
       const activeUser = currentUser || loadActiveUserFromStorage();
+      const userCredits = typeof activeUser?.credits === 'number' ? activeUser.credits : 555;
       const maxAllowed = activeUser?.usage?.maxCompanies || 2;
-      if (companies.length >= maxAllowed) {
+      if (companies.length >= maxAllowed && userCredits <= 0) {
         setSubscriptionUpgradeReason(
-          `You have reached the ${maxAllowed}-company limit on your active ${activeUser?.planTier === 'professional' ? 'CA Professional' : 'Starter Free Trial'} plan. Upgrade to unlock up to 25 companies or unlimited enterprise clients.`
+          `Insufficient Credits: You currently have 0 credits remaining. Top up your Credits balance or invite a colleague (+500 free credits) to add more client companies.`
         );
         setIsSubscriptionModalOpen(true);
         setNotification({
           type: 'info',
-          message: `Plan limit reached (${companies.length}/${maxAllowed} companies). Please upgrade to add more entities.`,
+          message: `No credits remaining (0 credits). Please top up credits or refer a colleague to add more entities.`,
         });
         return;
       }
 
       isSwitchingCompanyRef.current = true;
       const newId = `comp-${Date.now()}`;
+      const normalizedNewConfig: EntityConfig =
+        newConfig.numberOfBranches && newConfig.numberOfBranches > 0
+          ? { ...newConfig, branches: ensureBranchesInitialized(newConfig) }
+          : newConfig;
+
       let cyRows: TrialBalanceRow[] = [];
       let cyMapped: MappedLedger[] = [];
       let cyExceptions: AuditException[] = [];
@@ -921,19 +1240,70 @@ export default function App() {
       let tbName = '';
       let pyName = '';
 
-      if (starterType === 'sample_partnership') {
+      if (
+        (starterType === 'sample_partnership' || starterType === 'sample_proprietorship') &&
+        normalizedNewConfig.numberOfBranches &&
+        normalizedNewConfig.numberOfBranches > 0 &&
+        normalizedNewConfig.branches
+      ) {
+        const populatedBranches = normalizedNewConfig.branches.map((b, idx) => {
+          const cySample = generateSampleBranchTrialBalance(
+            idx,
+            b.branchName,
+            'CY',
+            normalizedNewConfig.entityType
+          );
+          const pySample = generateSampleBranchTrialBalance(
+            idx,
+            b.branchName,
+            'PY',
+            normalizedNewConfig.entityType
+          );
+          const cyDr = cySample.rows.reduce((s, r) => s + r.closingDebit, 0);
+          const cyCr = cySample.rows.reduce((s, r) => s + r.closingCredit, 0);
+          const pyDr = pySample.rows.reduce((s, r) => s + r.closingDebit, 0);
+          const pyCr = pySample.rows.reduce((s, r) => s + r.closingCredit, 0);
+          return {
+            ...b,
+            cyRawRows: cySample.rows,
+            cyFileName: cySample.fileName,
+            cyUploadedAt: new Date().toISOString(),
+            cyTotalDebit: cyDr,
+            cyTotalCredit: cyCr,
+            cyIsBalanced: Math.abs(cyDr - cyCr) < 1,
+            pyRawRows: pySample.rows,
+            pyFileName: pySample.fileName,
+            pyUploadedAt: new Date().toISOString(),
+            pyTotalDebit: pyDr,
+            pyTotalCredit: pyCr,
+            pyIsBalanced: Math.abs(pyDr - pyCr) < 1,
+          };
+        });
+        normalizedNewConfig.branches = populatedBranches;
+        const cyCons = consolidateBranchTrialBalances(populatedBranches, 'CY');
+        cyRows = cyCons.rawRows;
+        cyMapped = cyCons.mappedLedgers;
+        cyExceptions = cyCons.exceptions;
+        tbName = cyCons.consolidatedFileName;
+
+        const pyCons = consolidateBranchTrialBalances(populatedBranches, 'PY');
+        pyRows = pyCons.rawRows;
+        pyMapped = pyCons.mappedLedgers;
+        pyExceptions = pyCons.exceptions;
+        pyName = pyCons.consolidatedFileName;
+      } else if (starterType === 'sample_partnership') {
         const s = SAMPLE_DATASETS[0];
         cyRows = [...s.rows];
         const res = mapTrialBalanceLedgers(cyRows);
         cyMapped = res.mappedLedgers;
         cyExceptions = res.exceptions;
-        tbName = `${newConfig.entityName} - CY Trial Balance.xlsx`;
+        tbName = `${normalizedNewConfig.entityName} - CY Trial Balance.xlsx`;
         if (s.previousYearRows) {
           pyRows = [...s.previousYearRows];
           const pyRes = mapTrialBalanceLedgers(pyRows);
           pyMapped = pyRes.mappedLedgers;
           pyExceptions = pyRes.exceptions;
-          pyName = `${newConfig.entityName} - PY Trial Balance.xlsx`;
+          pyName = `${normalizedNewConfig.entityName} - PY Trial Balance.xlsx`;
         }
       } else if (starterType === 'sample_proprietorship') {
         const s = SAMPLE_DATASETS[1];
@@ -941,7 +1311,7 @@ export default function App() {
         const res = mapTrialBalanceLedgers(cyRows);
         cyMapped = res.mappedLedgers;
         cyExceptions = res.exceptions;
-        tbName = `${newConfig.entityName} - Trial Balance.xlsx`;
+        tbName = `${normalizedNewConfig.entityName} - Trial Balance.xlsx`;
       } else if (starterType === 'clone' && cloneFromCompanyId) {
         const sourceComp = companies.find((c) => c.id === cloneFromCompanyId);
         if (sourceComp) {
@@ -961,7 +1331,7 @@ export default function App() {
 
       const newCompany: Company = {
         id: newId,
-        config: newConfig,
+        config: normalizedNewConfig,
         rawRows: cyRows,
         mappedLedgers: cyMapped,
         mappingExceptions: cyExceptions,
@@ -987,7 +1357,7 @@ export default function App() {
       setActiveCompanyId(newId);
       saveActiveCompanyIdForUserSession(newId, currentUser);
 
-      setConfig(newConfig);
+      setConfig(normalizedNewConfig);
       setRawRows(cyRows);
       setMappedLedgers(cyMapped);
       setMappingExceptions(cyExceptions);
@@ -1019,24 +1389,47 @@ export default function App() {
   // Handler: Update Existing Company Config
   const handleUpdateCompanyConfig = useCallback(
     (companyId: string, updatedConfig: EntityConfig) => {
+      const normalizedConfig: EntityConfig =
+        updatedConfig.numberOfBranches && updatedConfig.numberOfBranches > 0
+          ? { ...updatedConfig, branches: ensureBranchesInitialized(updatedConfig) }
+          : updatedConfig;
+
       setCompanies((prev) => {
         const updated = prev.map((c) =>
           c.id === companyId
-            ? { ...c, config: updatedConfig, updatedAt: new Date().toISOString() }
+            ? { ...c, config: normalizedConfig, updatedAt: new Date().toISOString() }
             : c
         );
         saveCompaniesForUserSession(updated, currentUser);
         return updated;
       });
       if (companyId === activeCompanyId) {
-        setConfig(updatedConfig);
+        setConfig(normalizedConfig);
+        if (normalizedConfig.branches && normalizedConfig.branches.length > 0) {
+          const hasAnyCY = normalizedConfig.branches.some((b) => b.cyRawRows && b.cyRawRows.length > 0);
+          if (hasAnyCY) {
+            const cyCons = consolidateBranchTrialBalances(normalizedConfig.branches, 'CY', mappedLedgers);
+            setRawRows(cyCons.rawRows);
+            setMappedLedgers(cyCons.mappedLedgers);
+            setMappingExceptions(cyCons.exceptions);
+            setTbFileName(cyCons.consolidatedFileName);
+          }
+          const hasAnyPY = normalizedConfig.branches.some((b) => b.pyRawRows && b.pyRawRows.length > 0);
+          if (hasAnyPY) {
+            const pyCons = consolidateBranchTrialBalances(normalizedConfig.branches, 'PY', pyMappedLedgers);
+            setPyRawRows(pyCons.rawRows);
+            setPyMappedLedgers(pyCons.mappedLedgers);
+            setPyMappingExceptions(pyCons.exceptions);
+            setPyFileName(pyCons.consolidatedFileName);
+          }
+        }
       }
       setNotification({
         type: 'success',
-        message: `Updated parameters for "${updatedConfig.entityName}".`,
+        message: `Updated parameters for "${normalizedConfig.entityName}".`,
       });
     },
-    [activeCompanyId]
+    [activeCompanyId, currentUser, mappedLedgers, pyMappedLedgers]
   );
 
   const handleUpdateConfig = useCallback(
@@ -1081,7 +1474,7 @@ export default function App() {
         setActiveCompanyId('');
         saveActiveCompanyIdForUserSession('', currentUser);
         setConfig({
-          entityName: '',
+          entityName: 'Viva Group',
           entityType: 'Partnership Firm',
           financialYear: '2025-26',
           reportingPeriod: 'March 31, 2026',
@@ -1381,6 +1774,7 @@ export default function App() {
             noteNumber: newNoteNumber,
             noteName: noteDef?.name || `Note ${newNoteNumber}`,
             statement: noteDef?.statement || 'BalanceSheet',
+            nature: noteDef?.nature || l.nature,
             subCategory: noteDef?.subCategories?.[0] || l.subCategory,
             isUserOverridden: true,
           };
@@ -1401,6 +1795,7 @@ export default function App() {
             noteNumber: newNoteNumber,
             noteName: noteDef?.name || `Note ${newNoteNumber}`,
             statement: noteDef?.statement || 'BalanceSheet',
+            nature: noteDef?.nature || l.nature,
             subCategory: noteDef?.subCategories?.[0] || l.subCategory,
             isUserOverridden: true,
           };
@@ -1631,6 +2026,347 @@ export default function App() {
       message: 'Previous Year Trial Balance cleared. Standard comparative benchmarks will be applied.',
     });
   };
+
+  // ============================================================================
+  // MULTI-BRANCH TRIAL BALANCE IMPORT & CONSOLIDATION HANDLERS (CY & PY)
+  // ============================================================================
+  const applyBranchConsolidationState = useCallback(
+    (updatedBranches: NonNullable<EntityConfig['branches']>, period: 'CY' | 'PY') => {
+      const cons = consolidateBranchTrialBalances(
+        updatedBranches,
+        period,
+        period === 'CY' ? mappedLedgers : pyMappedLedgers
+      );
+
+      const nextAdjustments = { ...(config.yearEndAdjustments || {}) };
+      if (cons.totalClosingStock !== undefined) {
+        if (period === 'CY') {
+          nextAdjustments.closingStock = cons.totalClosingStock;
+        } else {
+          nextAdjustments.pyClosingStock = cons.totalClosingStock;
+        }
+      }
+
+      const nextConfig: EntityConfig = {
+        ...config,
+        branches: updatedBranches,
+        yearEndAdjustments: nextAdjustments,
+      };
+      setConfig(nextConfig);
+
+      if (period === 'CY') {
+        setRawRows(cons.rawRows);
+        setMappedLedgers(cons.mappedLedgers);
+        setMappingExceptions(cons.exceptions);
+        setTbFileName(cons.consolidatedFileName);
+      } else {
+        setPyRawRows(cons.rawRows);
+        setPyMappedLedgers(cons.mappedLedgers);
+        setPyMappingExceptions(cons.exceptions);
+        setPyFileName(cons.consolidatedFileName);
+      }
+      return cons;
+    },
+    [config, mappedLedgers, pyMappedLedgers]
+  );
+
+  const handleUploadBranchTB = useCallback(
+    async (branchId: string, file: File, period: 'CY' | 'PY') => {
+      try {
+        const branches = ensureBranchesInitialized(config);
+        const targetBranch = branches.find((b) => b.branchId === branchId);
+        setNotification({
+          type: 'info',
+          message: `Parsing ${period} Trial Balance (${file.name}) for ${targetBranch?.branchName || 'Branch'}...`,
+        });
+
+        const parsedRows = await parseTrialBalanceFile(file);
+        if (parsedRows.length === 0) {
+          throw new Error(`No valid ledger rows found in ${file.name}.`);
+        }
+
+        const taggedRows: TrialBalanceRow[] = parsedRows.map((r) => ({
+          ...r,
+          branchId,
+          branchName: targetBranch?.branchName || branchId,
+        }));
+
+        const dr = taggedRows.reduce((s, r) => s + (r.closingDebit || 0), 0);
+        const cr = taggedRows.reduce((s, r) => s + (r.closingCredit || 0), 0);
+        const isBal = Math.abs(dr - cr) < 1;
+
+        const updatedBranches = branches.map((b) => {
+          if (b.branchId !== branchId) return b;
+          if (period === 'CY') {
+            return {
+              ...b,
+              cyRawRows: taggedRows,
+              cyFileName: file.name,
+              cyUploadedAt: new Date().toISOString(),
+              cyTotalDebit: dr,
+              cyTotalCredit: cr,
+              cyIsBalanced: isBal,
+            };
+          } else {
+            return {
+              ...b,
+              pyRawRows: taggedRows,
+              pyFileName: file.name,
+              pyUploadedAt: new Date().toISOString(),
+              pyTotalDebit: dr,
+              pyTotalCredit: cr,
+              pyIsBalanced: isBal,
+            };
+          }
+        });
+
+        const cons = applyBranchConsolidationState(updatedBranches, period);
+        setNotification({
+          type: 'success',
+          message: `Imported ${taggedRows.length} ${period} ledgers for "${targetBranch?.branchName}". Consolidated ${cons.uploadedBranchesCount}/${cons.totalBranchesCount} branches (${cons.mappedLedgers.length} consolidated ledgers).`,
+        });
+      } catch (err: any) {
+        console.error('Branch TB upload error:', err);
+        setNotification({
+          type: 'error',
+          message: err.message || `Failed to import ${period} branch Trial Balance.`,
+        });
+      }
+    },
+    [config, applyBranchConsolidationState]
+  );
+
+  const handleBulkUploadBranchTBs = useCallback(
+    async (files: FileList, period: 'CY' | 'PY') => {
+      try {
+        const fileList = Array.from(files);
+        if (fileList.length === 0) return;
+
+        let updatedBranches = [...ensureBranchesInitialized(config)];
+        const assignedBranchIds = new Set<string>();
+        let importedCount = 0;
+
+        for (const file of fileList) {
+          const parsedRows = await parseTrialBalanceFile(file);
+          if (parsedRows.length === 0) continue;
+
+          const lowerFile = file.name.toLowerCase();
+          // Try matching by branchName or branchCode first
+          let targetIdx = updatedBranches.findIndex(
+            (b) =>
+              !assignedBranchIds.has(b.branchId) &&
+              (lowerFile.includes(b.branchName.toLowerCase()) ||
+                (b.branchCode && lowerFile.includes(b.branchCode.toLowerCase())))
+          );
+          // Next, try first branch without data for this period
+          if (targetIdx === -1) {
+            targetIdx = updatedBranches.findIndex(
+              (b) =>
+                !assignedBranchIds.has(b.branchId) &&
+                ((period === 'CY' && (!b.cyRawRows || b.cyRawRows.length === 0)) ||
+                  (period === 'PY' && (!b.pyRawRows || b.pyRawRows.length === 0)))
+            );
+          }
+          // Fallback to first unassigned branch
+          if (targetIdx === -1) {
+            targetIdx = updatedBranches.findIndex((b) => !assignedBranchIds.has(b.branchId));
+          }
+          if (targetIdx === -1) break;
+
+          const branch = updatedBranches[targetIdx];
+          assignedBranchIds.add(branch.branchId);
+          importedCount++;
+
+          const taggedRows = parsedRows.map((r) => ({
+            ...r,
+            branchId: branch.branchId,
+            branchName: branch.branchName,
+          }));
+          const dr = taggedRows.reduce((s, r) => s + (r.closingDebit || 0), 0);
+          const cr = taggedRows.reduce((s, r) => s + (r.closingCredit || 0), 0);
+          const isBal = Math.abs(dr - cr) < 1;
+
+          updatedBranches[targetIdx] =
+            period === 'CY'
+              ? {
+                  ...branch,
+                  cyRawRows: taggedRows,
+                  cyFileName: file.name,
+                  cyUploadedAt: new Date().toISOString(),
+                  cyTotalDebit: dr,
+                  cyTotalCredit: cr,
+                  cyIsBalanced: isBal,
+                }
+              : {
+                  ...branch,
+                  pyRawRows: taggedRows,
+                  pyFileName: file.name,
+                  pyUploadedAt: new Date().toISOString(),
+                  pyTotalDebit: dr,
+                  pyTotalCredit: cr,
+                  pyIsBalanced: isBal,
+                };
+        }
+
+        const cons = applyBranchConsolidationState(updatedBranches, period);
+        setNotification({
+          type: 'success',
+          message: `Bulk imported ${importedCount} branch ${period} Trial Balance file(s)! Consolidated ${cons.uploadedBranchesCount}/${cons.totalBranchesCount} branches.`,
+        });
+      } catch (err: any) {
+        console.error('Bulk branch TB upload error:', err);
+        setNotification({
+          type: 'error',
+          message: err.message || `Failed to bulk import ${period} branch Trial Balances.`,
+        });
+      }
+    },
+    [config, applyBranchConsolidationState]
+  );
+
+  const handleClearBranchTB = useCallback(
+    (branchId: string, period: 'CY' | 'PY') => {
+      const branches = ensureBranchesInitialized(config);
+      const target = branches.find((b) => b.branchId === branchId);
+      const updatedBranches = branches.map((b) => {
+        if (b.branchId !== branchId) return b;
+        if (period === 'CY') {
+          return {
+            ...b,
+            cyRawRows: [],
+            cyFileName: undefined,
+            cyUploadedAt: undefined,
+            cyTotalDebit: 0,
+            cyTotalCredit: 0,
+            cyIsBalanced: undefined,
+          };
+        } else {
+          return {
+            ...b,
+            pyRawRows: [],
+            pyFileName: undefined,
+            pyUploadedAt: undefined,
+            pyTotalDebit: 0,
+            pyTotalCredit: 0,
+            pyIsBalanced: undefined,
+          };
+        }
+      });
+
+      const cons = applyBranchConsolidationState(updatedBranches, period);
+      setNotification({
+        type: 'info',
+        message: `Cleared ${period} Trial Balance for "${target?.branchName || 'Branch'}". Consolidated ${cons.uploadedBranchesCount}/${cons.totalBranchesCount} branches.`,
+      });
+    },
+    [config, applyBranchConsolidationState]
+  );
+
+  const handleLoadSampleBranches = useCallback(
+    (period: 'CY' | 'PY') => {
+      const branches = ensureBranchesInitialized(config);
+      const otherPeriodHasData = branches.some((b) =>
+        period === 'CY'
+          ? b.pyRawRows && b.pyRawRows.length > 0
+          : b.cyRawRows && b.cyRawRows.length > 0
+      );
+
+      const updatedBranches = branches.map((b, idx) => {
+        const sample = generateSampleBranchTrialBalance(idx, b.branchName, period, config.entityType);
+        const dr = sample.rows.reduce((s, r) => s + r.closingDebit, 0);
+        const cr = sample.rows.reduce((s, r) => s + r.closingCredit, 0);
+
+        let updated =
+          period === 'CY'
+            ? {
+                ...b,
+                cyRawRows: sample.rows,
+                cyFileName: sample.fileName,
+                cyUploadedAt: new Date().toISOString(),
+                cyTotalDebit: dr,
+                cyTotalCredit: cr,
+                cyIsBalanced: Math.abs(dr - cr) < 1,
+              }
+            : {
+                ...b,
+                pyRawRows: sample.rows,
+                pyFileName: sample.fileName,
+                pyUploadedAt: new Date().toISOString(),
+                pyTotalDebit: dr,
+                pyTotalCredit: cr,
+                pyIsBalanced: Math.abs(dr - cr) < 1,
+              };
+
+        // Also populate comparative period if empty so both CY & PY consolidated statements are immediately available
+        if (!otherPeriodHasData) {
+          const otherPeriod = period === 'CY' ? 'PY' : 'CY';
+          const otherSample = generateSampleBranchTrialBalance(idx, b.branchName, otherPeriod, config.entityType);
+          const oDr = otherSample.rows.reduce((s, r) => s + r.closingDebit, 0);
+          const oCr = otherSample.rows.reduce((s, r) => s + r.closingCredit, 0);
+          updated =
+            otherPeriod === 'CY'
+              ? {
+                  ...updated,
+                  cyRawRows: otherSample.rows,
+                  cyFileName: otherSample.fileName,
+                  cyUploadedAt: new Date().toISOString(),
+                  cyTotalDebit: oDr,
+                  cyTotalCredit: oCr,
+                  cyIsBalanced: Math.abs(oDr - oCr) < 1,
+                }
+              : {
+                  ...updated,
+                  pyRawRows: otherSample.rows,
+                  pyFileName: otherSample.fileName,
+                  pyUploadedAt: new Date().toISOString(),
+                  pyTotalDebit: oDr,
+                  pyTotalCredit: oCr,
+                  pyIsBalanced: Math.abs(oDr - oCr) < 1,
+                };
+        }
+
+        return updated;
+      });
+
+      const cyCons = consolidateBranchTrialBalances(updatedBranches, 'CY', mappedLedgers);
+      const pyCons = consolidateBranchTrialBalances(updatedBranches, 'PY', pyMappedLedgers);
+
+      setConfig((prev) => ({
+        ...prev,
+        branches: updatedBranches,
+      }));
+
+      setRawRows(cyCons.rawRows);
+      setMappedLedgers(cyCons.mappedLedgers);
+      setMappingExceptions(cyCons.exceptions);
+      setTbFileName(cyCons.consolidatedFileName);
+
+      setPyRawRows(pyCons.rawRows);
+      setPyMappedLedgers(pyCons.mappedLedgers);
+      setPyMappingExceptions(pyCons.exceptions);
+      setPyFileName(pyCons.consolidatedFileName);
+
+      setNotification({
+        type: 'success',
+        message: `Loaded sample CY & PY Trial Balances across all ${updatedBranches.length} branches and consolidated ${cyCons.mappedLedgers.length} ledgers!`,
+      });
+    },
+    [config, mappedLedgers, pyMappedLedgers]
+  );
+
+  const handleUpdateBranchClosingStock = useCallback(
+    (branchId: string, stockAmount: number | undefined, period: 'CY' | 'PY') => {
+      const branches = ensureBranchesInitialized(config);
+      const updatedBranches = branches.map((b) => {
+        if (b.branchId !== branchId) return b;
+        return period === 'CY'
+          ? { ...b, cyClosingStock: stockAmount }
+          : { ...b, pyClosingStock: stockAmount };
+      });
+      applyBranchConsolidationState(updatedBranches, period);
+    },
+    [config, applyBranchConsolidationState]
+  );
 
   // Handle direct import from Google Drive
   const handleImportDriveTrialBalance = useCallback(
@@ -2093,229 +2829,454 @@ export default function App() {
   // Navigate to specific Note
   const handleSelectNote = (noteNumber: number) => {
     setSelectedNoteNumber(noteNumber);
+    setWorkspaceStep(4);
+    setDashboardView('workspace');
     setActiveTab('notes');
   };
 
-  return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans antialiased">
-      {/* Top Header */}
-      <Header
-        config={config}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isTallyBalanced={isTallyBalanced}
-        tallyDifference={tallyDifference}
-        isBSBalanced={computed?.balanceSheet.isBalanced ?? true}
-        bsDifference={computed?.balanceSheet.difference ?? 0}
-        exceptionCount={allExceptions.length}
-        onExportExcel={handleExportExcel}
-        onOpenConfig={() => setIsConfigModalOpen(true)}
-        onTriggerAIMap={handleTriggerAIMap}
-        isAIMapping={isAIMapping}
-        companies={companies}
-        activeCompanyId={activeCompanyId}
-        onSelectCompany={handleSelectCompany}
-        onOpenCompanyManager={handleOpenCompanyManager}
-        onOpenYearModal={() => setIsYearModalOpen(true)}
-        onUpdateConfig={(newCfg) => handleUpdateCompanyConfig(activeCompanyId, newCfg)}
-        onOpenYearEndAdjustments={(target) => {
-          setAdjustmentsFocusPeriod(target || (workspaceStep === 2 ? 'PY' : 'CY'));
-          setIsYearEndAdjustmentsOpen(true);
-        }}
-        onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
-        user={user}
-        accessToken={accessToken}
-        onConnectGmail={() => setActiveTab('gmail')}
-        currentUser={currentUser}
-        onOpenAuthModal={(tab) => {
-          setAuthModalTab(tab || 'signin');
-          setIsAuthModalOpen(true);
-        }}
-        onOpenSubscriptionModal={() => {
-          setSubscriptionUpgradeReason(undefined);
-          setIsSubscriptionModalOpen(true);
-        }}
-        onOpenUserProfileModal={() => setIsUserProfileModalOpen(true)}
-        onOpenReferralModal={() => setIsReferralModalOpen(true)}
-        onLogout={handleLogout}
-        dashboardView={dashboardView}
-        onDashboardViewChange={setDashboardView}
-        workspaceStep={workspaceStep}
-        onWorkspaceStepChange={(s) => {
-          setWorkspaceStep(s);
+  // Active Left Sidebar Navigation Item
+  const activeVivaNav: VivaNavId = useMemo(() => {
+    if (dashboardView === 'home') return 'home';
+    if (dashboardView === 'companies') return 'companies';
+    if (workspaceStep === 1 || workspaceStep === 2) return 'cy_tb';
+    if (workspaceStep === 3) return 'accounts';
+    if (workspaceStep === 4) return 'notes';
+    if (workspaceStep === 5) return 'reports';
+    return 'home';
+  }, [dashboardView, workspaceStep]);
+
+  const handleSelectVivaNav = useCallback(
+    (nav: VivaNavId) => {
+      switch (nav) {
+        case 'home':
+          setDashboardView('home');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+        case 'smart_ai':
+          handleTriggerAIMap();
+          break;
+        case 'cy_tb':
+          setWorkspaceStep(1);
           setDashboardView('workspace');
-        }}
-        driveSyncStatus={driveSyncStatus}
-        lastDriveSyncTime={lastDriveSyncTime}
-        onManualDriveSync={handleManualDriveSync}
-        onConnectDrive={handleConnectGoogleDrive}
-        onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
-        onOpenTermsModal={() => setIsTermsModalOpen(true)}
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+        case 'stock':
+          setAdjustmentsFocusPeriod('CY');
+          setIsYearEndAdjustmentsOpen(true);
+          break;
+        case 'accounts':
+          setWorkspaceStep(3);
+          setDashboardView('workspace');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+        case 'notes':
+          setWorkspaceStep(4);
+          setDashboardView('workspace');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+        case 'reports':
+          setWorkspaceStep(5);
+          setDashboardView('workspace');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+        case 'companies':
+          setDashboardView('companies');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          break;
+      }
+    },
+    [handleTriggerAIMap]
+  );
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex font-sans antialiased">
+      {/* Left Vertical VIVA Icon Sidebar */}
+      <VivaSidebar
+        activeNav={activeVivaNav}
+        onSelectNav={handleSelectVivaNav}
         onOpenUserManual={() => setIsUserManualOpen(true)}
-        onOpenAICopilot={(prompt) => {
-          setAiCopilotPrompt(prompt);
+        onOpenAICopilot={() => {
+          setAiCopilotPrompt(undefined);
           setIsAICopilotOpen(true);
         }}
+        onOpenUserProfile={() => {
+          if (currentUser && currentUser.id !== 'guest_ca') {
+            setIsUserProfileModalOpen(true);
+          } else {
+            setAuthModalTab('signin');
+            setIsAuthModalOpen(true);
+          }
+        }}
+        onLogoutOrSwitch={() => {
+          handleLogout();
+        }}
+        exceptionCount={allExceptions.length}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Notification Toast */}
-        {notification && (
-          <div
-            className={`mb-5 p-3 sm:p-3.5 rounded-xl flex items-center justify-between text-xs shadow-xs border transition ${
-              notification.type === 'success'
-                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                : notification.type === 'error'
-                ? 'bg-rose-50 text-rose-900 border-rose-200'
-                : 'bg-blue-50 text-blue-900 border-blue-200'
-            }`}
-          >
-            <div className="flex items-center gap-2.5 flex-wrap">
-              {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
-              {notification.type === 'error' && <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />}
-              {notification.type === 'info' && <Info className="w-4 h-4 text-blue-600 shrink-0" />}
-              <span className="font-medium">{notification.message}</span>
-              {notification.action && (
-                <button
-                  type="button"
-                  onClick={notification.action.onClick}
-                  className={`px-3 py-1 rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
-                    notification.type === 'error'
-                      ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  }`}
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>{notification.action.label}</span>
-                </button>
-              )}
-            </div>
-            <button
-              onClick={() => setNotification(null)}
-              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg ml-2 cursor-pointer shrink-0"
+      {/* Right Main Column (Top Header + Main Viewport + Bottom Quick Access Bar) */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header */}
+        <Header
+          config={config}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isTallyBalanced={isTallyBalanced}
+          tallyDifference={tallyDifference}
+          isBSBalanced={computed?.balanceSheet.isBalanced ?? true}
+          bsDifference={computed?.balanceSheet.difference ?? 0}
+          exceptionCount={allExceptions.length}
+          onExportExcel={handleExportExcel}
+          onOpenConfig={() => setIsConfigModalOpen(true)}
+          onTriggerAIMap={handleTriggerAIMap}
+          isAIMapping={isAIMapping}
+          companies={companies}
+          activeCompanyId={activeCompanyId}
+          onSelectCompany={handleSelectCompany}
+          onOpenCompanyManager={handleOpenCompanyManager}
+          onOpenYearModal={() => setIsYearModalOpen(true)}
+          onUpdateConfig={(newCfg) => handleUpdateCompanyConfig(activeCompanyId, newCfg)}
+          onOpenYearEndAdjustments={(target) => {
+            setAdjustmentsFocusPeriod(target || (workspaceStep === 2 ? 'PY' : 'CY'));
+            setIsYearEndAdjustmentsOpen(true);
+          }}
+          onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
+          user={user}
+          accessToken={accessToken}
+          onConnectGmail={() => setActiveTab('gmail')}
+          currentUser={currentUser}
+          onOpenAuthModal={(tab) => {
+            setAuthModalTab(tab || 'signin');
+            setIsAuthModalOpen(true);
+          }}
+          onOpenSubscriptionModal={() => {
+            setSubscriptionUpgradeReason(undefined);
+            setIsSubscriptionModalOpen(true);
+          }}
+          onOpenUserProfileModal={() => setIsUserProfileModalOpen(true)}
+          onOpenReferralModal={() => setIsReferralModalOpen(true)}
+          onLogout={handleLogout}
+          dashboardView={dashboardView}
+          onDashboardViewChange={setDashboardView}
+          workspaceStep={workspaceStep}
+          onWorkspaceStepChange={(s, noteNum) => {
+            if (noteNum !== undefined) {
+              setSelectedNoteNumber(noteNum);
+            } else {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            setWorkspaceStep(s);
+            setDashboardView('workspace');
+          }}
+          driveSyncStatus={driveSyncStatus}
+          lastDriveSyncTime={lastDriveSyncTime}
+          onManualDriveSync={handleManualDriveSync}
+          onConnectDrive={handleConnectGoogleDrive}
+          onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
+          onExportSingleCompanyBackup={handleExportSingleCompanyBackup}
+          onOpenTermsModal={() => setIsTermsModalOpen(true)}
+          onOpenUserManual={() => setIsUserManualOpen(true)}
+          onOpenAICopilot={(prompt) => {
+            setAiCopilotPrompt(prompt);
+            setIsAICopilotOpen(true);
+          }}
+        />
+
+        {/* Main Content Area */}
+        <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          {/* Notification Toast */}
+          {notification && (
+            <div
+              className={`mb-5 p-3 sm:p-3.5 rounded-2xl flex items-center justify-between text-xs shadow-xs border transition ${
+                notification.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                  : notification.type === 'error'
+                  ? 'bg-rose-50 text-rose-900 border-rose-200'
+                  : 'bg-blue-50 text-blue-900 border-blue-200'
+              }`}
             >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
+                {notification.type === 'error' && <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />}
+                {notification.type === 'info' && <Info className="w-4 h-4 text-blue-600 shrink-0" />}
+                <span className="font-medium">{notification.message}</span>
+                {notification.action && (
+                  <button
+                    type="button"
+                    onClick={notification.action.onClick}
+                    className={`px-3 py-1 rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      notification.type === 'error'
+                        ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>{notification.action.label}</span>
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setNotification(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg ml-2 cursor-pointer shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
-        {/* VIEW 1: SAVED CLIENT COMPANIES (ONE WINDOW ONLY) */}
-        {dashboardView === 'companies' ? (
-          <CompaniesWindow
-            companies={companies}
-            activeCompanyId={activeCompanyId}
-            onSelectCompany={(id) => {
-              handleSelectCompany(id);
-              setDashboardView('workspace');
-              setWorkspaceStep(1);
-            }}
-            onCreateCompany={(cfg, starter, cloneId) => {
-              handleCreateCompany(cfg, starter, cloneId);
-              setDashboardView('workspace');
-              setWorkspaceStep(1);
-            }}
-            onUpdateCompanyConfig={(id, cfg) => handleUpdateCompanyConfig(id, cfg)}
-            onDeleteCompany={handleDeleteCompany}
-            onDuplicateCompany={handleDuplicateCompany}
-            onOpenWorkingWindows={() => setDashboardView('workspace')}
-            onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
-            driveSyncStatus={driveSyncStatus}
-            lastDriveSyncTime={lastDriveSyncTime}
-            userEmail={currentUser?.email || user?.email || undefined}
-            onManualDriveSync={handleManualDriveSync}
-            onConnectDrive={handleConnectGoogleDrive}
-            onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
-          />
-        ) : (
-          /* VIEW 2: 5-STEP GUIDED WORKSPACE WINDOW */
-          <StepByStepWorkspace
-            config={config}
-            mappedLedgers={mappedLedgers}
-            totalDebit={totalDebit}
-            totalCredit={totalCredit}
-            isTallyBalanced={isTallyBalanced}
-            tallyDifference={tallyDifference}
-            tbFileName={tbFileName}
-            onUploadTB={handleUploadTB}
-            onClearTB={handleClearTB}
-            onLoadSample={(id) => {
-              const ds = SAMPLE_DATASETS.find((d) => d.id === id);
-              if (ds) loadDataset(ds);
-            }}
-            onUpdateLedgerNote={handleUpdateLedgerNote}
-            onUpdateLedgerDetails={handleUpdateLedgerDetails}
-            onAddLedger={handleAddLedger}
-            onDeleteLedger={handleDeleteLedger}
-            onTriggerAIMap={handleTriggerAIMap}
-            isAIMapping={isAIMapping}
-            onOpenYearEndAdjustments={(target, onProceed) => {
-              setAdjustmentsFocusPeriod(target || (workspaceStep === 2 ? 'PY' : 'CY'));
-              if (onProceed) setPostAdjustmentCallback(() => onProceed);
-              setIsYearEndAdjustmentsOpen(true);
-            }}
-            onOpenConfig={() => setIsConfigModalOpen(true)}
-            onOpenYearModal={() => setIsYearModalOpen(true)}
-            pyMappedLedgers={pyMappedLedgers}
-            pyTotalDebit={pyTotalDebit}
-            pyTotalCredit={pyTotalCredit}
-            isPYTallyBalanced={isPYTallyBalanced}
-            pyTallyDifference={pyTallyDifference}
-            pyFileName={pyFileName}
-            onUploadPYTB={handleUploadPYTB}
-            onClearPYTB={handleClearPYTB}
-            onUpdatePyLedgerNote={handleUpdatePyLedgerNote}
-            computedFinancials={computed}
-            allExceptions={allExceptions}
-            onExportExcel={handleExportExcel}
-            onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
-            onUpdateConfig={handleUpdateConfig}
-            onSwitchCompany={() => setDashboardView('companies')}
-            initialStep={workspaceStep}
-            onStepChange={(step) => setWorkspaceStep(step)}
-            currentUser={currentUser}
-            onOpenSubscriptionModal={() => {
-              setSubscriptionUpgradeReason(undefined);
-              setIsSubscriptionModalOpen(true);
-            }}
-            user={user}
-            accessToken={accessToken}
-            onAuthSuccess={(authedUser, token) => {
-              setUser(authedUser);
-              setAccessToken(token);
-            }}
-            onSignOut={() => {
-              setUser(null);
-              setAccessToken(null);
-            }}
-          />
-        )}
-      </main>
+          {/* VIEW 0: VIVA EXECUTIVE HOME DASHBOARD */}
+          {dashboardView === 'home' ? (
+            <VivaHomeDashboard
+              config={config}
+              companies={companies}
+              activeCompanyId={activeCompanyId}
+              onSelectCompany={(id) => {
+                handleSelectCompany(id);
+                setDashboardView('home');
+              }}
+              onOpenAddCompany={() => handleOpenCompanyManager('add')}
+              mappedLedgers={mappedLedgers}
+              pyMappedLedgers={pyMappedLedgers}
+              totalDebit={totalDebit}
+              totalCredit={totalCredit}
+              computedFinancials={computed}
+              allExceptions={allExceptions}
+              isTallyBalanced={isTallyBalanced}
+              tallyDifference={tallyDifference}
+              onNavigateToStep={(step, noteNum) => {
+                if (noteNum !== undefined) {
+                  setSelectedNoteNumber(noteNum);
+                } else {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+                setWorkspaceStep(step);
+                setDashboardView('workspace');
+              }}
+              onOpenCompanies={() => setDashboardView('companies')}
+              onTriggerAIMap={() => handleTriggerAIMap()}
+              onOpenYearEndAdjustments={(target) => {
+                setAdjustmentsFocusPeriod(target || 'CY');
+                setIsYearEndAdjustmentsOpen(true);
+              }}
+              onOpenTradePayables={() => setIsTradePayablesOpen(true)}
+              onOpenConfig={() => setIsConfigModalOpen(true)}
+              onExportExcel={handleExportExcel}
+              onLoadSample={(id) => {
+                const ds = SAMPLE_DATASETS.find((d) => d.id === id) || SAMPLE_DATASETS[0];
+                if (ds) loadDataset(ds);
+              }}
+              currentUser={currentUser}
+              onOpenSubscriptionModal={() => {
+                setSubscriptionUpgradeReason(undefined);
+                setIsSubscriptionModalOpen(true);
+              }}
+              onOpenReferralModal={() => setIsReferralModalOpen(true)}
+              onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
+              driveSyncStatus={driveSyncStatus}
+              lastDriveSyncTime={lastDriveSyncTime}
+              accessToken={accessToken}
+              userEmail={currentUser?.email || user?.email || undefined}
+              onManualDriveSync={handleManualDriveSync}
+              onConnectDrive={handleConnectGoogleDrive}
+              onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
+              onExportSingleCompanyBackup={handleExportSingleCompanyBackup}
+              driveApiDisabledUrl={driveApiDisabledUrl}
+            />
+          ) : dashboardView === 'companies' ? (
+            /* VIEW 1: SAVED CLIENT COMPANIES */
+            <CompaniesWindow
+              companies={companies}
+              activeCompanyId={activeCompanyId}
+              onSelectCompany={(id) => {
+                handleSelectCompany(id);
+                setDashboardView('home');
+              }}
+              onCreateCompany={(cfg, starter, cloneId) => {
+                handleCreateCompany(cfg, starter, cloneId);
+              }}
+              onUpdateCompanyConfig={(id, cfg) => handleUpdateCompanyConfig(id, cfg)}
+              onDeleteCompany={handleDeleteCompany}
+              onDuplicateCompany={handleDuplicateCompany}
+              onOpenWorkingWindows={() => setDashboardView('workspace')}
+              onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
+              driveSyncStatus={driveSyncStatus}
+              lastDriveSyncTime={lastDriveSyncTime}
+              userEmail={currentUser?.email || user?.email || undefined}
+              onManualDriveSync={handleManualDriveSync}
+              onConnectDrive={handleConnectGoogleDrive}
+              onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
+              onExportSingleCompanyBackup={(comp) => handleExportSingleCompanyBackup(comp.id)}
+              driveApiDisabledUrl={driveApiDisabledUrl}
+            />
+          ) : (
+            /* VIEW 2: 5-STEP GUIDED WORKSPACE WINDOW */
+            <StepByStepWorkspace
+              config={config}
+              companies={companies}
+              activeCompanyId={activeCompanyId}
+              onSelectCompany={handleSelectCompany}
+              onOpenAddCompany={() => handleOpenCompanyManager('add')}
+              onExportSingleCompanyBackup={() => handleExportSingleCompanyBackup(activeCompanyId)}
+              onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
+              mappedLedgers={mappedLedgers}
+              totalDebit={totalDebit}
+              totalCredit={totalCredit}
+              isTallyBalanced={isTallyBalanced}
+              tallyDifference={tallyDifference}
+              tbFileName={tbFileName}
+              onUploadTB={handleUploadTB}
+              onClearTB={handleClearTB}
+              onLoadSample={(id) => {
+                const ds = SAMPLE_DATASETS.find((d) => d.id === id);
+                if (ds) loadDataset(ds);
+              }}
+              onUpdateLedgerNote={handleUpdateLedgerNote}
+              onUpdateLedgerDetails={handleUpdateLedgerDetails}
+              onAddLedger={handleAddLedger}
+              onDeleteLedger={handleDeleteLedger}
+              onTriggerAIMap={handleTriggerAIMap}
+              isAIMapping={isAIMapping}
+              onOpenYearEndAdjustments={(target, onProceed) => {
+                setAdjustmentsFocusPeriod(target || (workspaceStep === 2 ? 'PY' : 'CY'));
+                if (onProceed) setPostAdjustmentCallback(() => onProceed);
+                setIsYearEndAdjustmentsOpen(true);
+              }}
+              onOpenConfig={() => setIsConfigModalOpen(true)}
+              onOpenYearModal={() => setIsYearModalOpen(true)}
+              pyMappedLedgers={pyMappedLedgers}
+              pyTotalDebit={pyTotalDebit}
+              pyTotalCredit={pyTotalCredit}
+              isPYTallyBalanced={isPYTallyBalanced}
+              pyTallyDifference={pyTallyDifference}
+              pyFileName={pyFileName}
+              onUploadPYTB={handleUploadPYTB}
+              onClearPYTB={handleClearPYTB}
+              onUpdatePyLedgerNote={handleUpdatePyLedgerNote}
+              onUploadBranchTB={handleUploadBranchTB}
+              onBulkUploadBranchTBs={handleBulkUploadBranchTBs}
+              onClearBranchTB={handleClearBranchTB}
+              onLoadSampleBranches={handleLoadSampleBranches}
+              onUpdateBranchClosingStock={handleUpdateBranchClosingStock}
+              computedFinancials={computed}
+              allExceptions={allExceptions}
+              onExportExcel={handleExportExcel}
+              onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
+              onRestoreBackup={(backupPayload) => {
+                const parsed = importWorkspaceBackup(JSON.stringify(backupPayload));
+                if (parsed.success && parsed.companies) {
+                  handleRestoreCompanies(parsed.companies, parsed.activeCompanyId, {
+                    backupType: parsed.backupType,
+                    duplicateStrategy: parsed.backupType === 'single' ? 'add_as_new' : 'update_matching',
+                  });
+                } else {
+                  setNotification({
+                    type: 'error',
+                    message: parsed.error || 'Could not restore backup payload.',
+                  });
+                }
+              }}
+              onUpdateConfig={handleUpdateConfig}
+              onSwitchCompany={() => setDashboardView('companies')}
+              onBackToHome={() => setDashboardView('home')}
+              initialStep={workspaceStep}
+              initialNoteNumber={selectedNoteNumber}
+              onStepChange={(step) => setWorkspaceStep(step)}
+              currentUser={currentUser}
+              onOpenSubscriptionModal={() => {
+                setSubscriptionUpgradeReason(undefined);
+                setIsSubscriptionModalOpen(true);
+              }}
+              user={user}
+              accessToken={accessToken}
+              onAuthSuccess={(authedUser, token) => {
+                setUser(authedUser);
+                setAccessToken(token);
+              }}
+              onSignOut={handleLogout}
+            />
+          )}
+        </main>
 
-      {/* Footer / Professional Compliance Bar */}
-      <footer className="w-full bg-white border-t border-slate-200 py-3.5 px-4 sm:px-6 lg:px-8 text-xs text-slate-500 mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left">
+        {/* Clean Non-Overlapping Footer */}
+        <footer className="mt-auto border-t border-slate-200/80 bg-white px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500 print:hidden">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-800">AuditFinancials</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-slate-600">ICAI Non-Corporate Entity (NCE) Audit Reporting Platform</span>
+            <span>•</span>
+            <span>ICAI Non-Corporate Entity (NCE) Financial Statement Suite</span>
           </div>
-
-          <div className="flex items-center gap-3 flex-wrap justify-center text-xs">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsUserManualOpen(true)}
+              className="hover:text-indigo-600 font-semibold transition cursor-pointer"
+            >
+              User Guide
+            </button>
+            <span>•</span>
             <button
               type="button"
               onClick={() => setIsTermsModalOpen(true)}
-              className="text-emerald-700 hover:text-emerald-900 font-bold underline transition cursor-pointer"
+              className="hover:text-indigo-600 font-semibold transition cursor-pointer"
             >
-              Terms of Service &amp; Professional Disclaimer
+              ICAI Disclaimer &amp; Terms
             </button>
-            <span className="text-slate-300">•</span>
-            <span>FY 2025-26 (AY 2026-27)</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-[11px] text-slate-400">100% Client-Side Private Computation</span>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
+
+      {/* Right-Side Quick-Access Floating Icons (User Manual & ICAI CA Guide + AI Copilot) */}
+      <div className="fixed right-4 bottom-16 z-40 flex flex-col items-end gap-2.5 print:hidden">
+        {/* AuditFinancials User Manual & ICAI CA Guide Icon Button */}
+        <button
+          type="button"
+          onClick={() => setIsUserManualOpen(true)}
+          className="group flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white shadow-xl shadow-slate-900/25 border border-emerald-500/40 transition-all duration-200 cursor-pointer hover:pr-4"
+          title="AuditFinancials User Manual & ICAI CA Guide (FY 2025-26)"
+        >
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+            <BookOpen className="w-5 h-5" />
+          </div>
+          <div className="hidden group-hover:flex flex-col text-left pr-1 animate-in fade-in duration-150">
+            <span className="text-xs font-bold text-white whitespace-nowrap leading-tight">
+              User Manual &amp; ICAI Guide
+            </span>
+            <span className="text-[10px] text-emerald-400 font-semibold whitespace-nowrap">
+              FY 2025-26 Reference
+            </span>
+          </div>
+        </button>
+
+        {/* Ask AI CA Copilot Floating Icon Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setAiCopilotPrompt(undefined);
+            setIsAICopilotOpen(true);
+          }}
+          className="group flex items-center gap-2.5 p-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-600/25 border border-emerald-400/40 transition-all duration-200 cursor-pointer hover:pr-4"
+          title="Ask AI CA Copilot"
+        >
+          <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center shrink-0">
+            <Bot className="w-5 h-5" />
+          </div>
+          <div className="hidden group-hover:flex flex-col text-left pr-1 animate-in fade-in duration-150">
+            <span className="text-xs font-bold text-white whitespace-nowrap leading-tight">
+              Ask AI Copilot
+            </span>
+            <span className="text-[10px] text-emerald-100 font-semibold whitespace-nowrap">
+              ICAI NCE Assistant
+            </span>
+          </div>
+        </button>
+      </div>
+
+      {/* Trade Payables & MSME Aging Modal (accessible from Home & Quick Access) */}
+      <TradePayablesMsmeModal
+        isOpen={isTradePayablesOpen}
+        onClose={() => setIsTradePayablesOpen(false)}
+        config={config}
+        onUpdateConfig={handleUpdateConfig}
+        noteSchedule={computed.noteSchedules[9]}
+      />
 
       {/* Entity Config Modal */}
       <EntityConfigModal
@@ -2341,6 +3302,7 @@ export default function App() {
         onDuplicateCompany={handleDuplicateCompany}
         initialTab={companyManagerInitialTab}
         onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
+        onExportSingleCompanyBackup={(comp) => handleExportSingleCompanyBackup(comp.id)}
         userEmail={currentUser?.email || user?.email || undefined}
       />
 
@@ -2350,21 +3312,8 @@ export default function App() {
         onClose={() => setIsBackupRestoreOpen(false)}
         companies={companies}
         activeCompanyId={activeCompanyId}
-        onRestoreSuccess={(restoredCompanies, restoredActiveId) => {
-          const userEmail = currentUser?.email?.trim().toLowerCase() || user?.email?.trim().toLowerCase() || undefined;
-          const userId = currentUser?.id || user?.uid || undefined;
-          const tagged = restoredCompanies.map((c) => ({
-            ...c,
-            userEmail: userEmail || c.userEmail,
-            userId: userId || c.userId,
-          }));
-          setCompanies(tagged);
-          saveCompaniesForUserSession(tagged, currentUser);
-          handleSelectCompany(restoredActiveId);
-          setNotification({
-            type: 'success',
-            message: `Backup restored successfully! Loaded ${tagged.length} company entity/entities.`,
-          });
+        onRestoreSuccess={(restoredCompanies, restoredActiveId, restoreOptions) => {
+          handleRestoreCompanies(restoredCompanies, restoredActiveId, restoreOptions);
         }}
         user={user}
         accessToken={accessToken}
@@ -2492,6 +3441,7 @@ export default function App() {
           setIsReferralModalOpen(true);
         }}
         onOpenTermsModal={() => setIsTermsModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Onboarding / Profile Setup Modal for New Users */}
@@ -2516,12 +3466,13 @@ export default function App() {
           isOpen={isReferralModalOpen}
           onClose={() => setIsReferralModalOpen(false)}
           currentUser={currentUser}
+          onUserUpdated={(updated) => setCurrentUser(updated)}
         />
       )}
 
       {/* Statutory Terms of Service & Professional Accounting Disclaimer Modal */}
       <TermsAndConditionsModal
-        isOpen={isTermsModalOpen}
+        isOpen={isTermsModalOpen || !hasAcceptedTermsState}
         onAccept={handleAcceptTerms}
         onClose={() => {
           if (hasAcceptedTermsState) {
@@ -2530,35 +3481,6 @@ export default function App() {
         }}
         isMandatory={!hasAcceptedTermsState}
       />
-
-      {/* Floating AI CA Copilot & Quick Help Action Hub */}
-      <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 print:hidden">
-        <button
-          type="button"
-          onClick={() => {
-            setAiCopilotPrompt(undefined);
-            setIsAICopilotOpen(true);
-          }}
-          className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 hover:from-emerald-500 hover:to-teal-700 text-white font-bold text-xs shadow-xl shadow-emerald-950/40 border border-emerald-400/40 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          title="Ask AI CA Copilot (ICAI Non-Corporate Entity & App Guidance)"
-        >
-          <div className="relative">
-            <Bot className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400" />
-          </div>
-          <span>Ask AI Copilot</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setIsUserManualOpen(true)}
-          className="p-2.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          title="Open User Manual & ICAI Reference Guide"
-        >
-          <BookOpen className="w-4 h-4" />
-        </button>
-      </div>
 
       {/* Comprehensive User Manual & ICAI CA Reference Guide Modal */}
       <UserManualModal

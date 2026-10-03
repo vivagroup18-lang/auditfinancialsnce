@@ -1,5 +1,6 @@
 import { BalanceSheetData, MappedLedger, NoteScheduleData, ProfitAndLossData, EntityConfig, AuditException, PartnerCapitalRecord } from '../types';
 import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
+import { isProfitAndLossLedger, normalizeProfitAndLossLedgers } from './mappingEngine';
 
 interface SinglePeriodResult {
   balanceSheet: Omit<BalanceSheetData, 'previousYear'>;
@@ -277,6 +278,37 @@ export function computeOwnersCapitalTable(
       };
     });
 
+    // If opening/closing balances were not explicitly entered (e.g. default 0) and Note 3 has a Trial Balance total,
+    // deduce closing & opening balances from totalClosing so Note 3 schedule reconciles with the Balance Sheet
+    const allExplicitZeroOrUnset = partnerConfigs.every((p) => {
+      const pOpen = isPY ? (p.pyOpeningBalance ?? p.openingBalance) : p.openingBalance;
+      const pClose = isPY ? (p.pyClosingBalance ?? p.closingBalance) : p.closingBalance;
+      return (!pOpen || pOpen === 0) && pClose === undefined;
+    });
+
+    if (allExplicitZeroOrUnset && totalClosing !== 0 && records.length > 0) {
+      let allocatedClose = 0;
+      records.forEach((r, idx) => {
+        const isLast = idx === records.length - 1;
+        const ratio = (r.profitSharePercent || 100 / records.length) / 100;
+        const targetClose = isLast
+          ? Math.round((totalClosing - allocatedClose) * 100) / 100
+          : Math.round(totalClosing * ratio * 100) / 100;
+        allocatedClose += targetClose;
+        r.closingBalance = targetClose;
+        r.openingBalance =
+          Math.round(
+            (r.closingBalance -
+              r.capitalIntroduced -
+              r.remuneration -
+              r.interestOnCapital +
+              r.withdrawals -
+              r.shareOfProfit) *
+              100
+          ) / 100;
+      });
+    }
+
     return records;
   }
 
@@ -295,9 +327,16 @@ export function computeOwnersCapitalTable(
     const name = it.accountName;
     if (
       it.accountCode?.startsWith('VIRT-') ||
+      isProfitAndLossLedger(name) ||
       name.toLowerCase().includes('statutory') ||
       name.toLowerCase().includes('net profit') ||
       name.toLowerCase().includes('net loss') ||
+      name.toLowerCase().includes('profit & loss') ||
+      name.toLowerCase().includes('profit and loss') ||
+      name.toLowerCase().includes('p & l') ||
+      name.toLowerCase().includes('p&l') ||
+      name.toLowerCase().includes('profit transfer') ||
+      name.toLowerCase().includes('loss transfer') ||
       name.toLowerCase().includes('total') ||
       name.toLowerCase().includes('surplus')
     ) {
@@ -467,7 +506,8 @@ export function computePeriodTotals(
   const computationExceptions: AuditException[] = [];
 
   // 1. Prepare effective ledgers array including Year-End Adjustments if present
-  const effectiveLedgers: MappedLedger[] = [...mappedLedgers];
+  // Also normalize any Profit & Loss Account / Profit Transferred ledger into Note 3 (Owners' Capital Account)
+  const effectiveLedgers: MappedLedger[] = normalizeProfitAndLossLedgers(mappedLedgers);
   const adjustments = config.yearEndAdjustments;
 
   if (adjustments) {
@@ -642,13 +682,14 @@ export function computePeriodTotals(
       // Owners' / Partners' Capital Account (Note 3):
       let totalCapital = 0;
       schedule.items.forEach((item) => {
-        const isDebitEntry =
-          (item.originalDebit !== undefined && item.originalDebit > 0 && (item.originalCredit === 0 || item.originalDebit > item.originalCredit)) ||
-          item.subCategory === 'Drawings Account' ||
-          item.accountName.toLowerCase().includes('drawing') ||
-          item.accountName.toLowerCase().includes('rent') ||
-          item.accountName.toLowerCase().includes('tax') ||
-          (item.accountName.toLowerCase().includes('loss') && !item.accountName.toLowerCase().includes('profit'));
+        const hasExplicitDrCr = (item.originalDebit || 0) > 0 || (item.originalCredit || 0) > 0;
+        const isDebitEntry = hasExplicitDrCr
+          ? (item.originalDebit || 0) > (item.originalCredit || 0)
+          : item.subCategory === 'Drawings Account' ||
+            item.accountName.toLowerCase().includes('drawing') ||
+            item.accountName.toLowerCase().includes('rent') ||
+            item.accountName.toLowerCase().includes('tax') ||
+            (item.accountName.toLowerCase().includes('loss') && !item.accountName.toLowerCase().includes('profit'));
 
         if (isDebitEntry) {
           item.displayBalance = -Math.abs(item.netBalance);
@@ -663,10 +704,11 @@ export function computePeriodTotals(
       // Reserves and Surplus (Note 4):
       let totalReserves = 0;
       schedule.items.forEach((item) => {
-        const isDebitEntry =
-          (item.originalDebit !== undefined && item.originalDebit > 0 && (item.originalCredit === 0 || item.originalDebit > item.originalCredit)) ||
-          item.accountName.toLowerCase().includes('deficit') ||
-          item.accountName.toLowerCase().includes('loss');
+        const hasExplicitDrCr = (item.originalDebit || 0) > 0 || (item.originalCredit || 0) > 0;
+        const isDebitEntry = hasExplicitDrCr
+          ? (item.originalDebit || 0) > (item.originalCredit || 0)
+          : item.accountName.toLowerCase().includes('deficit') ||
+            (item.accountName.toLowerCase().includes('loss') && !item.accountName.toLowerCase().includes('profit'));
 
         if (isDebitEntry) {
           item.displayBalance = -Math.abs(item.netBalance);
@@ -726,14 +768,13 @@ export function computePeriodTotals(
     } else if (noteNo >= 21 && noteNo <= 25) {
       // Expense Schedules (Notes 21 to 25):
       // Debit entries (+) increase Expense
-      // Credit entries (-) decrease Expense (e.g. Round Off credit, Discount Received, Less: Closing Stock)
+      // Credit entries (-) decrease Expense (e.g. Round Off with credit balance, Purchase Returns, Discount Received, Less: Closing Stock)
       let totalExp = 0;
       schedule.items.forEach((item) => {
         const isCreditEntry =
           (item.originalCredit > 0 && (item.originalDebit === 0 || item.originalCredit > item.originalDebit)) ||
           item.accountCode?.includes('VIRT-CS-COGS') ||
-          item.accountName.toLowerCase().includes('less:') ||
-          item.accountName.toLowerCase().includes('round off');
+          item.accountName.toLowerCase().includes('less:');
 
         if (isCreditEntry) {
           item.displayBalance = -Math.abs(item.netBalance);
@@ -747,7 +788,7 @@ export function computePeriodTotals(
     } else if (noteNo >= 19 && noteNo <= 20) {
       // Income Schedules (Notes 19 & 20):
       // Credit entries (+) increase Income
-      // Debit entries (-) decrease Income (e.g. Sales Return, Discount Allowed)
+      // Debit entries (-) decrease Income (e.g. Round Off with debit balance, Sales Return, Discount Allowed)
       // Provision reversals / return back / written back are CREDIT income additions (+), NOT debit returns (-)
       let totalInc = 0;
       schedule.items.forEach((item) => {
@@ -806,18 +847,19 @@ export function computePeriodTotals(
   let openingStockVal = 0;
 
   noteSchedules[21]?.items.forEach((it) => {
+    const bal = it.displayBalance !== undefined ? it.displayBalance : it.netBalance;
     if (it.subCategory.includes('(B)') || it.subCategory.toLowerCase().includes('stock-in-trade')) {
-      purchasesOfStockInTrade += it.netBalance;
+      purchasesOfStockInTrade += bal;
     } else if (it.subCategory.includes('(C)') || it.subCategory.toLowerCase().includes('changes in')) {
-      changesInInventories += it.netBalance;
+      changesInInventories += bal;
       if (it.accountName.toLowerCase().includes('opening stock') || it.subCategory.toLowerCase().includes('opening')) {
-        openingStockVal += it.netBalance;
+        openingStockVal += Math.abs(it.netBalance);
       }
     } else {
       if (it.accountName.toLowerCase().includes('opening stock') || it.subCategory.toLowerCase().includes('opening')) {
-        openingStockVal += it.netBalance;
+        openingStockVal += Math.abs(it.netBalance);
       }
-      costOfRawMaterialsConsumed += it.netBalance;
+      costOfRawMaterialsConsumed += bal;
     }
   });
 
@@ -1045,13 +1087,14 @@ export function computePeriodTotals(
         return;
       }
 
-      const isDebitEntry =
-        ((item.originalDebit || 0) > (item.originalCredit || 0)) ||
-        item.subCategory === 'Drawings Account' ||
-        item.accountName.toLowerCase().includes('drawing') ||
-        item.accountName.toLowerCase().includes('rent') ||
-        item.accountName.toLowerCase().includes('tax') ||
-        (item.accountName.toLowerCase().includes('loss') && !item.accountName.toLowerCase().includes('profit'));
+      const hasExplicitDrCr = (item.originalDebit || 0) > 0 || (item.originalCredit || 0) > 0;
+      const isDebitEntry = hasExplicitDrCr
+        ? (item.originalDebit || 0) > (item.originalCredit || 0)
+        : item.subCategory === 'Drawings Account' ||
+          item.accountName.toLowerCase().includes('drawing') ||
+          item.accountName.toLowerCase().includes('rent') ||
+          item.accountName.toLowerCase().includes('tax') ||
+          (item.accountName.toLowerCase().includes('loss') && !item.accountName.toLowerCase().includes('profit'));
 
       if (isDebitEntry) {
         item.displayBalance = -Math.abs(item.netBalance);
@@ -1062,6 +1105,12 @@ export function computePeriodTotals(
       }
     });
     noteSchedules[3].totalAmount = totalCapital;
+    noteSchedules[3].subTotals = {};
+    noteSchedules[3].items.forEach((item) => {
+      const subCat = item.subCategory || 'General';
+      const bal = item.displayBalance !== undefined ? item.displayBalance : item.netBalance;
+      noteSchedules[3].subTotals![subCat] = (noteSchedules[3].subTotals![subCat] || 0) + bal;
+    });
     noteSchedules[3].partnerCapitalTable = computeOwnersCapitalTable(
       noteSchedules[3],
       config,
@@ -1085,10 +1134,11 @@ export function computePeriodTotals(
         return;
       }
 
-      const isDebitEntry =
-        ((item.originalDebit || 0) > (item.originalCredit || 0)) ||
-        item.accountName.toLowerCase().includes('deficit') ||
-        (item.accountName.toLowerCase().includes('loss') && !item.accountName.toLowerCase().includes('profit'));
+      const hasExplicitDrCr = (item.originalDebit || 0) > 0 || (item.originalCredit || 0) > 0;
+      const isDebitEntry = hasExplicitDrCr
+        ? (item.originalDebit || 0) > (item.originalCredit || 0)
+        : item.accountName.toLowerCase().includes('deficit') ||
+          (item.accountName.toLowerCase().includes('loss') && !item.accountName.toLowerCase().includes('profit'));
 
       if (isDebitEntry) {
         item.displayBalance = -Math.abs(item.netBalance);
@@ -1099,6 +1149,12 @@ export function computePeriodTotals(
       }
     });
     noteSchedules[4].totalAmount = totalReserves;
+    noteSchedules[4].subTotals = {};
+    noteSchedules[4].items.forEach((item) => {
+      const subCat = item.subCategory || 'General';
+      const bal = item.displayBalance !== undefined ? item.displayBalance : item.netBalance;
+      noteSchedules[4].subTotals![subCat] = (noteSchedules[4].subTotals![subCat] || 0) + bal;
+    });
   }
 
   const adjustedCapital = noteSchedules[3]?.totalAmount || 0;

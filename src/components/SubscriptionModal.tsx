@@ -3,42 +3,40 @@ import {
   X,
   Check,
   Zap,
-  ShieldCheck,
-  Sparkles,
-  Building2,
-  Calendar,
-  CreditCard,
-  Tag,
   ArrowRight,
-  Download,
   AlertCircle,
-  Clock,
-  ChevronRight,
-  Receipt,
-  FileCheck,
   CheckCircle2,
   Gift,
   PlusCircle,
   Coins,
+  ShieldCheck,
+  Receipt,
+  CreditCard,
+  Printer,
+  Building2,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Crown,
 } from 'lucide-react';
 import {
-  SubscriptionPlan,
   SubscriptionTier,
   BillingCycle,
   UserProfile,
-  UserInvoice,
   CreditPack,
+  SubscriptionPlan,
+  UserInvoice,
 } from '../types';
 import {
-  SUBSCRIPTION_PLANS,
-  PROMO_CODES,
   CREDIT_PACKS,
-  CREDIT_COSTS,
-  calculatePricingBreakdown,
-  calculateNextExpiryDate,
-  formatCurrencyINR,
+  SUBSCRIPTION_PLANS,
+  GST_RATE,
 } from '../data/subscriptionPlans';
-import { updateUserSubscription, addCredits } from '../utils/storageManager';
+import { addCredits } from '../utils/storageManager';
+import {
+  RazorpayCheckoutModal,
+  RazorpayCheckoutItem,
+} from './RazorpayCheckoutModal';
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -51,640 +49,681 @@ interface SubscriptionModalProps {
   upgradeReason?: string;
 }
 
+const PLAN_ICONS: Record<string, React.FC<{ className?: string }>> = {
+  free_trial: ({ className }) => <Zap className={className} />,
+  professional: ({ className }) => <Star className={className} />,
+  enterprise: ({ className }) => <Crown className={className} />,
+};
+
+const PLAN_GRADIENTS: Record<string, string> = {
+  free_trial: 'from-slate-600 to-slate-800',
+  professional: 'from-sky-600 to-blue-800',
+  enterprise: 'from-violet-600 to-purple-800',
+};
+
 export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   isOpen,
   onClose,
   currentUser,
   onSubscriptionUpdated,
   onOpenReferralModal,
-  initialSelectedTier,
-  initialViewTab = 'plans',
+  initialViewTab = 'credits',
   upgradeReason,
 }) => {
-  const [viewTab, setViewTab] = useState<'plans' | 'credits'>(initialViewTab);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
-  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionTier | null>(
-    initialSelectedTier || null
+  const [activeTab, setActiveTab] = useState<'credits' | 'plans' | 'invoices'>(
+    initialViewTab === 'plans' ? 'plans' : 'credits'
   );
-  const [checkoutStep, setCheckoutStep] = useState<'plans' | 'checkout' | 'success'>('plans');
-
-  // Checkout form state
-  const [promoCodeInput, setPromoCodeInput] = useState('');
-  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
-  const [promoError, setPromoError] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Credit Card' | 'Debit Card' | 'Net Banking'>('UPI');
-  const [firmBillingName, setFirmBillingName] = useState(currentUser?.firmName || '');
-  const [gstinNumber, setGstinNumber] = useState(currentUser?.gstin || '');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [generatedInvoice, setGeneratedInvoice] = useState<UserInvoice | null>(null);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
+  const [customCreditsInput, setCustomCreditsInput] = useState<string>('2500');
+  const [checkoutItem, setCheckoutItem] = useState<RazorpayCheckoutItem | null>(null);
   const [topUpSuccessMsg, setTopUpSuccessMsg] = useState<string | null>(null);
+  const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<UserInvoice | null>(null);
 
   if (!isOpen) return null;
 
-  const currentTier: SubscriptionTier = currentUser?.planTier || 'free_trial';
-  const currentPlan = SUBSCRIPTION_PLANS.find((p) => p.id === currentTier) || SUBSCRIPTION_PLANS[0];
+  const availableCredits = currentUser?.credits ?? 555;
+  const userInvoices = currentUser?.invoices || [];
 
-  const targetPlan = selectedPlanId
-    ? SUBSCRIPTION_PLANS.find((p) => p.id === selectedPlanId) || SUBSCRIPTION_PLANS[1]
-    : SUBSCRIPTION_PLANS[1];
+  const handleOpenCreditPackCheckout = (pack: CreditPack) => {
+    setCheckoutItem({
+      itemType: 'credit_pack',
+      itemId: pack.id,
+      itemName: `${pack.name} (${pack.credits.toLocaleString()} Credits)`,
+      tagline: pack.tagline,
+      basePriceINR: pack.priceINR,
+      creditsGranted: pack.credits,
+    });
+  };
 
-  const pricing = calculatePricingBreakdown(targetPlan, billingCycle, appliedPromoCode || undefined);
+  const handleOpenCustomCreditCheckout = () => {
+    const cleanCredits = Math.max(100, Math.min(50000, Math.round(Number(customCreditsInput) || 1000)));
+    const priceINR = Math.max(99, Math.round(cleanCredits * 0.75));
+    setCheckoutItem({
+      itemType: 'credit_pack',
+      itemId: `custom_${cleanCredits}`,
+      itemName: `Custom Credit Top-Up (${cleanCredits.toLocaleString()} Credits)`,
+      tagline: 'On-demand pay-as-you-go statutory audit credits',
+      basePriceINR: priceINR,
+      creditsGranted: cleanCredits,
+    });
+  };
 
-  const handleApplyPromo = () => {
-    setPromoError(null);
-    const clean = promoCodeInput.trim().toUpperCase();
-    if (!clean) return;
-    const found = PROMO_CODES.find((p) => p.code === clean);
-    if (found) {
-      setAppliedPromoCode(found.code);
-      setPromoCodeInput('');
-    } else {
-      setPromoError('Invalid promo code. Try "ICAI2025" for 20% off.');
+  const handleOpenPlanCheckout = (plan: SubscriptionPlan) => {
+    if (plan.id === 'free_trial') return;
+    const basePrice = billingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
+    const creditsGranted =
+      billingCycle === 'yearly' ? plan.monthlyCredits * 12 : plan.monthlyCredits;
+
+    setCheckoutItem({
+      itemType: 'subscription',
+      itemId: `plan_${plan.id}_${billingCycle}`,
+      itemName: `${plan.name} Plan (${billingCycle === 'yearly' ? 'Annual' : 'Monthly'})`,
+      tagline: plan.tagline,
+      basePriceINR: basePrice,
+      creditsGranted,
+      planTier: plan.id,
+      billingCycle,
+    });
+  };
+
+  const handleRazorpayPaymentSuccess = ({
+    invoice,
+    creditsGranted,
+    item,
+  }: {
+    invoice: UserInvoice;
+    creditsGranted: number;
+    item: RazorpayCheckoutItem;
+  }) => {
+    if (!currentUser) return;
+
+    const txType = item.itemType === 'subscription' ? 'SUBSCRIPTION_GRANT' : 'TOPUP';
+    const planUpdate =
+      item.itemType === 'subscription' && item.planTier
+        ? { planTier: item.planTier, billingCycle: item.billingCycle || 'monthly' }
+        : undefined;
+
+    const res = addCredits(
+      currentUser.id,
+      creditsGranted,
+      `Razorpay (${invoice.transactionId}) — ${item.itemName} (+${creditsGranted.toLocaleString()} Credits)`,
+      txType,
+      invoice,
+      planUpdate
+    );
+
+    if (res.success && res.user) {
+      onSubscriptionUpdated(res.user);
+      setTopUpSuccessMsg(
+        `+${creditsGranted.toLocaleString()} credits added! Invoice ${invoice.invoiceNumber} generated.`
+      );
+      setCheckoutItem(null);
     }
   };
 
-  const handleStartUpgrade = (plan: SubscriptionPlan) => {
-    if (plan.id === currentTier) return;
-    setSelectedPlanId(plan.id);
-    setCheckoutStep('checkout');
-  };
-
-  const handleBuyCreditPack = (pack: CreditPack) => {
-    if (!currentUser) return;
-    setIsProcessing(true);
-
-    setTimeout(() => {
-      const res = addCredits(
-        currentUser.id,
-        pack.credits,
-        `Purchased ${pack.name} (+${pack.credits} Credits for ₹${pack.priceINR})`,
-        'TOPUP'
-      );
-
-      if (res.success && res.user) {
-        onSubscriptionUpdated(res.user);
-        setTopUpSuccessMsg(`Successfully added ${pack.credits} credits to your balance!`);
-        setTimeout(() => setTopUpSuccessMsg(null), 4000);
-      }
-      setIsProcessing(false);
-    }, 600);
-  };
-
-  const handleCompletePayment = async () => {
-    if (!currentUser) return;
-    setIsProcessing(true);
-
-    try {
-      // Simulate realistic payment gateway processing delay
-      await new Promise((res) => setTimeout(res, 900));
-
-      const invNumber = `CA-INV-${Date.now().toString().slice(-6)}`;
-      const newInvoice: UserInvoice = {
-        id: 'inv_' + Math.random().toString(36).substring(2, 9),
-        invoiceNumber: invNumber,
-        date: new Date().toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        }),
-        planName: targetPlan.name,
-        planTier: targetPlan.id,
-        billingCycle,
-        subtotal: pricing.subtotal,
-        gstAmount: pricing.gstAmount,
-        totalAmount: pricing.totalAmount,
-        status: 'paid',
-        paymentMethod,
-        transactionId: `TXN_ICAI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-        firmName: firmBillingName.trim() || currentUser.firmName || 'Chartered Accountant',
-        gstin: gstinNumber.trim() || undefined,
-        notes: `Subscription to ${targetPlan.name} (${billingCycle}) with ${targetPlan.monthlyCredits} credits.`,
-      };
-
-      const updateRes = updateUserSubscription(
-        currentUser.id,
-        targetPlan.id,
-        billingCycle,
-        newInvoice
-      );
-
-      if (updateRes.success && updateRes.user) {
-        // Also grant plan's monthly credits
-        addCredits(
-          currentUser.id,
-          targetPlan.monthlyCredits,
-          `Subscription tier grant: ${targetPlan.name} (+${targetPlan.monthlyCredits} credits)`,
-          'SUBSCRIPTION_GRANT'
-        );
-
-        setGeneratedInvoice(newInvoice);
-        onSubscriptionUpdated(updateRes.user);
-        setCheckoutStep('success');
-      }
-    } catch (err) {
-      console.error('Subscription checkout error:', err);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const PRESET_CREDITS = [500, 1000, 2500, 5000];
+  const customPriceINR = Math.max(99, Math.round(Math.max(100, Number(customCreditsInput) || 1000) * 0.75));
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-150">
-      <div className="relative w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Modal Header */}
-        <div className="bg-slate-900 text-white px-6 py-5 flex items-center justify-between border-b border-slate-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white font-bold shadow-sm">
-              <Zap className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold tracking-tight text-white">
-                  Licensing & Claude-Style Credits
-                </h2>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                  ICAI Compliance
-                </span>
+    <>
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6">
+        <div className="relative w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92vh]">
+
+          {/* ── Modal Header ── */}
+          <div className="bg-gradient-to-r from-[#072654] to-[#1a4ba0] text-white px-6 py-5 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-yellow-300" />
               </div>
-              <p className="text-xs text-slate-300">
-                Statutory Non-Corporate Entity Financial Statement Automation for CAs & Audit Firms
-              </p>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight">Credits & Billing</h2>
+                <p className="text-xs text-blue-200">
+                  Powered by Razorpay · UPI, Cards, NetBanking · Instant GST Invoice
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                <div className="text-xs text-blue-300">Available Balance</div>
+                <div className="text-lg font-bold font-mono text-emerald-300">
+                  {availableCredits.toLocaleString()} <span className="text-sm font-normal text-blue-200">credits</span>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* View Tabs Selector */}
-        {checkoutStep === 'plans' && (
-          <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-3 gap-3 shrink-0 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setViewTab('plans')}
-              className={`pb-3 transition border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                viewTab === 'plans'
-                  ? 'border-emerald-600 text-emerald-700'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <CreditCard className="w-4 h-4" />
-              <span>Subscription Plans</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewTab('credits')}
-              className={`pb-3 transition border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                viewTab === 'credits'
-                  ? 'border-emerald-600 text-emerald-700'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Coins className="w-4 h-4 text-amber-500" />
-              <span>Claude-Style Credits & Top-Up</span>
-              {currentUser && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold">
-                  ⚡ {currentUser.credits.toLocaleString()}
-                </span>
-              )}
-            </button>
-
-            {onOpenReferralModal && (
+          {/* ── Navigation Tabs ── */}
+          <div className="flex items-center border-b border-slate-200 bg-slate-50 px-6 shrink-0 overflow-x-auto">
+            {([
+              { id: 'credits', label: 'Top-Up Credits', icon: PlusCircle },
+              { id: 'plans', label: 'Practice Plans', icon: TrendingUp },
+              { id: 'invoices', label: `GST Invoices (${userInvoices.length})`, icon: Receipt },
+            ] as const).map((tab) => (
               <button
+                key={tab.id}
                 type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenReferralModal();
-                }}
-                className="pb-3 text-emerald-700 hover:text-emerald-800 ml-auto flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 py-3.5 px-4 text-sm font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
+                  activeTab === tab.id
+                    ? 'border-[#072654] text-[#072654]'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
               >
-                <Gift className="w-4 h-4 text-emerald-600" />
-                <span>Earn 500 Credits (Referrals)</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
               </button>
-            )}
-          </div>
-        )}
+            ))}
 
-        {/* Upgrade Reason Alert */}
-        {upgradeReason && checkoutStep === 'plans' && (
-          <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 text-xs text-amber-900 flex items-center gap-2 shrink-0">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span className="font-semibold">{upgradeReason}</span>
+            <div className="ml-auto pb-0 py-3 pl-4 hidden sm:flex">
+              {onOpenReferralModal && (
+                <button
+                  type="button"
+                  onClick={() => { onClose(); onOpenReferralModal(); }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 cursor-pointer whitespace-nowrap"
+                >
+                  <Gift className="w-3.5 h-3.5" />
+                  Refer & Earn +500 Credits
+                </button>
+              )}
+            </div>
           </div>
-        )}
 
-        {/* Body Container */}
-        <div className="overflow-y-auto p-6 flex-1 space-y-6">
-          {topUpSuccessMsg && (
-            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{topUpSuccessMsg}</span>
+          {/* ── Upgrade Banner ── */}
+          {upgradeReason && (
+            <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 text-sm text-amber-800 flex items-center gap-2 shrink-0">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{upgradeReason}</span>
             </div>
           )}
 
-          {checkoutStep === 'plans' && viewTab === 'credits' && (
-            <div className="space-y-6">
-              {/* Credit Status Hero */}
-              <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-6 border border-slate-800 shadow-md">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* ── Success Alert ── */}
+          {topUpSuccessMsg && (
+            <div className="mx-6 mt-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span className="font-semibold">{topUpSuccessMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('invoices')}
+                className="px-3 py-1 bg-emerald-700 text-white rounded-lg text-xs font-bold hover:bg-emerald-600 transition cursor-pointer whitespace-nowrap"
+              >
+                View Invoice
+              </button>
+            </div>
+          )}
+
+          {/* ── Body ── */}
+          <div className="overflow-y-auto flex-1 p-6">
+
+            {/* TAB 1: CREDIT TOP-UP PACKS */}
+            {activeTab === 'credits' && (
+              <div className="space-y-6">
+
+                {/* Hero Balance Card */}
+                <div className="bg-gradient-to-br from-slate-900 to-slate-700 text-white rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 bg-emerald-950 px-2.5 py-0.5 rounded-full border border-emerald-800">
-                      Claude-Style Credit Meter
-                    </span>
-                    <h3 className="text-3xl font-black text-white mt-1 flex items-center gap-2">
-                      <span>⚡ {currentUser?.credits.toLocaleString() || 0}</span>
-                      <span className="text-base font-normal text-slate-300">Credits Available</span>
-                    </h3>
-                    <p className="text-xs text-slate-300 mt-1 max-w-lg">
-                      Each statutory audit analysis, AI note mapping, and forensic diagnostic deducts credits from your balance. Credits never expire on active accounts.
+                    <div className="text-xs text-emerald-400 font-semibold mb-1">Your Credit Balance · Never Expires</div>
+                    <div className="text-4xl font-bold font-mono tabular-nums">
+                      {availableCredits.toLocaleString()}
+                      <span className="text-lg font-normal text-slate-300 ml-2">credits</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2 max-w-sm leading-relaxed">
+                      Top-up anytime with instant B2B GST tax invoices (SAC 998314).
+                      Each referral earns you +500 free credits.
                     </p>
                   </div>
-
                   {onOpenReferralModal && (
                     <button
                       type="button"
-                      onClick={() => {
-                        onClose();
-                        onOpenReferralModal();
-                      }}
-                      className="py-2.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 rounded-2xl text-xs font-black shadow-md transition flex items-center gap-2 cursor-pointer shrink-0"
+                      onClick={() => { onClose(); onOpenReferralModal?.(); }}
+                      className="py-2.5 px-5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-sm font-bold transition flex items-center gap-2 cursor-pointer shrink-0"
                     >
                       <Gift className="w-4 h-4" />
-                      <span>Get 500 Free Credits</span>
+                      Get +500 Free Credits
                     </button>
                   )}
                 </div>
-              </div>
 
-              {/* Instant Top-Up Credit Packs */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <PlusCircle className="w-4 h-4 text-emerald-600" />
-                    <span>Instant Credit Top-Up Packs (Pay-as-you-go)</span>
-                  </h4>
-                  <span className="text-[11px] text-slate-500 font-medium">No subscription required</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {CREDIT_PACKS.map((pack) => (
-                    <div
-                      key={pack.id}
-                      className={`relative rounded-2xl p-5 border transition flex flex-col justify-between ${
-                        pack.popular
-                          ? 'border-emerald-500 bg-emerald-50/40 shadow-md ring-1 ring-emerald-500'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      {pack.popular && (
-                        <span className="absolute -top-2.5 right-4 bg-emerald-600 text-white text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-full shadow-xs">
-                          Most Popular
-                        </span>
-                      )}
-
-                      <div>
-                        <div className="text-xs font-bold text-slate-700">{pack.name}</div>
-                        <div className="text-2xl font-black text-slate-900 mt-1 flex items-center gap-1">
-                          <span>⚡ {pack.credits.toLocaleString()}</span>
-                          <span className="text-xs font-semibold text-slate-500">Credits</span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-1">{pack.tagline}</p>
-                      </div>
-
-                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-base font-black text-emerald-700">
-                          ₹{pack.priceINR}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={isProcessing}
-                          onClick={() => handleBuyCreditPack(pack)}
-                          className="py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
-                        >
-                          Top-Up
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Credit Consumption Schedule */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <Coins className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Transparent Credit Cost Schedule</span>
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                  <div className="p-3 bg-white rounded-xl border border-slate-200/80">
-                    <div className="font-bold text-slate-900">AI Schedule Mapping</div>
-                    <div className="text-emerald-700 font-black mt-0.5">5 Credits / Run</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Automated ICAI Note 3 to 25 mapping</div>
-                  </div>
-                  <div className="p-3 bg-white rounded-xl border border-slate-200/80">
-                    <div className="font-bold text-slate-900">Statutory Exception Scan</div>
-                    <div className="text-emerald-700 font-black mt-0.5">10 Credits / Scan</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Form 3CD/3CB anomaly detection</div>
-                  </div>
-                  <div className="p-3 bg-white rounded-xl border border-slate-200/80">
-                    <div className="font-bold text-slate-900">Statutory Excel Export</div>
-                    <div className="text-emerald-700 font-black mt-0.5">5 Credits / Export</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Multi-sheet formatted ICAI workbook</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Credit Transactions Ledger */}
-              {currentUser?.creditTransactions && currentUser.creditTransactions.length > 0 && (
+                {/* Credit Packs Grid */}
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                    Recent Credit Activity Ledger
+                  <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <PlusCircle className="w-4 h-4 text-emerald-600" />
+                    Instant Top-Up Packs
+                    <span className="text-xs font-normal text-slate-400 ml-1">All prices + 18% GST · Instant delivery</span>
                   </h4>
-                  <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                    {currentUser.creditTransactions.slice(0, 10).map((tx) => (
-                      <div
-                        key={tx.id}
-                        className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <div className="font-bold text-slate-800">{tx.description}</div>
-                          <div className="text-[10px] text-slate-400">
-                            {new Date(tx.date).toLocaleDateString('en-IN', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </div>
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {CREDIT_PACKS.map((pack) => {
+                      const gstAmount = Math.round(pack.priceINR * GST_RATE);
+                      const totalINR = pack.priceINR + gstAmount;
+                      return (
                         <div
-                          className={`font-black ${
-                            tx.amount > 0 ? 'text-emerald-600' : 'text-slate-700'
+                          key={pack.id}
+                          className={`relative rounded-2xl p-5 border transition flex flex-col ${
+                            pack.popular
+                              ? 'border-emerald-500 bg-emerald-50/40 shadow-sm shadow-emerald-100'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
                           }`}
                         >
-                          {tx.amount > 0 ? `+${tx.amount}` : tx.amount} Credits
+                          {pack.popular && (
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                              <span className="bg-emerald-500 text-white text-[11px] font-bold px-3 py-0.5 rounded-full whitespace-nowrap">
+                                ⭐ Most Popular
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">{pack.name}</div>
+                            <div className="text-3xl font-bold text-slate-900 mt-1 font-mono tabular-nums">
+                              +{pack.credits.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-0.5">credits</div>
+                            <p className="text-xs text-slate-500 mt-2 leading-relaxed">{pack.tagline}</p>
+                          </div>
+
+                          <div className="mt-4 pt-3.5 border-t border-slate-200">
+                            <div className="flex items-end justify-between mb-3">
+                              <div>
+                                <div className="text-xl font-bold text-slate-900 font-mono">
+                                  ₹{pack.priceINR.toLocaleString('en-IN')}
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                  +₹{gstAmount} GST = ₹{totalINR.toLocaleString('en-IN')} total
+                                </div>
+                              </div>
+                              <div className="text-xs text-emerald-700 font-mono font-semibold">
+                                ₹{(pack.priceINR / pack.credits).toFixed(2)}/cr
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCreditPackCheckout(pack)}
+                              className={`w-full py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                                pack.popular
+                                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                  : 'bg-[#072654] hover:bg-[#0a3678] text-white'
+                              }`}
+                            >
+                              <CreditCard className="w-4 h-4" />
+                              Pay with Razorpay
+                            </button>
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Custom Top-Up */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1">
+                      <div className="text-sm font-bold text-slate-900 mb-0.5">Custom Credit Amount</div>
+                      <p className="text-xs text-slate-500">₹0.75 per credit · Minimum 100 credits</p>
+                      <div className="flex gap-2 mt-3 flex-wrap">
+                        {PRESET_CREDITS.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setCustomCreditsInput(String(preset))}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                              Number(customCreditsInput) === preset
+                                ? 'border-sky-500 bg-sky-50 text-sky-800'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                            }`}
+                          >
+                            +{preset.toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-3 py-2.5">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <input
+                          type="number"
+                          min={100}
+                          max={50000}
+                          step={100}
+                          value={customCreditsInput}
+                          onChange={(e) => setCustomCreditsInput(e.target.value)}
+                          className="w-20 text-sm font-mono font-bold text-slate-900 outline-none bg-transparent"
+                        />
+                        <span className="text-xs text-slate-400">cr</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleOpenCustomCreditCheckout}
+                        className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-bold transition cursor-pointer whitespace-nowrap"
+                      >
+                        Pay ₹{customPriceINR.toLocaleString('en-IN')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Credit Usage Schedule */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-5">
+                  <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-amber-500" />
+                    Credit Usage Schedule
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      { label: 'AI Schedule Mapping', cost: '5 Credits', detail: 'ICAI Notes 3–25 automation', color: 'text-sky-600' },
+                      { label: 'Exception Scan', cost: '10 Credits', detail: 'Form 3CD/3CB anomaly detection', color: 'text-amber-600' },
+                      { label: 'Excel Export', cost: '5 Credits', detail: 'Multi-sheet ICAI workbook', color: 'text-emerald-600' },
+                    ].map((item) => (
+                      <div key={item.label} className="bg-slate-50 rounded-xl p-3.5">
+                        <div className="font-semibold text-slate-800 text-sm">{item.label}</div>
+                        <div className={`font-bold text-base font-mono mt-0.5 ${item.color}`}>{item.cost}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{item.detail}</div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
-          )}
-
-          {checkoutStep === 'plans' && viewTab === 'plans' && (
-            <>
-              {/* Billing Cycle Toggle */}
-              <div className="flex justify-center mb-2">
-                <div className="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('monthly')}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${
-                      billingCycle === 'monthly'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Monthly Billing
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('yearly')}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                      billingCycle === 'yearly'
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>Annual Billing</span>
-                    <span className="text-[10px] bg-emerald-950 text-emerald-300 px-1.5 py-0.2 rounded-full">
-                      Save 17%
-                    </span>
-                  </button>
-                </div>
               </div>
+            )}
 
-              {/* Plans Comparison Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {SUBSCRIPTION_PLANS.map((plan) => {
-                  const isCurrent = plan.id === currentTier;
-                  const price =
-                    billingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
-
-                  return (
-                    <div
-                      key={plan.id}
-                      className={`rounded-3xl p-6 border flex flex-col justify-between relative transition ${
-                        plan.popular
-                          ? 'border-emerald-500 bg-white shadow-xl ring-2 ring-emerald-500/20'
-                          : 'border-slate-200 bg-slate-50/50 hover:bg-white'
+            {/* TAB 2: CA PRACTICE PLANS */}
+            {activeTab === 'plans' && (
+              <div className="space-y-6">
+                {/* Billing Toggle */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">CA Practice Subscription Plans</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">For high-volume CA firms seeking bundled credits & multi-partner access.</p>
+                  </div>
+                  <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-xl text-sm font-semibold shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setBillingCycle('monthly')}
+                      className={`px-4 py-1.5 rounded-lg transition cursor-pointer ${
+                        billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >
-                      {plan.badge && (
-                        <span className="absolute -top-3 left-6 bg-emerald-600 text-white text-[10px] font-extrabold uppercase px-3 py-0.5 rounded-full shadow-xs">
-                          {plan.badge}
-                        </span>
-                      )}
+                      Monthly
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBillingCycle('yearly')}
+                      className={`px-4 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                        billingCycle === 'yearly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Annual
+                      <span className="text-[11px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">Save 17%</span>
+                    </button>
+                  </div>
+                </div>
 
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-base font-extrabold text-slate-900">{plan.name}</h4>
-                          {isCurrent && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold uppercase">
-                              Current
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1 min-h-[34px]">{plan.tagline}</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  {SUBSCRIPTION_PLANS.map((plan) => {
+                    const price = billingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
+                    const isCurrentPlan = currentUser?.planTier === plan.id;
+                    const PlanIcon = PLAN_ICONS[plan.id] || Zap;
+                    const gradient = PLAN_GRADIENTS[plan.id] || 'from-slate-600 to-slate-800';
 
-                        <div className="my-4 pb-4 border-b border-slate-200">
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-black text-slate-900">
-                              {formatCurrencyINR(price)}
-                            </span>
-                            {price > 0 && (
-                              <span className="text-xs text-slate-500 font-medium">
-                                / {billingCycle === 'yearly' ? 'year' : 'month'}
+                    return (
+                      <div
+                        key={plan.id}
+                        className={`rounded-2xl overflow-hidden border flex flex-col ${
+                          plan.popular ? 'border-sky-400 shadow-md shadow-sky-100' : 'border-slate-200'
+                        }`}
+                      >
+                        {/* Plan Header */}
+                        <div className={`bg-gradient-to-br ${gradient} p-5 text-white`}>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+                              <PlanIcon className="w-5 h-5 text-white" />
+                            </div>
+                            {plan.popular && (
+                              <span className="text-[11px] font-bold bg-white/20 px-2.5 py-0.5 rounded-full">
+                                ⭐ Popular
+                              </span>
+                            )}
+                            {isCurrentPlan && (
+                              <span className="text-[11px] font-bold bg-emerald-400/30 text-emerald-200 px-2.5 py-0.5 rounded-full">
+                                ✓ Active
                               </span>
                             )}
                           </div>
-                          <div className="text-xs font-bold text-emerald-700 mt-1 flex items-center gap-1">
-                            <Zap className="w-3.5 h-3.5" />
-                            <span>⚡ {plan.monthlyCredits.toLocaleString()} Credits / month</span>
+                          <h4 className="text-base font-bold">{plan.name}</h4>
+                          <p className="text-xs text-white/70 mt-0.5">{plan.tagline}</p>
+                          <div className="mt-3">
+                            <div className="text-3xl font-bold font-mono">
+                              {price === 0 ? 'Free' : `₹${price.toLocaleString('en-IN')}`}
+                            </div>
+                            {price > 0 && (
+                              <div className="text-xs text-white/60 mt-0.5">
+                                /{billingCycle === 'yearly' ? 'year' : 'month'} + 18% GST
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* Features List */}
-                        <ul className="space-y-2 text-xs">
-                          {plan.features.map((f, idx) => (
-                            <li
-                              key={idx}
-                              className={`flex items-start gap-2 ${
-                                f.included
-                                  ? f.highlight
-                                    ? 'text-slate-900 font-semibold'
-                                    : 'text-slate-700'
-                                  : 'text-slate-400 line-through'
-                              }`}
-                            >
-                              <Check
-                                className={`w-4 h-4 shrink-0 mt-0.5 ${
-                                  f.included ? 'text-emerald-600' : 'text-slate-300'
-                                }`}
-                              />
-                              <span>{f.text}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                        {/* Plan Body */}
+                        <div className="bg-white p-4 flex-1 flex flex-col">
+                          <ul className="space-y-1.5 text-xs text-slate-600 flex-1">
+                            {plan.features.slice(0, 6).map((feat, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                                <span className={feat.highlight ? 'font-semibold text-slate-800' : ''}>{feat.text}</span>
+                              </li>
+                            ))}
+                          </ul>
 
-                      <div className="mt-6 pt-4 border-t border-slate-100">
+                          <div className="mt-4 pt-3 border-t border-slate-100">
+                            {plan.id === 'free_trial' ? (
+                              <div className={`py-2.5 px-4 text-center rounded-xl text-sm font-semibold ${
+                                isCurrentPlan ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'
+                              }`}>
+                                {isCurrentPlan ? '✓ Your Current Plan' : 'Free on Signup'}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPlanCheckout(plan)}
+                                className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                                  plan.popular
+                                    ? 'bg-sky-600 hover:bg-sky-500 text-white'
+                                    : 'bg-[#072654] hover:bg-[#0a3678] text-white'
+                                }`}
+                              >
+                                <CreditCard className="w-4 h-4" />
+                                {isCurrentPlan ? 'Renew Plan' : 'Subscribe Now'}
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: GST INVOICES */}
+            {activeTab === 'invoices' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">GST Tax Invoices & Transaction History</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">Official B2B Tax Invoices (SAC 998314) with Razorpay Payment & Order IDs</p>
+                  </div>
+                </div>
+
+                {/* Invoice Detail Popup */}
+                {selectedInvoiceForPrint && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                      <div>
+                        <div className="text-xs text-slate-500">GST Tax Invoice · SAC 998314</div>
+                        <h5 className="text-base font-bold text-slate-900 font-mono">{selectedInvoiceForPrint.invoiceNumber}</h5>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          disabled={isCurrent}
-                          onClick={() => handleStartUpgrade(plan)}
-                          className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                            isCurrent
-                              ? 'bg-slate-200 text-slate-600 cursor-default'
-                              : plan.popular
-                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
-                              : 'bg-slate-900 hover:bg-slate-800 text-white'
-                          }`}
+                          onClick={() => window.print()}
+                          className="py-1.5 px-3 bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                         >
-                          {isCurrent ? 'Current Plan' : `Upgrade to ${plan.name}`}
-                          {!isCurrent && <ArrowRight className="w-3.5 h-3.5" />}
+                          <Printer className="w-3.5 h-3.5" />
+                          Print / Save PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedInvoiceForPrint(null)}
+                          className="py-1.5 px-3 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+                        >
+                          Close
                         </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
 
-          {/* Checkout Form View */}
-          {checkoutStep === 'checkout' && (
-            <div className="max-w-xl mx-auto space-y-5 animate-in fade-in">
-              <button
-                type="button"
-                onClick={() => setCheckoutStep('plans')}
-                className="text-xs text-slate-500 hover:text-slate-800 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                ← Back to Plans
-              </button>
-
-              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-emerald-700">Selected Plan</span>
-                    <h4 className="text-lg font-black text-slate-900">{targetPlan.name}</h4>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-base font-black text-slate-900">
-                      {formatCurrencyINR(pricing.totalAmount)}
-                    </span>
-                    <span className="block text-[10px] text-slate-500">incl. 18% GST</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Firm / Billing Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={firmBillingName}
-                      onChange={(e) => setFirmBillingName(e.target.value)}
-                      placeholder="M/s Balaji Rao & Co."
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Firm GSTIN (For 18% Tax Credit)
-                    </label>
-                    <input
-                      type="text"
-                      value={gstinNumber}
-                      onChange={(e) => setGstinNumber(e.target.value.toUpperCase())}
-                      placeholder="27ABCDE1234F1Z5"
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 uppercase focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  {/* Promo code */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Promo Code
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={promoCodeInput}
-                        onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
-                        placeholder="ICAI2025"
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 uppercase focus:ring-2 focus:ring-emerald-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleApplyPromo}
-                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
-                      >
-                        Apply
-                      </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                      <div className="space-y-0.5">
+                        <div className="text-slate-500 font-semibold">Billed To</div>
+                        <div className="font-bold text-slate-900 text-sm">
+                          {selectedInvoiceForPrint.firmName || currentUser?.firmName || currentUser?.fullName}
+                        </div>
+                        {selectedInvoiceForPrint.gstin && (
+                          <div className="font-mono text-slate-600">GSTIN: {selectedInvoiceForPrint.gstin}</div>
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="text-slate-500 font-semibold">Payment Reference</div>
+                        <div className="font-mono font-bold text-slate-900">{selectedInvoiceForPrint.transactionId}</div>
+                        {selectedInvoiceForPrint.razorpayOrderId && (
+                          <div className="font-mono text-slate-500">Order: {selectedInvoiceForPrint.razorpayOrderId}</div>
+                        )}
+                      </div>
+                      <div className="space-y-0.5 sm:text-right">
+                        <div className="text-slate-500 font-semibold">Amount Paid</div>
+                        <div className="text-lg font-bold text-emerald-700 font-mono">
+                          ₹{selectedInvoiceForPrint.totalAmount.toLocaleString('en-IN')}
+                        </div>
+                        <div className="text-slate-400">
+                          incl. ₹{selectedInvoiceForPrint.gstAmount.toLocaleString('en-IN')} GST
+                        </div>
+                      </div>
                     </div>
-                    {appliedPromoCode && (
-                      <p className="text-[11px] text-emerald-700 font-bold mt-1">
-                        Code "{appliedPromoCode}" applied!
-                      </p>
-                    )}
                   </div>
-                </div>
+                )}
 
-                <button
-                  type="button"
-                  onClick={handleCompletePayment}
-                  disabled={isProcessing}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center gap-2 cursor-pointer mt-4 disabled:opacity-50"
-                >
-                  {isProcessing ? 'Activating Plan...' : `Pay ${formatCurrencyINR(pricing.totalAmount)} & Unlock Plan`}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
+                {/* Invoices List */}
+                {userInvoices.length === 0 ? (
+                  <div className="p-10 rounded-2xl border border-slate-200 bg-slate-50 text-center space-y-4">
+                    <div className="w-14 h-14 bg-slate-200 rounded-full flex items-center justify-center mx-auto">
+                      <Receipt className="w-7 h-7 text-slate-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-slate-700">No Invoices Yet</div>
+                      <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                        Purchase a Credit Pack or Practice Plan to receive an instant GST-compliant invoice.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('credits')}
+                      className="py-2 px-5 bg-[#072654] text-white rounded-xl text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      Top Up Credits
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs">
+                          <th className="py-3 px-4 font-semibold">Invoice #</th>
+                          <th className="py-3 px-4 font-semibold">Date</th>
+                          <th className="py-3 px-4 font-semibold">Item</th>
+                          <th className="py-3 px-4 font-semibold">Payment ID</th>
+                          <th className="py-3 px-4 font-semibold text-right">GST</th>
+                          <th className="py-3 px-4 font-semibold text-right">Total</th>
+                          <th className="py-3 px-4 font-semibold text-right"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {userInvoices.map((inv) => (
+                          <tr key={inv.id} className="hover:bg-slate-50 transition">
+                            <td className="py-3 px-4 font-bold text-slate-900 font-mono text-xs">{inv.invoiceNumber}</td>
+                            <td className="py-3 px-4 text-slate-500 text-xs font-mono">
+                              {new Date(inv.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="py-3 px-4 text-slate-800 font-medium text-xs">{inv.planName}</td>
+                            <td className="py-3 px-4 text-slate-500 font-mono text-xs truncate max-w-[120px]">{inv.transactionId}</td>
+                            <td className="py-3 px-4 text-right text-slate-500 font-mono text-xs">
+                              ₹{inv.gstAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-3 px-4 text-right font-bold text-emerald-700 font-mono text-xs">
+                              ₹{inv.totalAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedInvoiceForPrint(inv)}
+                                className="text-xs text-sky-600 hover:text-sky-800 font-semibold cursor-pointer"
+                              >
+                                View
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-          {/* Success Step */}
-          {checkoutStep === 'success' && generatedInvoice && (
-            <div className="max-w-md mx-auto text-center space-y-4 py-6">
-              <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-8 h-8" />
+                {/* Recent Credit Activity */}
+                {currentUser?.creditTransactions && currentUser.creditTransactions.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 mb-2">Recent Credit Activity</h4>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {currentUser.creditTransactions.slice(0, 10).map((tx) => (
+                        <div key={tx.id} className="bg-white border border-slate-100 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="font-medium text-slate-700">{tx.description}</div>
+                            <div className="text-slate-400 font-mono mt-0.5">
+                              {new Date(tx.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <div className={`font-bold font-mono text-sm ${tx.amount > 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                            {tx.amount > 0 ? `+${tx.amount}` : tx.amount}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <h3 className="text-xl font-black text-slate-900">Subscription Upgraded!</h3>
-              <p className="text-xs text-slate-600">
-                You now have access to {targetPlan.name} with monthly credit allowance.
-              </p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="py-2.5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Return to Workspace
-              </button>
+            )}
+          </div>
+
+          {/* ── Modal Footer ── */}
+          <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-400 shrink-0">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <span>Secured by Razorpay · PCI-DSS · 256-bit SSL · RBI Regulated</span>
             </div>
-          )}
+            <div className="font-mono text-[11px]">SAC: 998314</div>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Razorpay Checkout Modal */}
+      <RazorpayCheckoutModal
+        isOpen={Boolean(checkoutItem)}
+        onClose={() => setCheckoutItem(null)}
+        item={checkoutItem}
+        currentUser={currentUser}
+        onPaymentSuccess={handleRazorpayPaymentSuccess}
+      />
+    </>
   );
 };

@@ -3,7 +3,7 @@ import { SubscriptionPlan, SubscriptionTier, PromoCode, BillingCycle, CreditPack
 export const GST_RATE = 0.18; // 18% GST applicable for Indian B2B SaaS
 
 export const REFERRAL_CREDIT_BONUS = 500; // 500 Credits awarded per successful referral
-export const NEW_USER_SIGNUP_CREDITS = 100; // Free welcome credit grant
+export const NEW_USER_SIGNUP_CREDITS = 555; // Free welcome credit grant (555 points)
 
 export const CREDIT_COSTS = {
   AI_MAPPING: 5, // 5 credits per AI Schedule & Ledger mapping run
@@ -43,27 +43,26 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     tagline: 'Essential ICAI NCE statements for individual audits & testing',
     monthlyPrice: 0,
     yearlyPrice: 0,
-    monthlyCredits: 100,
-    maxCompanies: 2,
-    maxAiMappings: 10,
-    badge: '100 Free Credits',
+    monthlyCredits: 555,
+    maxCompanies: 9999,
+    maxAiMappings: 9999,
+    badge: '555 Welcome Credits',
     popular: false,
     features: [
-      { text: '100 Free AI Usage Credits', included: true, highlight: true },
+      { text: '555 Free Welcome Credit Points on Signup', included: true, highlight: true },
       { text: 'Earn 500 Free Credits per Colleague Referral', included: true, highlight: true },
-      { text: 'Up to 2 Companies / Entities', included: true },
+      { text: 'Unlimited Companies / Entities with Credits', included: true, highlight: true },
       { text: 'ICAI NCE Notes 3 to 25 Schedules', included: true },
       { text: 'Interactive Trial Balance & Verification', included: true },
       { text: 'Standard Excel & PDF Export', included: true },
-      { text: 'Automated Form 3CD/3CB Tax Audit Exceptions', included: false },
-      { text: 'Google Drive & Gmail Direct Integration', included: false },
-      { text: 'Partner Capital & Year-End Adjustments', included: false },
-      { text: 'Firm-Wide Multi-Auditor Team Workspace', included: false },
+      { text: 'Automated Form 3CD/3CB Tax Audit Exceptions', included: true },
+      { text: 'Google Drive & Gmail Direct Integration', included: true },
+      { text: 'Partner Capital & Year-End Adjustments', included: true },
+      { text: 'Firm-Wide Multi-Auditor Team Workspace', included: true },
     ],
     limitations: [
-      'Limited to 2 companies',
-      'Standard 100 credit pool on signup',
-      'Community & offline guidance only',
+      'Standard 555 welcome credit pool on signup',
+      'Pay-as-you-go credit top-ups',
     ],
   },
   {
@@ -73,14 +72,14 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     monthlyPrice: 1499,
     yearlyPrice: 14999, // ~₹1,250/month (Save 17%)
     monthlyCredits: 2500,
-    maxCompanies: 25,
-    maxAiMappings: 500,
+    maxCompanies: 9999,
+    maxAiMappings: 9999,
     popular: true,
-    badge: '2,500 Monthly Credits',
+    badge: '2,500 Credits',
     features: [
-      { text: '2,500 Claude-Style Monthly Credits', included: true, highlight: true },
+      { text: '2,500 Credits', included: true, highlight: true },
       { text: '500 Bonus Referral Credits on every invite', included: true, highlight: true },
-      { text: 'Up to 25 Companies / Audit Clients', included: true, highlight: true },
+      { text: 'Unlimited Companies / Audit Clients', included: true, highlight: true },
       { text: 'ICAI NCE Notes 3 to 25 Full Disclosures', included: true },
       { text: 'Automated Form 3CD/3CB Tax Audit Exceptions', included: true, highlight: true },
       { text: 'Partner Capital Accounts & Profit Distribution', included: true },
@@ -104,9 +103,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     maxCompanies: 9999, // Unlimited
     maxAiMappings: 9999, // Unlimited
     popular: false,
-    badge: '10,000 Monthly Credits',
+    badge: '10,000 Credits',
     features: [
-      { text: '10,000 Claude-Style Monthly Credits', included: true, highlight: true },
+      { text: '10,000 Credits', included: true, highlight: true },
       { text: 'Unlimited Companies & Audit Clients', included: true, highlight: true },
       { text: '500 Bonus Referral Credits + Custom Invite Link', included: true, highlight: true },
       { text: 'Multi-Partner & Article Assistant Access (Up to 10 Seats)', included: true, highlight: true },

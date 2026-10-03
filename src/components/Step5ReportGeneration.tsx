@@ -40,6 +40,7 @@ interface Step5ReportGenerationProps {
   exceptions: AuditException[];
   onExportExcel: () => void;
   onOpenBackupRestore?: () => void;
+  onRestoreBackup?: (backupData: any) => void;
   currentUser?: UserProfile | null;
   onOpenSubscriptionModal?: () => void;
   user?: User | null;
@@ -56,6 +57,7 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
   exceptions,
   onExportExcel,
   onOpenBackupRestore,
+  onRestoreBackup,
   currentUser,
   onOpenSubscriptionModal,
   user,
@@ -396,6 +398,7 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
             onAuthSuccess={onAuthSuccess || (() => {})}
             onSignOut={onSignOut || (() => {})}
             onImportTrialBalance={() => {}}
+            onRestoreBackup={onRestoreBackup}
           />
         </div>
       )}

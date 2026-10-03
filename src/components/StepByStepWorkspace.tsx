@@ -1,19 +1,28 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Building2,
   Calendar,
   CheckCircle2,
   ArrowRight,
-  ArrowLeft,
-  ShieldCheck,
-  Sparkles,
   FileSpreadsheet,
   Layers,
-  FileCheck,
   Download,
-  Box,
   Settings,
   Sliders,
+  ChevronDown,
+  Sparkles,
+  Plus,
+  Trash2,
+  Printer,
+  Database,
+  Check,
+  Search,
+  AlertTriangle,
+  BookOpen,
+  Scale,
+  Package,
+  Coins,
+  Home,
 } from 'lucide-react';
 import {
   EntityConfig,
@@ -23,11 +32,13 @@ import {
   NoteScheduleData,
   AuditException,
   UserProfile,
+  Company,
 } from '../types';
+import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
 import { computePeriodTotals } from '../utils/financialCalculations';
 import { Step1CurrentYear } from './Step1CurrentYear';
 import { Step2PreviousYear } from './Step2PreviousYear';
-import { Step3ComparativeStatements } from './Step3ComparativeStatements';
+import { Step3ComparativeStatements, Step3StatementTab } from './Step3ComparativeStatements';
 import { Step4NotesAndAudit } from './Step4NotesAndAudit';
 import { Step5ReportGeneration } from './Step5ReportGeneration';
 import { TradePayablesMsmeModal } from './TradePayablesMsmeModal';
@@ -35,6 +46,12 @@ import type { User } from 'firebase/auth';
 
 interface StepByStepWorkspaceProps {
   config: EntityConfig;
+  companies?: Company[];
+  activeCompanyId?: string;
+  onSelectCompany?: (companyId: string) => void;
+  onOpenAddCompany?: () => void;
+  onExportSingleCompanyBackup?: () => void;
+  onExportTotalLocalBackup?: () => void;
   mappedLedgers: MappedLedger[];
   totalDebit: number;
   totalCredit: number;
@@ -77,11 +94,19 @@ interface StepByStepWorkspaceProps {
   // Report Generation & Export
   onExportExcel: () => void;
   onOpenBackupRestore?: () => void;
+  onRestoreBackup?: (backupData: any) => void;
   onUpdateConfig: (updated: Partial<EntityConfig>) => void;
+  onUploadBranchTB?: (branchId: string, file: File, period: 'CY' | 'PY') => void;
+  onBulkUploadBranchTBs?: (files: File[], period: 'CY' | 'PY') => void;
+  onClearBranchTB?: (branchId: string, period: 'CY' | 'PY') => void;
+  onLoadSampleBranches?: (period: 'CY' | 'PY') => void;
+  onUpdateBranchClosingStock?: (branchId: string, stockAmount: number | undefined, period: 'CY' | 'PY') => void;
 
   // Navigation
   onSwitchCompany: () => void;
+  onBackToHome?: () => void;
   initialStep?: 1 | 2 | 3 | 4 | 5;
+  initialNoteNumber?: number;
   onStepChange?: (step: 1 | 2 | 3 | 4 | 5) => void;
 
   // Auth & Cloud
@@ -93,8 +118,35 @@ interface StepByStepWorkspaceProps {
   onSignOut?: () => void;
 }
 
+type DropdownId =
+  | 'home'
+  | 'step1'
+  | 'step2'
+  | 'step3'
+  | 'step4'
+  | 'step5'
+  | 'stock'
+  | 'msme'
+  | 'entity'
+  | 'settings'
+  | null;
+
+function formatShortINR(val: number | undefined | null): string {
+  const num = typeof val === 'number' && !Number.isNaN(val) ? val : 0;
+  return num.toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
 export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
   config,
+  companies = [],
+  activeCompanyId,
+  onSelectCompany,
+  onOpenAddCompany,
+  onExportSingleCompanyBackup,
+  onExportTotalLocalBackup,
   mappedLedgers,
   totalDebit,
   totalCredit,
@@ -126,9 +178,17 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
   allExceptions,
   onExportExcel,
   onOpenBackupRestore,
+  onRestoreBackup,
   onUpdateConfig,
+  onUploadBranchTB,
+  onBulkUploadBranchTBs,
+  onClearBranchTB,
+  onLoadSampleBranches,
+  onUpdateBranchClosingStock,
   onSwitchCompany,
+  onBackToHome,
   initialStep = 1,
+  initialNoteNumber,
   onStepChange,
   currentUser,
   onOpenSubscriptionModal,
@@ -138,6 +198,31 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
   onSignOut,
 }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(initialStep);
+  const [step3StatementTab, setStep3StatementTab] = useState<Step3StatementTab>('balance_sheet');
+  const [openDropdown, setOpenDropdown] = useState<DropdownId>(null);
+  const [noteFilterQuery, setNoteFilterQuery] = useState('');
+  const [entityFilterQuery, setEntityFilterQuery] = useState('');
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside or Escape
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Keep internal step synchronized with parent/header selection
   useEffect(() => {
@@ -151,10 +236,17 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
     if (onStepChange) {
       onStepChange(step);
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const [selectedNoteNumber, setSelectedNoteNumber] = useState<number | undefined>(undefined);
+  const [selectedNoteNumber, setSelectedNoteNumber] = useState<number | undefined>(initialNoteNumber);
   const [isTradePayablesModalOpen, setIsTradePayablesModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialNoteNumber !== undefined) {
+      setSelectedNoteNumber(initialNoteNumber);
+    }
+  }, [initialNoteNumber]);
 
   const handleOpenTradePayables = () => {
     setIsTradePayablesModalOpen(true);
@@ -175,166 +267,1001 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
 
   const STEPS = [
     {
-      step: 1,
-      title: 'Current Year',
-      subtitle: 'TB, Mapping & Statements',
+      step: 1 as const,
+      dropdownId: 'step1' as const,
+      title: 'CY Trial Balance',
+      subtitle: 'TB & Mapping',
       isCompleted: hasCYData,
     },
     {
-      step: 2,
-      title: 'Previous Year',
-      subtitle: 'Comparative TB & Notes',
+      step: 2 as const,
+      dropdownId: 'step2' as const,
+      title: 'PY Trial Balance',
+      subtitle: 'Prior Period TB',
       isCompleted: hasPYData,
     },
     {
-      step: 3,
-      title: 'Comparative Statements',
-      subtitle: 'Consolidated BS & P&L',
+      step: 3 as const,
+      dropdownId: 'step3' as const,
+      title: 'Comparative BS & P&L',
+      subtitle: 'ICAI Statements',
       isCompleted: hasCYData,
     },
     {
-      step: 4,
-      title: 'Notes & Audit Checks',
-      subtitle: 'ICAI Notes 1–25 & Flags',
+      step: 4 as const,
+      dropdownId: 'step4' as const,
+      title: 'Notes 1–25 & Audit',
+      subtitle: 'Schedules & Flags',
       isCompleted: hasCYData,
     },
     {
-      step: 5,
-      title: 'Generate Report',
-      subtitle: 'Excel, PDF & Transmittal',
+      step: 5 as const,
+      dropdownId: 'step5' as const,
+      title: 'Export & Reports',
+      subtitle: 'Excel, PDF & Cloud',
       isCompleted: false,
     },
   ];
 
   const handleSelectNote = (noteNumber: number) => {
     setSelectedNoteNumber(noteNumber);
-    handleStepChange(4);
+    setCurrentStep(4);
+    if (onStepChange) {
+      onStepChange(4);
+    }
+    setOpenDropdown(null);
+  };
+
+  const filteredNotesList = useMemo(() => {
+    const q = noteFilterQuery.trim().toLowerCase();
+    const seen = new Set<number>();
+    const all = NCE_NOTE_DEFINITIONS.filter((n) => {
+      if (seen.has(n.noteNumber)) return false;
+      seen.add(n.noteNumber);
+      return true;
+    }).map((n) => ({
+      noteNumber: n.noteNumber,
+      name: n.name,
+      statement: n.noteNumber <= 2 ? 'Policy' : n.statement,
+    }));
+    if (!q) return all;
+    return all.filter(
+      (n) =>
+        n.name.toLowerCase().includes(q) ||
+        `note ${n.noteNumber}`.includes(q) ||
+        String(n.noteNumber) === q
+    );
+  }, [noteFilterQuery]);
+
+  const filteredEntities = useMemo(() => {
+    const q = entityFilterQuery.trim().toLowerCase();
+    if (!q) return companies;
+    return companies.filter((c) => {
+      const name = (c.config.entityName || '').toLowerCase();
+      const pan = (c.config.pan || '').toLowerCase();
+      const gstin = (c.config.gstin || '').toLowerCase();
+      const fy = (c.config.financialYear || '').toLowerCase();
+      return name.includes(q) || pan.includes(q) || gstin.includes(q) || fy.includes(q);
+    });
+  }, [companies, entityFilterQuery]);
+
+  const toggleDropdown = (id: DropdownId) => {
+    setOpenDropdown((prev) => (prev === id ? null : id));
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ========================================================================= */}
-      {/* 1. TOP STEPPER & ACTIVE COMPANY BAR (STICKY)                              */}
+      {/* 1. STATIC PINNED WORKFLOW STEPPER BAR WITH INTERACTIVE DROPDOWNS          */}
       {/* ========================================================================= */}
-      <div className="sticky top-[104px] z-20 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 sm:p-5 space-y-4">
-        {/* Company Ribbon */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onSwitchCompany}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>← Switch / Add Company</span>
-            </button>
+      <div ref={barRef} className="sticky top-16 z-20 bg-[#F8FAFC] pt-1 pb-2 print:hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+          {/* Left: Home Dropdown + 5-Step Segmented Dropdowns */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {onBackToHome && (
+              <div className="relative">
+                <div className="inline-flex items-center rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-extrabold transition shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDropdown(null);
+                      onBackToHome();
+                    }}
+                    className="pl-2.5 pr-1.5 py-1.5 flex items-center gap-1 cursor-pointer"
+                    title="Return to Executive Home Dashboard"
+                  >
+                    <span>← Home</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDropdown('home');
+                    }}
+                    className="pr-2 pl-1 py-1.5 border-l border-indigo-200/70 hover:text-indigo-950 cursor-pointer flex items-center"
+                    title="Home & Workspace Quick Menu"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <h1 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
-                {config.entityName || 'Active Entity'}
-              </h1>
-              <span className="hidden md:inline-block text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium">
-                {config.entityType}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-            <div className="text-xs text-slate-500 font-medium">
-              Reporting Period: <strong className="text-emerald-700 font-bold">FY {config.financialYear}</strong>
-            </div>
-
-            {onOpenYearModal && (
-              <button
-                type="button"
-                onClick={onOpenYearModal}
-                className="text-[11px] text-indigo-700 hover:underline font-semibold"
-              >
-                Change FY
-              </button>
+                {openDropdown === 'home' && (
+                  <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Navigation &amp; Hub
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenDropdown(null);
+                        onBackToHome();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-50 text-slate-800 font-bold flex items-center gap-2 cursor-pointer"
+                    >
+                      <Home className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Executive Home Dashboard</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenDropdown(null);
+                        onSwitchCompany();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-teal-600" />
+                      <span>Saved Client Companies ({companies.length})</span>
+                    </button>
+                    {onOpenBackupRestore && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onOpenBackupRestore();
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Database className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Backup &amp; Restore Hub</span>
+                      </button>
+                    )}
+                    {onOpenSubscriptionModal && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onOpenSubscriptionModal();
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Coins className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Credits &amp; Top-Up</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
-            <button
-              type="button"
-              onClick={handleOpenTradePayables}
-              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              title="Edit Note 9 Creditors MSME & Aging Data"
-            >
-              <Sliders className="w-3.5 h-3.5 text-emerald-700" />
-              <span className="hidden sm:inline">Creditors MSME Data</span>
-            </button>
+            {STEPS.map((s) => {
+              const isCurrent = currentStep === s.step;
+              const isCompleted = s.isCompleted && !isCurrent;
+              const isOpen = openDropdown === s.dropdownId;
 
-            <button
-              type="button"
-              onClick={onOpenConfig}
-              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-              title="Edit Entity Config & Auditor Rules"
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* 5-Step Guided Stepper Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 pt-1">
-          {STEPS.map((s) => {
-            const isCurrent = currentStep === s.step;
-            const isCompleted = s.isCompleted && !isCurrent;
-
-            return (
-              <button
-                key={s.step}
-                type="button"
-                onClick={() => handleStepChange(s.step as any)}
-                className={`text-left p-3.5 rounded-xl border transition flex flex-col justify-between gap-2 cursor-pointer ${
-                  isCurrent
-                    ? 'bg-slate-900 text-white border-emerald-500 shadow-md ring-2 ring-emerald-500/25 scale-[1.01]'
-                    : isCompleted
-                    ? 'bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100 shadow-2xs'
-                    : 'bg-white border-slate-200/90 text-slate-700 hover:border-slate-300 hover:bg-slate-50 shadow-2xs'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center transition shrink-0 ${
-                      isCurrent
-                        ? 'bg-emerald-500 text-slate-950 shadow-xs'
-                        : isCompleted
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-150 text-slate-600 border border-slate-200'
-                    }`}
-                  >
-                    {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
-                  </span>
-
-                  <span
-                    className={`text-[9px] uppercase tracking-wider font-extrabold ${
-                      isCurrent
-                        ? 'text-emerald-400'
-                        : isCompleted
-                        ? 'text-emerald-700'
-                        : 'text-slate-400'
-                    }`}
-                  >
-                    {isCurrent ? 'Current' : isCompleted ? 'Completed' : `Step ${s.step}`}
-                  </span>
-                </div>
-
-                <div>
-                  <div className={`text-xs font-bold truncate ${isCurrent ? 'text-white' : 'text-slate-900'}`}>
-                    {s.title}
-                  </div>
+              return (
+                <div key={s.step} className="relative">
                   <div
-                    className={`text-[10px] truncate mt-0.5 ${
-                      isCurrent ? 'text-slate-300' : 'text-slate-500'
+                    className={`inline-flex items-center rounded-xl border text-xs transition shrink-0 ${
+                      isCurrent
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-extrabold'
+                        : isCompleted
+                        ? 'bg-emerald-50/80 hover:bg-emerald-100 text-emerald-950 border-emerald-200 font-bold'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80 font-semibold'
                     }`}
                   >
-                    {s.subtitle}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleStepChange(s.step);
+                        toggleDropdown(s.dropdownId);
+                      }}
+                      className="pl-2.5 pr-1.5 py-1.5 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span
+                        className={`w-4 h-4 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
+                          isCurrent
+                            ? 'bg-emerald-400 text-slate-950'
+                            : isCompleted
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-white text-slate-600 border border-slate-300'
+                        }`}
+                      >
+                        {isCompleted ? <CheckCircle2 className="w-3 h-3" /> : s.step}
+                      </span>
+                      <span className="whitespace-nowrap">{s.title}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleDropdown(s.dropdownId);
+                      }}
+                      className={`pr-2 pl-1 py-1.5 border-l cursor-pointer flex items-center ${
+                        isCurrent
+                          ? 'border-slate-700 text-slate-300 hover:text-white'
+                          : isCompleted
+                          ? 'border-emerald-200/80 text-emerald-700 hover:text-emerald-950'
+                          : 'border-slate-200 text-slate-500 hover:text-slate-900'
+                      }`}
+                      title={`Open ${s.title} options`}
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* STEP 1 DROPDOWN: CY Trial Balance */}
+                  {isOpen && s.step === 1 && (
+                    <div className="absolute left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-3 py-2 bg-slate-900 text-white rounded-xl mb-1 flex items-center justify-between">
+                        <span className="font-bold">Step 1: CY Trial Balance</span>
+                        <span className="text-[10px] text-emerald-400 font-mono">
+                          {mappedLedgers.length} Ledgers
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleStepChange(1);
+                          setOpenDropdown(null);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-800 font-bold flex items-center justify-between cursor-pointer"
+                      >
+                        <span>Open CY Trial Balance &amp; Mapping</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onTriggerAIMap('CY');
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-50 text-indigo-700 font-bold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>AI Auto-Map CY Ledgers</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onOpenYearEndAdjustments('CY');
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-50 text-amber-900 font-semibold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Package className="w-3.5 h-3.5 text-amber-600" />
+                        <span>CY Closing Stock &amp; Adjustments</span>
+                      </button>
+                      <div className="border-t border-slate-100 my-1 pt-1">
+                        <div className="px-3 py-1 text-[10px] font-bold uppercase text-slate-400">
+                          Load Sample Trial Balance
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            onLoadSample('rrk_manufacturing');
+                            handleStepChange(1);
+                          }}
+                          className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-emerald-50 text-emerald-800 font-semibold flex items-center gap-2 cursor-pointer"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Sample Partnership Firm (R R K &amp; Co)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            onLoadSample('durga_steel');
+                            handleStepChange(1);
+                          }}
+                          className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-indigo-50 text-indigo-800 font-semibold flex items-center gap-2 cursor-pointer"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Sample Proprietorship (Durga Steel)</span>
+                        </button>
+                      </div>
+                      {hasCYData && (
+                        <div className="border-t border-slate-100 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              onClearTB();
+                            }}
+                            className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-rose-50 text-rose-700 font-semibold flex items-center gap-2 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Clear CY Trial Balance</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* STEP 2 DROPDOWN: PY Trial Balance */}
+                  {isOpen && s.step === 2 && (
+                    <div className="absolute left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-3 py-2 bg-slate-900 text-white rounded-xl mb-1 flex items-center justify-between">
+                        <span className="font-bold">Step 2: PY Trial Balance</span>
+                        <span className="text-[10px] text-emerald-400 font-mono">
+                          {pyMappedLedgers.length} Ledgers
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleStepChange(2);
+                          setOpenDropdown(null);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-800 font-bold flex items-center justify-between cursor-pointer"
+                      >
+                        <span>
+                          Open PY Trial Balance (FY {config.previousFinancialYear || '2024-25'})
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onTriggerAIMap('PY');
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-indigo-50 text-indigo-700 font-bold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>AI Auto-Map PY Ledgers</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onOpenYearEndAdjustments('PY');
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-50 text-amber-900 font-semibold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Package className="w-3.5 h-3.5 text-amber-600" />
+                        <span>PY Closing Stock &amp; Adjustments</span>
+                      </button>
+                      {hasPYData && (
+                        <div className="border-t border-slate-100 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              onClearPYTB();
+                            }}
+                            className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-rose-50 text-rose-700 font-semibold flex items-center gap-2 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Clear PY Trial Balance</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* STEP 3 DROPDOWN: Comparative BS & P&L (Separate Options) */}
+                  {isOpen && s.step === 3 && (
+                    <div className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-3 py-2 bg-slate-900 text-white rounded-xl mb-1 flex items-center justify-between">
+                        <span className="font-bold">Step 3: Comparative Statements</span>
+                        <span className="text-[10px] text-emerald-400">
+                          {computedFinancials.balanceSheet.isBalanced ? '✓ BS Tallied' : 'Check Diff'}
+                        </span>
+                      </div>
+
+                      {/* Option 1: Comparative Balance Sheet */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep3StatementTab('balance_sheet');
+                          handleStepChange(3);
+                          setOpenDropdown(null);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+                          currentStep === 3 && step3StatementTab === 'balance_sheet'
+                            ? 'bg-indigo-50 text-indigo-950 font-extrabold'
+                            : 'hover:bg-slate-100 text-slate-900 font-bold'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Comparative Balance Sheet</span>
+                        </span>
+                        <span className="font-mono text-[11px] text-slate-700 font-bold">
+                          ₹{formatShortINR(computedFinancials.balanceSheet.totalAssets)}
+                        </span>
+                      </button>
+
+                      {/* Option 2: Comparative Profit & Loss */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep3StatementTab('profit_loss');
+                          handleStepChange(3);
+                          setOpenDropdown(null);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+                          currentStep === 3 && step3StatementTab === 'profit_loss'
+                            ? 'bg-indigo-50 text-indigo-950 font-extrabold'
+                            : 'hover:bg-slate-100 text-slate-900 font-bold'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span>Comparative Profit &amp; Loss</span>
+                        </span>
+                        <span className="font-mono text-[11px] text-indigo-700 font-bold">
+                          PAT: ₹{formatShortINR(computedFinancials.profitAndLoss.profitAfterTax)}
+                        </span>
+                      </button>
+
+                      {/* Option 3: Consolidated Notes Summary (1-25) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep3StatementTab('notes_summary');
+                          handleStepChange(3);
+                          setOpenDropdown(null);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+                          currentStep === 3 && step3StatementTab === 'notes_summary'
+                            ? 'bg-indigo-50 text-indigo-950 font-extrabold'
+                            : 'hover:bg-slate-100 text-slate-800 font-semibold'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Consolidated Notes (1–25)</span>
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                      </button>
+
+                      {(config.numberOfBranches ?? 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStep3StatementTab('branch_consolidation');
+                            handleStepChange(3);
+                            setOpenDropdown(null);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+                            currentStep === 3 && step3StatementTab === 'branch_consolidation'
+                              ? 'bg-indigo-50 text-indigo-950 font-extrabold'
+                              : 'hover:bg-slate-100 text-indigo-800 font-semibold'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span>Branch-wise vs Consolidated (CY &amp; PY)</span>
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                            {config.numberOfBranches} Br
+                          </span>
+                        </button>
+                      )}
+
+                      <div className="border-t border-slate-100 my-1 pt-1">
+                        <div className="px-3 py-1 text-[10px] font-bold uppercase text-slate-400">
+                          Key Schedule Breakdowns
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectNote(3)}
+                          className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                        >
+                          <span>Note 3: Owners&apos; / Partners&apos; Capital</span>
+                          <span className="font-mono text-[11px] text-slate-500">
+                            ₹{formatShortINR(computedFinancials.balanceSheet.ownersCapital)}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectNote(11)}
+                          className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                        >
+                          <span>Note 11: Fixed Assets / PPE Schedule</span>
+                          <span className="font-mono text-[11px] text-slate-500">
+                            ₹{formatShortINR(computedFinancials.balanceSheet.propertyPlantEquipment)}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectNote(19)}
+                          className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                        >
+                          <span>Note 19: Revenue from Operations</span>
+                          <span className="font-mono text-[11px] text-emerald-700">
+                            ₹{formatShortINR(computedFinancials.profitAndLoss.revenueFromOperations)}
+                          </span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onExportExcel();
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold flex items-center gap-2 cursor-pointer mt-1"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Export Statements to Excel (.xlsx)</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* STEP 4 DROPDOWN: Notes 1–25 & Audit */}
+                  {isOpen && s.step === 4 && (
+                    <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden text-xs animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-3.5 py-2.5 bg-slate-900 text-white flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1.5">
+                          <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Select ICAI Note (1 to 25) &amp; Audit</span>
+                        </span>
+                        <span className="text-[10px] text-amber-300 font-bold">
+                          {allExceptions.length} Audit Flags
+                        </span>
+                      </div>
+
+                      <div className="p-2 bg-slate-50 border-b border-slate-100">
+                        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 focus-within:border-indigo-500">
+                          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <input
+                            type="text"
+                            value={noteFilterQuery}
+                            onChange={(e) => setNoteFilterQuery(e.target.value)}
+                            placeholder="Filter Note 1 to 25 by number or title..."
+                            className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 p-1">
+                        {filteredNotesList.map((n) => {
+                          const sched = computedFinancials.noteSchedules?.[n.noteNumber];
+                          const amt = sched?.totalAmount ?? 0;
+                          const isSelectedNote =
+                            currentStep === 4 && selectedNoteNumber === n.noteNumber;
+                          return (
+                            <button
+                              key={n.noteNumber}
+                              type="button"
+                              onClick={() => handleSelectNote(n.noteNumber)}
+                              className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between gap-2 cursor-pointer ${
+                                isSelectedNote
+                                  ? 'bg-indigo-50 text-indigo-950 font-extrabold'
+                                  : 'hover:bg-slate-50 text-slate-800'
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <div className="font-bold truncate">
+                                  Note {n.noteNumber}: {n.name}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {n.statement === 'Policy'
+                                    ? 'Accounting Policy'
+                                    : n.statement === 'BalanceSheet'
+                                    ? 'Balance Sheet Schedule'
+                                    : 'Profit & Loss Schedule'}
+                                </div>
+                              </div>
+                              {n.noteNumber >= 3 && (
+                                <span className="font-mono font-bold text-[11px] text-slate-700 shrink-0">
+                                  ₹{formatShortINR(amt)}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 5 DROPDOWN: Export & Reports */}
+                  {isOpen && s.step === 5 && (
+                    <div className="absolute left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-3 py-2 bg-slate-900 text-white rounded-xl mb-1 flex items-center justify-between">
+                        <span className="font-bold">Step 5: Export &amp; Reports</span>
+                        <span className="text-[10px] text-emerald-400">ICAI Formats</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleStepChange(5);
+                          setOpenDropdown(null);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-800 font-bold flex items-center justify-between cursor-pointer"
+                      >
+                        <span>Open Export &amp; Reports Center</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onExportExcel();
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-50 text-emerald-800 font-bold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Download Statutory Excel (.xlsx)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          window.print();
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Print / Save as PDF</span>
+                      </button>
+                      {onExportSingleCompanyBackup && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            onExportSingleCompanyBackup();
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                        >
+                          <Database className="w-3.5 h-3.5 text-teal-600" />
+                          <span className="truncate">
+                            Single File Backup ({config.entityName})
+                          </span>
+                        </button>
+                      )}
+                      {onExportTotalLocalBackup && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            onExportTotalLocalBackup();
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                        >
+                          <Database className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Total Backup (All {companies.length} Companies)</span>
+                        </button>
+                      )}
+                      {onOpenBackupRestore && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            onOpenBackupRestore();
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                        >
+                          <Layers className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Open Backup &amp; Restore Hub</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Right: Utility Action Fields with Dropdowns */}
+          <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+            {/* 1. Closing Stock & Adj. Dropdown */}
+            <div className="relative">
+              <div className="inline-flex items-center rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/90 text-xs font-bold transition whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('stock')}
+                  className="px-2.5 py-1.5 flex items-center gap-1 cursor-pointer"
+                  title="Closing Stock Valuation & Year-End Adjustments Dropdown"
+                >
+                  <span>Closing Stock &amp; Adj.</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-amber-700" />
+                </button>
+              </div>
+
+              {openDropdown === 'stock' && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-2 bg-amber-950 text-white rounded-xl mb-1 flex items-center justify-between">
+                    <span className="font-bold">Closing Stock &amp; Adjustments</span>
+                    <span className="text-[10px] text-amber-300">Note 15 &amp; 21</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDropdown(null);
+                      onOpenYearEndAdjustments('CY');
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-50 text-slate-800 font-bold flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Current Year (CY) Stock &amp; Adj.</span>
+                    <span className="font-mono text-[11px] text-amber-800">
+                      ₹{formatShortINR(computedFinancials.balanceSheet.inventories)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDropdown(null);
+                      onOpenYearEndAdjustments('PY');
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-50 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Previous Year (PY) Stock &amp; Adj.</span>
+                    <span className="font-mono text-[11px] text-slate-500">
+                      ₹{formatShortINR(computedFinancials.balanceSheet.previousYear?.inventories)}
+                    </span>
+                  </button>
+                  <div className="border-t border-slate-100 my-1 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectNote(15)}
+                      className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                    >
+                      <span>View Note 15: Inventories Schedule</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectNote(21)}
+                      className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                    >
+                      <span>View Note 21: COGS &amp; Stock Change</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectNote(24)}
+                      className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                    >
+                      <span>View Note 24: Depreciation Expense</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                    </button>
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* 2. Creditors MSME Data Dropdown */}
+            <div className="relative">
+              <div className="inline-flex items-center rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/90 text-xs font-bold transition whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('msme')}
+                  className="px-2.5 py-1.5 flex items-center gap-1 cursor-pointer"
+                  title="Creditors MSME & Trade Payables Aging Dropdown"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Creditors MSME Data</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-emerald-700" />
+                </button>
+              </div>
+
+              {openDropdown === 'msme' && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-2 bg-emerald-950 text-white rounded-xl mb-1 flex items-center justify-between">
+                    <span className="font-bold">Creditors &amp; MSME Disclosures</span>
+                    <span className="text-[10px] text-emerald-300">Note 9</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDropdown(null);
+                      handleOpenTradePayables();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-50 text-emerald-950 font-bold flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Edit MSME &amp; Aging Table (Note 9)</span>
+                    <Sliders className="w-3.5 h-3.5 text-emerald-600" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectNote(9)}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Open Note 9: Trade Payables Schedule</span>
+                    <span className="font-mono text-[11px] text-slate-600">
+                      ₹{formatShortINR(computedFinancials.balanceSheet.tradePayables)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectNote(16)}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Open Note 16: Trade Receivables</span>
+                    <span className="font-mono text-[11px] text-slate-600">
+                      ₹{formatShortINR(computedFinancials.balanceSheet.tradeReceivables)}
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Switch Entity Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => toggleDropdown('entity')}
+                className="text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                title="Switch Client Entity or Manage Companies"
+              >
+                <Building2 className="w-3.5 h-3.5 text-slate-600" />
+                <span>Switch Entity</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               </button>
-            );
-          })}
+
+              {openDropdown === 'entity' && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden text-xs animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3.5 py-2.5 bg-slate-900 text-white flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Switch Active Entity</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {companies.length} {companies.length === 1 ? 'Company' : 'Companies'}
+                    </span>
+                  </div>
+
+                  <div className="p-2 bg-slate-50 border-b border-slate-100">
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 focus-within:border-indigo-500">
+                      <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <input
+                        type="text"
+                        value={entityFilterQuery}
+                        onChange={(e) => setEntityFilterQuery(e.target.value)}
+                        placeholder="Search company by name, PAN, GSTIN..."
+                        className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
+                    {filteredEntities.length === 0 ? (
+                      <div className="p-4 text-center text-slate-400">
+                        No company matches &ldquo;{entityFilterQuery}&rdquo;
+                      </div>
+                    ) : (
+                      filteredEntities.map((comp) => {
+                        const isSelected =
+                          comp.id === activeCompanyId ||
+                          (!activeCompanyId && comp.config.entityName === config.entityName);
+                        return (
+                          <button
+                            key={comp.id}
+                            type="button"
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              setEntityFilterQuery('');
+                              if (onSelectCompany) {
+                                onSelectCompany(comp.id);
+                              } else {
+                                onSwitchCompany();
+                              }
+                            }}
+                            className={`w-full text-left px-3.5 py-2.5 transition flex items-center justify-between gap-2 cursor-pointer ${
+                              isSelected
+                                ? 'bg-indigo-50/80 text-indigo-950 font-bold'
+                                : 'hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="font-bold truncate">{comp.config.entityName}</div>
+                              <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                {comp.config.entityType} • FY {comp.config.financialYear} •{' '}
+                                {comp.mappedLedgers?.length || 0} ledgers
+                              </div>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="p-2 bg-slate-50 border-t border-slate-200 space-y-1">
+                    {onOpenAddCompany && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          onOpenAddCompany();
+                        }}
+                        className="w-full text-left px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Add New Company / Entity</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenDropdown(null);
+                        onSwitchCompany();
+                      }}
+                      className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-slate-200/70 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Open Full Company Manager</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Settings / Config Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => toggleDropdown('settings')}
+                className="px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition flex items-center gap-1 cursor-pointer"
+                title="Entity Config, Financial Year & Auditor Settings Dropdown"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <ChevronDown className="w-3 h-3 text-slate-500" />
+              </button>
+
+              {openDropdown === 'settings' && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden p-1.5 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    Entity &amp; Audit Settings
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDropdown(null);
+                      onOpenConfig();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-800 font-bold flex items-center gap-2 cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Edit Entity &amp; Auditor Config</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDropdown(null);
+                      if (onOpenYearModal) {
+                        onOpenYearModal();
+                      } else {
+                        onOpenConfig();
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Change Financial Year (FY {config.financialYear})</span>
+                  </button>
+                  {onOpenBackupRestore && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenDropdown(null);
+                        onOpenBackupRestore();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer"
+                    >
+                      <Database className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Backup &amp; Restore Hub</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -365,6 +1292,11 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onSelectNote={handleSelectNote}
           onOpenTradePayables={handleOpenTradePayables}
           onUpdateConfig={onUpdateConfig}
+          onUploadBranchTB={onUploadBranchTB}
+          onBulkUploadBranchTBs={onBulkUploadBranchTBs}
+          onClearBranchTB={onClearBranchTB}
+          onLoadSampleBranches={onLoadSampleBranches}
+          onUpdateBranchClosingStock={onUpdateBranchClosingStock}
         />
       )}
 
@@ -391,6 +1323,11 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onProceedToStep3={() => handleStepChange(3)}
           onSelectNote={handleSelectNote}
           onUpdateConfig={onUpdateConfig}
+          onUploadBranchTB={onUploadBranchTB}
+          onBulkUploadBranchTBs={onBulkUploadBranchTBs}
+          onClearBranchTB={onClearBranchTB}
+          onLoadSampleBranches={onLoadSampleBranches}
+          onUpdateBranchClosingStock={onUpdateBranchClosingStock}
         />
       )}
 
@@ -402,6 +1339,8 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           onProceedToStep4={() => handleStepChange(4)}
           onSelectNote={handleSelectNote}
           onOpenTradePayables={handleOpenTradePayables}
+          activeStatementTab={step3StatementTab}
+          onChangeStatementTab={setStep3StatementTab}
         />
       )}
 
@@ -434,6 +1373,7 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
           exceptions={allExceptions}
           onExportExcel={onExportExcel}
           onOpenBackupRestore={onOpenBackupRestore}
+          onRestoreBackup={onRestoreBackup}
           currentUser={currentUser}
           onOpenSubscriptionModal={onOpenSubscriptionModal}
           user={user}
