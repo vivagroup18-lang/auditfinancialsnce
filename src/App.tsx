@@ -2137,7 +2137,7 @@ export default function App() {
   );
 
   const handleBulkUploadBranchTBs = useCallback(
-    async (files: FileList, period: 'CY' | 'PY') => {
+    async (files: FileList | File[], period: 'CY' | 'PY') => {
       try {
         const fileList = Array.from(files);
         if (fileList.length === 0) return;
@@ -3104,7 +3104,7 @@ export default function App() {
               onManualDriveSync={handleManualDriveSync}
               onConnectDrive={handleConnectGoogleDrive}
               onExportTotalLocalBackup={handleDownloadTotalLocalBackup}
-              onExportSingleCompanyBackup={(comp) => handleExportSingleCompanyBackup(comp.id)}
+              onExportSingleCompanyBackup={(compId) => handleExportSingleCompanyBackup(compId)}
               driveApiDisabledUrl={driveApiDisabledUrl}
             />
           ) : (
@@ -3302,7 +3302,6 @@ export default function App() {
         onDuplicateCompany={handleDuplicateCompany}
         initialTab={companyManagerInitialTab}
         onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
-        onExportSingleCompanyBackup={(comp) => handleExportSingleCompanyBackup(comp.id)}
         userEmail={currentUser?.email || user?.email || undefined}
       />
 

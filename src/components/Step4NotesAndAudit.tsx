@@ -204,6 +204,7 @@ export const Step4NotesAndAudit: React.FC<Step4NotesAndAuditProps> = ({
           config={config}
           balanceSheet={balanceSheet}
           profitAndLoss={profitAndLoss}
+          noteSchedules={noteSchedules}
           onUpdateConfig={onUpdateConfig}
           onSelectNote={onSelectNote}
         />

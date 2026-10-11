@@ -2926,19 +2926,67 @@ export function buildAttractiveExcelWorkbook({
   ]);
   mrlRowHeights.push({ hpt: 26 });
 
+  const mrlBsTotalCY = balanceSheet.totalAssets || balanceSheet.totalEquityAndLiabilities || 0;
+  const mrlRevCY = profitAndLoss.revenueFromOperations || 0;
+  const mrlPatCY = profitAndLoss.profitAfterTax || 0;
+  const mrlStockCY = balanceSheet.inventories || 0;
+  const mrlCashCY = balanceSheet.cashAndBankBalances || 0;
+  const mrlRecCY = balanceSheet.tradeReceivables || 0;
+  const mrlPayCY = balanceSheet.tradePayables || 0;
+  const mrlMsmeCY = balanceSheet.tradePayablesMsme || 0;
+  const mrlPpeCY = balanceSheet.propertyPlantEquipment || 0;
+  const mrlDeprCY = profitAndLoss.depreciationExpense || 0;
+  const mrlCapCY = balanceSheet.ownersCapital || 0;
+
   const mrlClauses = [
-    ['1', 'Financial Statements Responsibility', 'Management acknowledges responsibility for preparing financial statements in conformity with ICAI Guidance Note on Non-Corporate Entities.', 'CONFIRMED'],
+    [
+      '1',
+      'Financial Statements Responsibility',
+      `Management acknowledges responsibility for preparing financial statements in conformity with ICAI Guidance Note on Non-Corporate Entities. Prepared financials reflect Balance Sheet Total of ₹${mrlBsTotalCY.toLocaleString('en-IN')}, Turnover of ₹${mrlRevCY.toLocaleString('en-IN')}, Net Profit/Loss of ₹${mrlPatCY.toLocaleString('en-IN')}, and Capital of ₹${mrlCapCY.toLocaleString('en-IN')}.`,
+      'CONFIRMED',
+    ],
     ['2', 'Completeness of Books & Vouchers', 'All books of account, registers, branch records, agreements, contracts and supporting vouchers made available to auditors.', 'CONFIRMED'],
-    ['3', 'Inventories & Physical Verification', mrlData.inventoryValuationMethod || 'Inventories valued at lower of cost or NRV on FIFO basis, physically verified at year-end.', 'CONFIRMED'],
-    ['4', 'Cash & Bank Balances Verification', 'Physical cash count conducted at year-end matching cash book balance; all active bank accounts duly reconciled.', 'CONFIRMED'],
-    ['5', 'Trade Receivables & Loans/Advances', 'Book debts and advances considered good and recoverable; adequate provision created for any doubtful debts.', 'CONFIRMED'],
-    ['6', 'Trade Payables & MSMED Act Sec 22', 'Identification of Micro, Small and Medium Enterprises completed based on supplier confirmations received.', 'CONFIRMED'],
-    ['7', 'Cash Limits (Sec 269SS & 269T)', 'No loan or deposit accepted or repaid in cash exceeding ₹20,000 threshold under Income Tax Act.', 'CONFIRMED'],
-    ['8', 'Litigations & Contingent Liabilities', `${mrlData.litigationDetails || 'No disputed tax demands'} | ${mrlData.contingentLiabilitiesDetails || 'No contingent liabilities'}`, 'CONFIRMED'],
-    ['9', 'Fraud & Non-Compliance Declarations', 'No known frauds, suspected frauds or material regulatory non-compliances affecting the entity.', 'CONFIRMED'],
-    ['10', 'Related Party Transactions & Deed Terms', 'All transactions with partners and relatives strictly comply with partnership deed and Section 40(b) limits.', 'CONFIRMED'],
-    ['11', 'Subsequent Events Declaration', 'No significant events occurred after balance sheet date that require adjustments to financial statements.', 'CONFIRMED'],
-    ['12', 'Custom Specific Representations', mrlData.customRepresentations || 'All transactions recorded in normal course of business.', 'CONFIRMED'],
+    [
+      '3',
+      'Inventories & Physical Verification',
+      `Inventories as at ${currentPeriod} amounting to ₹${mrlStockCY.toLocaleString('en-IN')} ${mrlData.inventoryValuationMethod || 'valued at lower of cost or NRV on FIFO basis'}, physically verified at year-end by management.`,
+      'CONFIRMED',
+    ],
+    [
+      '4',
+      'Cash & Bank Balances Verification',
+      `Total Cash & Bank Balances aggregating to ₹${mrlCashCY.toLocaleString('en-IN')} verified. Physical cash count conducted at year-end matching cash book balance; all active bank accounts duly reconciled.`,
+      'CONFIRMED',
+    ],
+    [
+      '5',
+      'Trade Receivables & Loans/Advances',
+      `Trade receivables amounting to ₹${mrlRecCY.toLocaleString('en-IN')} and advances considered good and recoverable; adequate provision created for any doubtful debts.`,
+      'CONFIRMED',
+    ],
+    [
+      '6',
+      'Trade Payables & MSMED Act Sec 22',
+      `Trade payables amounting to ₹${mrlPayCY.toLocaleString('en-IN')} (including Micro & Small Enterprises MSME dues of ₹${mrlMsmeCY.toLocaleString('en-IN')}). Identification of MSMEs completed per supplier confirmations.`,
+      'CONFIRMED',
+    ],
+    [
+      '7',
+      'Property, Plant & Equipment (PPE)',
+      `Net PPE carrying value of ₹${mrlPpeCY.toLocaleString('en-IN')} with depreciation for the year of ₹${mrlDeprCY.toLocaleString('en-IN')} owned by entity and physically verified.`,
+      'CONFIRMED',
+    ],
+    ['8', 'Cash Limits (Sec 269SS & 269T)', 'No loan or deposit accepted or repaid in cash exceeding ₹20,000 threshold under Income Tax Act, 1961.', 'CONFIRMED'],
+    ['9', 'Litigations & Contingent Liabilities', `${mrlData.litigationDetails || 'No disputed tax demands'} | ${mrlData.contingentLiabilitiesDetails || 'No contingent liabilities'}`, 'CONFIRMED'],
+    ['10', 'Fraud & Non-Compliance Declarations', 'No known frauds, suspected frauds or material regulatory non-compliances affecting the entity.', 'CONFIRMED'],
+    [
+      '11',
+      'Related Party Transactions & Deed Terms',
+      `All transactions with partners and relatives (including capital ₹${mrlCapCY.toLocaleString('en-IN')}${!isProprietor && profitAndLoss.partnersRemuneration ? ` & remuneration ₹${profitAndLoss.partnersRemuneration.toLocaleString('en-IN')}` : ''}) strictly comply with partnership deed and Section 40(b) limits.`,
+      'CONFIRMED',
+    ],
+    ['12', 'Subsequent Events Declaration', 'No significant events occurred after balance sheet date that require adjustments to financial statements.', 'CONFIRMED'],
+    ['13', 'Custom Specific Representations', mrlData.customRepresentations || 'All transactions recorded in normal course of business.', 'CONFIRMED'],
   ];
 
   mrlClauses.forEach((c) => {
@@ -2948,12 +2996,46 @@ export function buildAttractiveExcelWorkbook({
       textCell(c[2], { sz: 9, color: '334155', wrapText: true }),
       textCell(c[3], { align: 'center', bold: true, sz: 9.5, color: '166534', bg: 'DCFCE7' }),
     ]);
-    mrlRowHeights.push({ hpt: 30 });
+    mrlRowHeights.push({ hpt: 32 });
+  });
+
+  // Annexure: Summary of Financial Statement Balances Confirmed by Management
+  mrlRows.push([
+    thCell('REF', 'center', PALETTE.navyDark),
+    thCell('ANNEXURE: STATUTORY FINANCIAL STATEMENT BALANCES CONFIRMED (SA 580)', 'left', PALETTE.navyDark),
+    thCell(`AS AT ${currentPeriod} (CY)`, 'right', PALETTE.navyDark),
+    thCell(`AS AT ${previousPeriod} (PY)`, 'right', PALETTE.navyDark),
+  ]);
+  mrlRowHeights.push({ hpt: 26 });
+
+  const mrlFinancialItems = [
+    { ref: 'Note 3', label: isProprietor ? "Proprietor's Capital" : "Partners' Capital", cy: mrlCapCY, py: balanceSheet.previousYear?.ownersCapital || 0 },
+    { ref: 'Note 5', label: 'Long-term Borrowings', cy: balanceSheet.longTermBorrowings || 0, py: balanceSheet.previousYear?.longTermBorrowings || 0 },
+    { ref: 'Note 9', label: `Trade Payables (Total)${mrlMsmeCY > 0 ? ` [MSME: ₹${mrlMsmeCY.toLocaleString('en-IN')}]` : ''}`, cy: mrlPayCY, py: balanceSheet.previousYear?.tradePayables || 0 },
+    { ref: 'Note 5,10', label: 'Short-term Borrowings & Current Liabilities', cy: (balanceSheet.shortTermBorrowings || 0) + (balanceSheet.otherCurrentLiabilities || 0), py: (balanceSheet.previousYear?.shortTermBorrowings || 0) + (balanceSheet.previousYear?.otherCurrentLiabilities || 0) },
+    { ref: 'ICAI BS', label: 'TOTAL BALANCE SHEET / ASSETS', cy: mrlBsTotalCY, py: balanceSheet.previousYear?.totalAssets || 0, isGrand: true },
+    { ref: 'Note 11', label: 'Property, Plant & Equipment (Net PPE)', cy: mrlPpeCY, py: balanceSheet.previousYear?.propertyPlantEquipment || 0 },
+    { ref: 'Note 15', label: 'Inventories / Closing Stock', cy: mrlStockCY, py: balanceSheet.previousYear?.inventories || 0 },
+    { ref: 'Note 16', label: 'Trade Receivables (Book Debts)', cy: mrlRecCY, py: balanceSheet.previousYear?.tradeReceivables || 0 },
+    { ref: 'Note 17', label: 'Cash and Bank Balances', cy: mrlCashCY, py: balanceSheet.previousYear?.cashAndBankBalances || 0 },
+    { ref: 'Note 19', label: 'Revenue from Operations (Turnover)', cy: mrlRevCY, py: profitAndLoss.previousYear?.revenueFromOperations || 0 },
+    { ref: 'Note 24', label: 'Depreciation & Amortization Expense', cy: mrlDeprCY, py: profitAndLoss.previousYear?.depreciationExpense || 0 },
+    { ref: 'ICAI PL', label: 'NET PROFIT / (LOSS) FOR THE YEAR', cy: mrlPatCY, py: profitAndLoss.previousYear?.profitAfterTax || 0, isGrand: true },
+  ];
+
+  mrlFinancialItems.forEach((item) => {
+    mrlRows.push([
+      textCell(item.ref, { align: 'center', bold: true, sz: 9.5, color: '64748B' }),
+      textCell(item.label, { bold: item.isGrand || false, sz: item.isGrand ? 10.5 : 9.5, color: item.isGrand ? '0F172A' : '334155' }),
+      numCell(item.cy, { isGrandTotal: item.isGrand, bold: item.isGrand }),
+      numCell(item.py, { isGrandTotal: item.isGrand, bold: item.isGrand }),
+    ]);
+    mrlRowHeights.push({ hpt: item.isGrand ? 26 : 22 });
   });
 
   appendSignOffBlock(mrlRows, entityConfig, currentPeriod, mrlColCount, mrlRowHeights);
   const wsMrl = XLSX.utils.aoa_to_sheet(mrlRows);
-  wsMrl['!cols'] = [{ wch: 10 }, { wch: 32 }, { wch: 60 }, { wch: 18 }];
+  wsMrl['!cols'] = [{ wch: 12 }, { wch: 38 }, { wch: 50 }, { wch: 22 }];
   wsMrl['!rows'] = mrlRowHeights;
   wsMrl['!merges'] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: mrlColCount - 1 } },

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Building2, ShieldCheck, Award, Layers } from 'lucide-react';
-import { EntityConfig } from '../types';
+import { EntityConfig, BalanceSheetData, ProfitAndLossData, NoteScheduleData } from '../types';
 import { CoverPageView } from './CoverPageView';
 import { AuditAppointmentView } from './AuditAppointmentView';
 import { ManagementRepresentationView } from './ManagementRepresentationView';
@@ -11,6 +11,9 @@ interface AuditDossierModalProps {
   isOpen: boolean;
   onClose: () => void;
   config: EntityConfig;
+  balanceSheet?: BalanceSheetData;
+  profitAndLoss?: ProfitAndLossData;
+  noteSchedules?: Record<number, NoteScheduleData>;
   onUpdateConfig: (updated: Partial<EntityConfig>) => void;
   initialTab?: AuditDossierTab;
 }
@@ -19,6 +22,9 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
   isOpen,
   onClose,
   config,
+  balanceSheet,
+  profitAndLoss,
+  noteSchedules,
   onUpdateConfig,
   initialTab = 'cover_page',
 }) => {
@@ -124,6 +130,9 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
           {activeTab === 'mrl' && (
             <ManagementRepresentationView
               config={config}
+              balanceSheet={balanceSheet}
+              profitAndLoss={profitAndLoss}
+              noteSchedules={noteSchedules}
               onUpdateConfig={onUpdateConfig}
             />
           )}

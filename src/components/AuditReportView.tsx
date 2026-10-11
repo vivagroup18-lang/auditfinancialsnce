@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, ShieldCheck, CheckCircle2, AlertCircle, FileCheck, Award, Printer, Download, Sparkles, HelpCircle, Mail, Layers, Building2 } from 'lucide-react';
-import { AuditException, EntityConfig, BalanceSheetData, ProfitAndLossData } from '../types';
+import { AuditException, EntityConfig, BalanceSheetData, ProfitAndLossData, NoteScheduleData } from '../types';
 import { CoverPageView } from './CoverPageView';
 import { AuditAppointmentView } from './AuditAppointmentView';
 import { ManagementRepresentationView } from './ManagementRepresentationView';
@@ -10,6 +10,7 @@ interface AuditReportViewProps {
   config: EntityConfig;
   balanceSheet: BalanceSheetData;
   profitAndLoss: ProfitAndLossData;
+  noteSchedules?: Record<number, NoteScheduleData>;
   onUpdateConfig: (updated: Partial<EntityConfig>) => void;
   onSelectNote: (noteNumber: number) => void;
   onEmailAuditQueries?: () => void;
@@ -20,6 +21,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
   config,
   balanceSheet,
   profitAndLoss,
+  noteSchedules,
   onUpdateConfig,
   onSelectNote,
   onEmailAuditQueries,
@@ -584,6 +586,9 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
       {activeSubTab === 'mrl' && (
         <ManagementRepresentationView
           config={config}
+          balanceSheet={balanceSheet}
+          profitAndLoss={profitAndLoss}
+          noteSchedules={noteSchedules}
           onUpdateConfig={onUpdateConfig}
         />
       )}

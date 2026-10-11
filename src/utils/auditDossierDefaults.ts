@@ -73,5 +73,7 @@ export function getDefaultManagementRepresentation(config: EntityConfig): Manage
     relatedPartyConfirmed: existing.relatedPartyConfirmed ?? true,
     subsequentEventsConfirmed: existing.subsequentEventsConfirmed ?? true,
     customRepresentations: existing.customRepresentations || 'All transactions have been recorded in the accounting records and are reflected in the financial statements in accordance with applicable deed and regulations.',
+    includeFinancialFiguresInClauses: existing.includeFinancialFiguresInClauses ?? true,
+    includeFinancialSummaryTable: existing.includeFinancialSummaryTable ?? true,
   };
 }

@@ -25,7 +25,6 @@ import {
   UserProfile,
 } from '../types';
 import { PROMO_CODES, GST_RATE } from '../data/subscriptionPlans';
-import { sanitizeMockText } from '../utils/storageManager';
 import {
   createRazorpayOrder,
   verifyRazorpayPayment,
@@ -100,10 +99,10 @@ export const RazorpayCheckoutModal: React.FC<RazorpayCheckoutModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setFirmName(sanitizeMockText(currentUser?.firmName, 'Viva') || 'Viva');
+      setFirmName(currentUser?.firmName || 'Chartered Accountant Practice');
       setGstin(currentUser?.gstin || '');
       setContactMobile(currentUser?.mobile || '9876543210');
-      setCardHolder(sanitizeMockText(currentUser?.fullName, 'Balaji') || 'Balaji');
+      setCardHolder(currentUser?.fullName || 'Chartered Accountant');
       setErrorMessage(null);
       setVerifiedInvoice(null);
       setOrderData(null);
@@ -155,10 +154,10 @@ export const RazorpayCheckoutModal: React.FC<RazorpayCheckoutModalProps> = ({
       includeGst: true,
       customer: {
         userId: currentUser?.id || 'guest_ca',
-        name: sanitizeMockText(currentUser?.fullName, 'Balaji') || 'Balaji',
+        name: currentUser?.fullName || 'Chartered Accountant',
         email: currentUser?.email || 'ca@auditfinancials.local',
         contact: contactMobile,
-        firmName: sanitizeMockText(firmName, 'Viva') || 'Viva',
+        firmName: firmName || currentUser?.firmName || 'Chartered Accountant Practice',
         gstin,
       },
     })

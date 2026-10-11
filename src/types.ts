@@ -450,6 +450,8 @@ export interface ManagementRepresentationConfig {
   relatedPartyConfirmed?: boolean;
   subsequentEventsConfirmed?: boolean;
   customRepresentations?: string;
+  includeFinancialFiguresInClauses?: boolean; // Embed actual prepared figures (Stock, Receivables, Cash, Payables, Revenue, Profit) in SA 580 representation clauses
+  includeFinancialSummaryTable?: boolean; // Include statutory annexure table of prepared financial balances in representation letter
 }
 
 export interface EntityConfig {

@@ -195,37 +195,91 @@ export const CA_EMAIL_TEMPLATES: EmailTemplateOption[] = [
       'Formal representation letter from client management to statutory auditor affirming completeness of books and statutory compliance.',
     defaultSubject: (config) =>
       `Management Representation Letter Draft — FY ${config.financialYear} — ${config.entityName}`,
-    generateHtml: (config) => {
+    generateHtml: (config, bs, pl) => {
+      const bsTotal = bs?.totalEquityAndLiabilities
+        ? `₹${bs.totalEquityAndLiabilities.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : 'As calculated';
+      const netProfit = pl?.profitAfterTax
+        ? `₹${pl.profitAfterTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : 'As computed';
+      const revenue = pl?.revenueFromOperations
+        ? `₹${pl.revenueFromOperations.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : (pl?.totalRevenue ? `₹${pl.totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'As per accounts');
+      const stock = bs?.inventories
+        ? `₹${bs.inventories.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : null;
+      const cashBank = bs?.cashAndBankBalances
+        ? `₹${bs.cashAndBankBalances.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : null;
+      const receivables = bs?.tradeReceivables
+        ? `₹${bs.tradeReceivables.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : null;
+      const payables = bs?.tradePayables
+        ? `₹${bs.tradePayables.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : null;
+      const capital = bs?.ownersCapital
+        ? `₹${bs.ownersCapital.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : null;
+
       return `
 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 680px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
   <div style="background-color: #0f766e; color: #ffffff; padding: 18px 24px;">
-    <h2 style="margin: 0 0 4px 0; font-size: 18px;">Draft Management Representation Letter</h2>
-    <p style="margin: 0; font-size: 12px; opacity: 0.9;">Standard on Auditing (SA 580) — Written Representations</p>
+    <h2 style="margin: 0 0 4px 0; font-size: 18px;">Draft Management Representation Letter (ICAI SA 580)</h2>
+    <p style="margin: 0; font-size: 12px; opacity: 0.9;">Carrying Prepared Financial Figures — Period Ended ${config.reportingPeriod}</p>
   </div>
 
   <div style="padding: 24px; font-size: 13px;">
     <p><strong>[To be printed on Client Letterhead]</strong></p>
 
-    <p>To,<br />The Statutory Auditors,<br />[CA Firm Name &amp; Address]</p>
+    <p>To,<br />The Statutory Auditors,<br />${config.auditorFirmName || config.auditorName || 'Chartered Accountants'}<br />${config.registeredAddress || ''}</p>
 
     <p>Dear Sirs,</p>
 
-    <p>This representation letter is provided in connection with your audit of the financial statements of <strong>${config.entityName}</strong> for the year ended <strong>${config.reportingPeriod}</strong> for the purpose of expressing an opinion on whether the financial statements give a true and fair view in accordance with the applicable accounting standards for Non-Corporate Entities.</p>
+    <p>This representation letter is provided in connection with your audit of the financial statements of <strong>${config.entityName}</strong> for the year ended <strong>${config.reportingPeriod}</strong> for the purpose of expressing an opinion on whether the financial statements give a true and fair view in accordance with the Guidance Note on Financial Statements of Non-Corporate Entities issued by ICAI.</p>
 
-    <p>We confirm, to the best of our knowledge and belief, the following representations:</p>
+    <div style="background-color: #f8fafc; border-left: 4px solid #0f766e; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+      <p style="margin: 0 0 8px 0; font-weight: bold; font-size: 12px; color: #0f172a; text-transform: uppercase;">Key Financial Balances Confirmed by Management:</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <tr>
+          <td style="padding: 4px 0; color: #64748b;">Balance Sheet Total:</td>
+          <td style="padding: 4px 0; font-weight: bold; text-align: right; color: #0f172a;">${bsTotal}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: #64748b;">Revenue from Operations:</td>
+          <td style="padding: 4px 0; font-weight: bold; text-align: right; color: #0f172a;">${revenue}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: #64748b;">Net Profit / (Loss) for the Year:</td>
+          <td style="padding: 4px 0; font-weight: bold; text-align: right; color: #0f172a;">${netProfit}</td>
+        </tr>
+        ${stock ? `<tr><td style="padding: 4px 0; color: #64748b;">Closing Inventories:</td><td style="padding: 4px 0; font-weight: bold; text-align: right; color: #0f172a;">${stock}</td></tr>` : ''}
+        ${cashBank ? `<tr><td style="padding: 4px 0; color: #64748b;">Cash &amp; Bank Balances:</td><td style="padding: 4px 0; font-weight: bold; text-align: right; color: #0f172a;">${cashBank}</td></tr>` : ''}
+        ${receivables ? `<tr><td style="padding: 4px 0; color: #64748b;">Trade Receivables:</td><td style="padding: 4px 0; font-weight: bold; text-align: right; color: #0f172a;">${receivables}</td></tr>` : ''}
+        ${payables ? `<tr><td style="padding: 4px 0; color: #64748b;">Trade Payables:</td><td style="padding: 4px 0; font-weight: bold; text-align: right; color: #0f172a;">${payables}</td></tr>` : ''}
+        ${capital ? `<tr><td style="padding: 4px 0; color: #64748b;">Owners' / Partners' Capital:</td><td style="padding: 4px 0; font-weight: bold; text-align: right; color: #0f172a;">${capital}</td></tr>` : ''}
+      </table>
+    </div>
+
+    <p>We confirm, to the best of our knowledge and belief, the following statutory representations:</p>
     <ol style="padding-left: 20px; line-height: 1.7;">
-      <li>We have fulfilled our responsibilities for the preparation and presentation of the financial statements per ICAI Non-Corporate Entity guidelines.</li>
-      <li>All significant accounting policies adopted are disclosed in Note 1 of the financial statements.</li>
-      <li>All transactions have been recorded in the accounting records and are reflected in the financial statements.</li>
-      <li>There are no material unrecorded liabilities, contingent liabilities, or litigation claims against the entity as of ${config.reportingPeriod}.</li>
-      <li>Closing stock as of ${config.reportingPeriod} has been physically verified and valued at the lower of cost or net realizable value.</li>
+      <li>We acknowledge our responsibility for preparing financial statements in conformity with the ICAI Guidance Note on Non-Corporate Entities.</li>
+      <li>All books of account, registers, branch returns, contracts, bank statements, and vouchers have been made available to you.</li>
+      <li>Closing inventories${stock ? ` amounting to <strong>${stock}</strong>` : ''} as of ${config.reportingPeriod} were physically verified and valued at the lower of cost or net realizable value on FIFO basis.</li>
+      <li>Cash-in-hand${cashBank ? ` and bank balances totaling <strong>${cashBank}</strong>` : ''} were physically counted/reconciled and tallied with books as of ${config.reportingPeriod}.</li>
+      <li>Trade receivables${receivables ? ` of <strong>${receivables}</strong>` : ''} and advances are considered good and recoverable; adequate provision for doubtful debts has been provided.</li>
+      <li>Trade payables${payables ? ` of <strong>${payables}</strong>` : ''} have been identified under Section 22 of the MSMED Act, 2006, and no overdue interest is payable.</li>
+      <li>No cash loans or deposits exceeding the ₹20,000 threshold under Sections 269SS/269T of the Income Tax Act were accepted or repaid.</li>
+      <li>There are no material unrecorded liabilities, undisclosed contingent liabilities, or pending tax litigations other than disclosed.</li>
+      <li>There have been no frauds, suspected frauds, or non-compliances with laws affecting the entity.</li>
+      <li>Related party transactions and partners' remuneration comply strictly with the Partnership Deed and Section 40(b) limits.</li>
+      <li>No events have occurred subsequent to the balance sheet date that require adjustments to the financial statements.</li>
     </ol>
 
     <div style="margin-top: 28px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
       <p style="margin: 0;">For <strong>${config.entityName}</strong></p>
       <br /><br />
       <p style="margin: 0;">_____________________________</p>
-      <p style="margin: 4px 0 0 0; color: #64748b;">Partner / Proprietor / Authorized Signatory</p>
+      <p style="margin: 4px 0 0 0; color: #64748b;">${config.signingPartnerName || config.proprietorName || 'Partner / Proprietor / Authorized Signatory'}</p>
     </div>
   </div>
 </div>

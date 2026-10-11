@@ -1473,6 +1473,9 @@ export const StepByStepWorkspace: React.FC<StepByStepWorkspaceProps> = ({
         isOpen={isAuditDossierModalOpen}
         onClose={() => setIsAuditDossierModalOpen(false)}
         config={config}
+        balanceSheet={computedFinancials.balanceSheet}
+        profitAndLoss={computedFinancials.profitAndLoss}
+        noteSchedules={computedFinancials.noteSchedules}
         onUpdateConfig={onUpdateConfig}
         initialTab={auditDossierTab}
       />

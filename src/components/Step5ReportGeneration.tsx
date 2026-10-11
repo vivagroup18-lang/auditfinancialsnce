@@ -471,6 +471,9 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
       {activeDeliveryTab === 'mrl' && (
         <ManagementRepresentationView
           config={config}
+          balanceSheet={computedFinancials.balanceSheet}
+          profitAndLoss={computedFinancials.profitAndLoss}
+          noteSchedules={computedFinancials.noteSchedules}
           onUpdateConfig={onUpdateConfig}
         />
       )}
