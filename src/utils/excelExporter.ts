@@ -13,6 +13,11 @@ import {
   TrialBalanceRow,
 } from '../types';
 import { NCE_NOTE_DEFINITIONS } from '../data/nceTaxonomy';
+import {
+  getDefaultCoverPage,
+  getDefaultAuditAppointment,
+  getDefaultManagementRepresentation,
+} from './auditDossierDefaults';
 
 interface ExportExcelParams {
   entityConfig: EntityConfig;
@@ -2755,6 +2760,220 @@ export function buildAttractiveExcelWorkbook({
     headerRowsToFreeze: 7,
     tabColor: 'DC2626',
   });
+
+  // ==========================================
+  // SHEET 7: STATUTORY COVER PAGE
+  // ==========================================
+  const coverData = getDefaultCoverPage(entityConfig);
+  const coverRows: any[][] = [];
+  const coverRowHeights: Array<{ hpt?: number; hidden?: boolean }> = [];
+  const coverColCount = 4;
+
+  appendExecutiveHeaderBanner(
+    coverRows,
+    entityName,
+    coverData.reportTitle || 'STATUTORY AUDIT REPORT & FINANCIAL STATEMENTS',
+    currentPeriod,
+    previousPeriod,
+    coverColCount,
+    coverRowHeights,
+    effectiveAddress
+  );
+
+  coverRows.push([
+    thCell('STATUTORY AUDIT DOSSIER & FINANCIAL STATEMENTS INDEX', 'left', PALETTE.navyPrimary),
+    thCell('', 'left', PALETTE.navyPrimary),
+    thCell('SECTION / WORKING PAPER', 'left', PALETTE.navyPrimary),
+    thCell('STANDARD / REFERENCE', 'center', PALETTE.navyPrimary),
+  ]);
+  coverRowHeights.push({ hpt: 26 });
+
+  const coverIndexItems = [
+    ['1', 'Executive Summary & Audit Dashboard', 'Statutory Financial Overview', 'ICAI NCE Format'],
+    ['2', 'Balance Sheet as at 31st March (CY & PY)', 'Statement of Assets & Liabilities', 'Schedule III / Part I'],
+    ['3', 'Statement of Profit and Loss (CY & PY)', 'Statement of Financial Performance', 'Schedule III / Part II'],
+    ['4', 'Notes 1 to 25 to Financial Statements', '25 Statutory Schedules to Accounts', 'ICAI NCE Taxonomy'],
+    ['5', `${isProprietor ? "Proprietor's Capital Account" : "Partners' Capital Account Schedule"}`, 'Capital movement, profit sharing & interest', 'Note 3 & Deed'],
+    ['6', 'Terms of Statutory Audit Appointment & Acceptance', 'Letter of appointment & formal acceptance', 'ICAI SA 210'],
+    ['7', 'Management Representation Letter (MRL)', 'Written representations from management', 'ICAI SA 580'],
+    ['8', 'Master Trial Balance Register', 'Complete itemized ledger audit trail', 'Working Paper'],
+    ['9', 'Statutory Audit Exceptions & Forensic Checks', 'Abnormal signs, MSME, suspense & variance checks', 'Forensic Audit'],
+  ];
+
+  coverIndexItems.forEach((item, idx) => {
+    coverRows.push([
+      textCell(item[0], { align: 'center', bold: true, sz: 10 }),
+      textCell(item[1], { bold: true, sz: 10, color: '1E293B' }),
+      textCell(item[2], { sz: 9.5, color: '475569' }),
+      textCell(item[3], { align: 'center', sz: 9.5, color: '0284C7', bold: true }),
+    ]);
+    coverRowHeights.push({ hpt: 22 });
+  });
+
+  appendSignOffBlock(coverRows, entityConfig, currentPeriod, coverColCount, coverRowHeights);
+  const wsCover = XLSX.utils.aoa_to_sheet(coverRows);
+  wsCover['!cols'] = [{ wch: 8 }, { wch: 42 }, { wch: 38 }, { wch: 24 }];
+  wsCover['!rows'] = coverRowHeights;
+  wsCover['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: coverColCount - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: coverColCount - 1 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: coverColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: coverColCount - 1 } },
+    { s: { r: 5, c: 0 }, e: { r: 5, c: 1 } },
+  ];
+  applyPrintSetup(wsCover, {
+    orientation: 'portrait',
+    entityName,
+    reportTitle: 'STATUTORY AUDIT REPORT COVER PAGE',
+    financialYear: fyCY,
+    headerRowsToFreeze: 6,
+    tabColor: '1E3A8A',
+  });
+
+  // ==========================================
+  // SHEET 8: TERMS OF AUDIT APPOINTMENT (SA 210)
+  // ==========================================
+  const apptData = getDefaultAuditAppointment(entityConfig);
+  const apptRows: any[][] = [];
+  const apptRowHeights: Array<{ hpt?: number; hidden?: boolean }> = [];
+  const apptColCount = 4;
+
+  appendExecutiveHeaderBanner(
+    apptRows,
+    entityName,
+    'TERMS OF STATUTORY AUDIT ENGAGEMENT & APPOINTMENT (ICAI SA 210)',
+    currentPeriod,
+    previousPeriod,
+    apptColCount,
+    apptRowHeights,
+    effectiveAddress
+  );
+
+  apptRows.push([
+    thCell('APPOINTMENT & ENGAGEMENT PARAMETER', 'left', PALETTE.navyMedium),
+    thCell('', 'left', PALETTE.navyMedium),
+    thCell('AGREED TERMS & STATUTORY PARTICULARS', 'left', PALETTE.navyMedium),
+    thCell('', 'left', PALETTE.navyMedium),
+  ]);
+  apptRowHeights.push({ hpt: 26 });
+
+  const apptDetails = [
+    ['Client Entity Legal Name:', entityName, 'Statutory Auditor Firm:', entityConfig.auditorFirmName || entityConfig.auditorName || 'Chartered Accountants'],
+    ['Appointment Resolution / Ref No.:', apptData.resolutionNumber || 'AUD/APPT/2025-26/01', 'Signing Chartered Accountant:', `${entityConfig.auditorName || 'Chartered Accountant'} (${entityConfig.auditorRole || 'Partner'})`],
+    ['Date of Appointment Resolution:', apptData.appointmentDate || '15-09-2025', 'ICAI Membership No. & FRN:', `M.No: ${entityConfig.auditorMembershipNo || 'N/A'} • FRN: ${entityConfig.firmRegistrationNo || 'N/A'}`],
+    ['Appointing Authority:', apptData.appointingAuthority || 'Partners of the Firm', 'Audit Tenure / Financial Year:', apptData.auditTenure || `FY ${fyCY}`],
+    ['Statutory Authority & Act:', apptData.statutorySection || 'Section 44AB of the Income Tax Act, 1961', 'Unique Document Identification Number:', entityConfig.udin || 'Applicable at signing'],
+    ['Agreed Audit Remuneration:', `₹ ${(apptData.proposedAuditFees ?? 25000).toLocaleString('en-IN')}`, 'Fee Payment Terms:', apptData.auditFeeTerms || 'Plus applicable GST and out-of-pocket expenses'],
+    ['Predecessor Auditor & NOC:', apptData.priorAuditorName ? `${apptData.priorAuditorName} (NOC: ${apptData.nocReference})` : 'Continuing Auditor / ICAI Code of Ethics verified', 'Scope of Deliverables:', apptData.scopeDescription || 'Audit of Balance Sheet, P&L, 25 Notes and Tax Audit Form 3CD'],
+    ['Auditor Acceptance Letter Ref:', apptData.acceptanceLetterRef || 'CA/AUD/ACC/2025-26/01', 'Acceptance Date (SA 210):', apptData.acceptanceDate || '20-09-2025'],
+  ];
+
+  apptDetails.forEach((row) => {
+    apptRows.push([
+      textCell(row[0], { bold: true, sz: 10, color: '334155' }),
+      textCell(row[1], { sz: 9.5, color: '0F172A' }),
+      textCell(row[2], { bold: true, sz: 10, color: '334155' }),
+      textCell(row[3], { sz: 9.5, color: '0F172A' }),
+    ]);
+    apptRowHeights.push({ hpt: 24 });
+  });
+
+  appendSignOffBlock(apptRows, entityConfig, currentPeriod, apptColCount, apptRowHeights);
+  const wsAppt = XLSX.utils.aoa_to_sheet(apptRows);
+  wsAppt['!cols'] = [{ wch: 32 }, { wch: 36 }, { wch: 32 }, { wch: 38 }];
+  wsAppt['!rows'] = apptRowHeights;
+  wsAppt['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: apptColCount - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: apptColCount - 1 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: apptColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: apptColCount - 1 } },
+    { s: { r: 5, c: 0 }, e: { r: 5, c: 1 } },
+    { s: { r: 5, c: 2 }, e: { r: 5, c: 3 } },
+  ];
+  applyPrintSetup(wsAppt, {
+    orientation: 'portrait',
+    entityName,
+    reportTitle: 'TERMS OF AUDIT APPOINTMENT (SA 210)',
+    financialYear: fyCY,
+    headerRowsToFreeze: 6,
+    tabColor: '4338CA',
+  });
+
+  // ==========================================
+  // SHEET 9: MANAGEMENT REPRESENTATION LETTER (SA 580)
+  // ==========================================
+  const mrlData = getDefaultManagementRepresentation(entityConfig);
+  const mrlRows: any[][] = [];
+  const mrlRowHeights: Array<{ hpt?: number; hidden?: boolean }> = [];
+  const mrlColCount = 4;
+
+  appendExecutiveHeaderBanner(
+    mrlRows,
+    entityName,
+    'MANAGEMENT REPRESENTATION LETTER (ICAI SA 580)',
+    currentPeriod,
+    previousPeriod,
+    mrlColCount,
+    mrlRowHeights,
+    effectiveAddress
+  );
+
+  mrlRows.push([
+    thCell('CLAUSE #', 'center', PALETTE.navyMedium),
+    thCell('STATUTORY REPRESENTATION AREA', 'left', PALETTE.navyMedium),
+    thCell('MANAGEMENT CONFIRMATION & STATUTORY DECLARATION', 'left', PALETTE.navyMedium),
+    thCell('SA 580 STATUS', 'center', PALETTE.navyMedium),
+  ]);
+  mrlRowHeights.push({ hpt: 26 });
+
+  const mrlClauses = [
+    ['1', 'Financial Statements Responsibility', 'Management acknowledges responsibility for preparing financial statements in conformity with ICAI Guidance Note on Non-Corporate Entities.', 'CONFIRMED'],
+    ['2', 'Completeness of Books & Vouchers', 'All books of account, registers, branch records, agreements, contracts and supporting vouchers made available to auditors.', 'CONFIRMED'],
+    ['3', 'Inventories & Physical Verification', mrlData.inventoryValuationMethod || 'Inventories valued at lower of cost or NRV on FIFO basis, physically verified at year-end.', 'CONFIRMED'],
+    ['4', 'Cash & Bank Balances Verification', 'Physical cash count conducted at year-end matching cash book balance; all active bank accounts duly reconciled.', 'CONFIRMED'],
+    ['5', 'Trade Receivables & Loans/Advances', 'Book debts and advances considered good and recoverable; adequate provision created for any doubtful debts.', 'CONFIRMED'],
+    ['6', 'Trade Payables & MSMED Act Sec 22', 'Identification of Micro, Small and Medium Enterprises completed based on supplier confirmations received.', 'CONFIRMED'],
+    ['7', 'Cash Limits (Sec 269SS & 269T)', 'No loan or deposit accepted or repaid in cash exceeding ₹20,000 threshold under Income Tax Act.', 'CONFIRMED'],
+    ['8', 'Litigations & Contingent Liabilities', `${mrlData.litigationDetails || 'No disputed tax demands'} | ${mrlData.contingentLiabilitiesDetails || 'No contingent liabilities'}`, 'CONFIRMED'],
+    ['9', 'Fraud & Non-Compliance Declarations', 'No known frauds, suspected frauds or material regulatory non-compliances affecting the entity.', 'CONFIRMED'],
+    ['10', 'Related Party Transactions & Deed Terms', 'All transactions with partners and relatives strictly comply with partnership deed and Section 40(b) limits.', 'CONFIRMED'],
+    ['11', 'Subsequent Events Declaration', 'No significant events occurred after balance sheet date that require adjustments to financial statements.', 'CONFIRMED'],
+    ['12', 'Custom Specific Representations', mrlData.customRepresentations || 'All transactions recorded in normal course of business.', 'CONFIRMED'],
+  ];
+
+  mrlClauses.forEach((c) => {
+    mrlRows.push([
+      textCell(c[0], { align: 'center', bold: true, sz: 10 }),
+      textCell(c[1], { bold: true, sz: 9.5, color: '1E293B' }),
+      textCell(c[2], { sz: 9, color: '334155', wrapText: true }),
+      textCell(c[3], { align: 'center', bold: true, sz: 9.5, color: '166534', bg: 'DCFCE7' }),
+    ]);
+    mrlRowHeights.push({ hpt: 30 });
+  });
+
+  appendSignOffBlock(mrlRows, entityConfig, currentPeriod, mrlColCount, mrlRowHeights);
+  const wsMrl = XLSX.utils.aoa_to_sheet(mrlRows);
+  wsMrl['!cols'] = [{ wch: 10 }, { wch: 32 }, { wch: 60 }, { wch: 18 }];
+  wsMrl['!rows'] = mrlRowHeights;
+  wsMrl['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: mrlColCount - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: mrlColCount - 1 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: mrlColCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: mrlColCount - 1 } },
+  ];
+  applyPrintSetup(wsMrl, {
+    orientation: 'portrait',
+    entityName,
+    reportTitle: 'MANAGEMENT REPRESENTATION LETTER (SA 580)',
+    financialYear: fyCY,
+    headerRowsToFreeze: 6,
+    tabColor: 'D97706',
+  });
+
+  // Append all sheets to workbook in logical audit dossier order
+  XLSX.utils.book_append_sheet(wb, wsCover, 'Cover Page');
+  XLSX.utils.book_append_sheet(wb, wsAppt, 'Audit Appointment');
+  XLSX.utils.book_append_sheet(wb, wsMrl, 'Management Representation');
   XLSX.utils.book_append_sheet(wb, wsExc, 'Audit Exceptions');
 
   // Setup print titles (repeating header rows 1 to 7 on every printed page)
@@ -2767,6 +2986,9 @@ export function buildAttractiveExcelWorkbook({
     { Name: '_xlnm.Print_Titles', Ref: `'${capitalSheetName}'!$1:$7`, Sheet: 4 },
     { Name: '_xlnm.Print_Titles', Ref: "'Trial Balance Master'!$1:$7", Sheet: 5 },
     { Name: '_xlnm.Print_Titles', Ref: "'Audit Exceptions'!$1:$7", Sheet: 6 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Cover Page'!$1:$6", Sheet: 7 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Audit Appointment'!$1:$6", Sheet: 8 },
+    { Name: '_xlnm.Print_Titles', Ref: "'Management Representation'!$1:$6", Sheet: 9 },
   ];
 
   const sheetConfigs: SheetPrintConfig[] = [
@@ -2777,6 +2999,9 @@ export function buildAttractiveExcelWorkbook({
     { sheetName: capitalSheetName, orientation: isProprietor ? 'portrait' : 'landscape', reportTitle: capitalReportTitle, entityName, financialYear: fyCY },
     { sheetName: 'Trial Balance Master', orientation: 'landscape', reportTitle: 'MASTER TRIAL BALANCE REGISTER', entityName, financialYear: fyCY },
     { sheetName: 'Audit Exceptions', orientation: 'landscape', reportTitle: 'STATUTORY AUDIT VALIDATION REPORT', entityName, financialYear: fyCY },
+    { sheetName: 'Cover Page', orientation: 'portrait', reportTitle: 'STATUTORY AUDIT REPORT COVER PAGE', entityName, financialYear: fyCY },
+    { sheetName: 'Audit Appointment', orientation: 'portrait', reportTitle: 'TERMS OF AUDIT APPOINTMENT (SA 210)', entityName, financialYear: fyCY },
+    { sheetName: 'Management Representation', orientation: 'portrait', reportTitle: 'MANAGEMENT REPRESENTATION LETTER (SA 580)', entityName, financialYear: fyCY },
   ];
 
   // Return Workbook and Target File Name

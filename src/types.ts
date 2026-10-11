@@ -2,6 +2,38 @@ export type AccountingNature = 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Ex
 
 export type StatementType = 'BalanceSheet' | 'ProfitAndLoss';
 
+export interface BranchLedgerBreakdown {
+  branchId: string;
+  branchName: string;
+  debit: number;
+  credit: number;
+  netBalance: number;
+}
+
+export interface BranchTrialBalanceData {
+  branchId: string;
+  branchName: string;
+  branchCode?: string;
+  cyFileName?: string;
+  cyUploadedAt?: string;
+  cyRawRows?: TrialBalanceRow[];
+  cyMappedLedgers?: MappedLedger[];
+  cyTotalDebit?: number;
+  cyTotalCredit?: number;
+  cyIsBalanced?: boolean;
+  isCYBalanced?: boolean;
+  cyClosingStock?: number;
+  pyFileName?: string;
+  pyUploadedAt?: string;
+  pyRawRows?: TrialBalanceRow[];
+  pyMappedLedgers?: MappedLedger[];
+  pyTotalDebit?: number;
+  pyTotalCredit?: number;
+  pyIsBalanced?: boolean;
+  isPYBalanced?: boolean;
+  pyClosingStock?: number;
+}
+
 export interface TrialBalanceRow {
   id: string;
   accountCode?: string;
@@ -14,6 +46,8 @@ export interface TrialBalanceRow {
   closingCredit: number;
   netBalance: number; // positive = normal balance for nature, negative = abnormal
   rawLineIndex?: number;
+  branchId?: string;
+  branchName?: string;
 }
 
 export interface MappedLedger {
@@ -40,6 +74,7 @@ export interface MappedLedger {
   pyCredit?: number;
   linkedStatementItem?: string; // e.g. "Trade Payables - Creditors in uploaded Balance Sheet"
   aiReasoning?: string;
+  branchBreakdown?: BranchLedgerBreakdown[];
 }
 
 export interface UploadedFinancialLineItem {
@@ -302,6 +337,8 @@ export interface CustomAdjustmentEntry {
 }
 
 export interface YearEndAdjustments {
+  closingStock?: number;
+  pyClosingStock?: number;
   closingStockCY?: number;
   closingStockPY?: number;
   provisionForTaxCY?: number;
@@ -366,6 +403,55 @@ export interface TradePayablesMsmeConfig {
   agingDisputedOthersMore3Yrs?: number;
 }
 
+export interface AuditAppointmentConfig {
+  appointmentDate?: string;
+  resolutionNumber?: string;
+  appointingAuthority?: string; // e.g. "Partners of the Firm", "Sole Proprietor", "Annual General Meeting", "Management Committee"
+  auditTenure?: string; // e.g. "FY 2025-26"
+  statutorySection?: string; // e.g. "Section 44AB of the Income Tax Act, 1961 read with ICAI Guidance Note"
+  proposedAuditFees?: number;
+  auditFeeTerms?: string; // e.g. "Plus applicable GST and reimbursement of actual conveyance/out-of-pocket expenses"
+  priorAuditorName?: string;
+  hasPriorAuditorNoc?: boolean;
+  nocReference?: string;
+  scopeDescription?: string;
+  acceptanceDate?: string;
+  acceptanceLetterRef?: string;
+  appointeeSignatory?: string; // Client signing partner/proprietor
+}
+
+export interface CoverPageConfig {
+  reportTitle?: string; // e.g. "ANNUAL AUDIT REPORT & FINANCIAL STATEMENTS"
+  reportSubtitle?: string; // e.g. "For the Financial Year Ended March 31, 2026 (Assessment Year 2026-27)"
+  theme?: 'navy' | 'emerald' | 'slate' | 'classic';
+  includeIndex?: boolean;
+  includeUdinBanner?: boolean;
+  includeFirmBadge?: boolean;
+  confidentialNotice?: string;
+  customDossierNotes?: string;
+  documentDate?: string;
+}
+
+export interface ManagementRepresentationConfig {
+  letterDate?: string;
+  signatoryName?: string;
+  signatoryDesignation?: string;
+  coSignatoryName?: string;
+  coSignatoryDesignation?: string;
+  inventoryValuationMethod?: string; // e.g. "At lower of cost or net realizable value"
+  physicalVerificationConfirmed?: boolean;
+  cashInHandVerified?: boolean;
+  receivablesRecoverableConfirmed?: boolean;
+  msmeComplianceConfirmed?: boolean;
+  sec269ComplianceConfirmed?: boolean; // Sec 269SS/269T cash limits
+  fraudDeclarationConfirmed?: boolean;
+  litigationDetails?: string; // Any pending legal cases / tax demands
+  contingentLiabilitiesDetails?: string;
+  relatedPartyConfirmed?: boolean;
+  subsequentEventsConfirmed?: boolean;
+  customRepresentations?: string;
+}
+
 export interface EntityConfig {
   entityName: string;
   entityType: 'Partnership Firm' | 'Sole Proprietorship' | 'LLP' | 'AOP/BOI';
@@ -395,6 +481,13 @@ export interface EntityConfig {
   partnerCapitalSchedule?: PartnerCapitalRecord[];
   pyPartnerCapitalSchedule?: PartnerCapitalRecord[];
   tradePayablesConfig?: TradePayablesMsmeConfig;
+  numberOfBranches?: number;
+  branches?: BranchTrialBalanceData[];
+  mergeIdenticalBranchLedgers?: boolean;
+  consolidateIdenticalLedgers?: boolean;
+  auditAppointment?: AuditAppointmentConfig;
+  coverPageConfig?: CoverPageConfig;
+  managementRepresentation?: ManagementRepresentationConfig;
   partners?: Array<{
     name: string;
     profitSharePercent?: number;

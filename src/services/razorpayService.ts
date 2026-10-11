@@ -55,6 +55,26 @@ export interface VerifyRazorpayPaymentParams {
   customer?: {
     firmName?: string;
     gstin?: string;
+    userId?: string;
+    name?: string;
+    email?: string;
+    contact?: string;
+  };
+  orderData?: Partial<CreateRazorpayOrderResponse>;
+  itemDetails?: {
+    itemType?: string;
+    itemId?: string;
+    itemName?: string;
+    planTier?: string;
+    billingCycle?: string;
+    basePriceINR?: number;
+    discountPercent?: number;
+    discountAmountINR?: number;
+    subtotalINR?: number;
+    gstAmountINR?: number;
+    totalAmountINR?: number;
+    creditsGranted?: number;
+    promoCode?: string;
   };
 }
 
@@ -215,7 +235,11 @@ export async function launchOfficialRazorpayPopup(options: {
             customer: {
               firmName: customer.firmName,
               gstin: customer.gstin,
+              name: customer.name,
+              email: customer.email,
+              contact: customer.contact,
             },
+            orderData: orderResponse,
           });
           onSuccess(verified);
         } catch (err: any) {

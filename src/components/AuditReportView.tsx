@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { AlertTriangle, ShieldCheck, CheckCircle2, AlertCircle, FileCheck, Award, Printer, Download, Sparkles, HelpCircle, Mail } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, CheckCircle2, AlertCircle, FileCheck, Award, Printer, Download, Sparkles, HelpCircle, Mail, Layers, Building2 } from 'lucide-react';
 import { AuditException, EntityConfig, BalanceSheetData, ProfitAndLossData } from '../types';
+import { CoverPageView } from './CoverPageView';
+import { AuditAppointmentView } from './AuditAppointmentView';
+import { ManagementRepresentationView } from './ManagementRepresentationView';
 
 interface AuditReportViewProps {
   exceptions: AuditException[];
@@ -21,7 +24,7 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
   onSelectNote,
   onEmailAuditQueries,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'exceptions' | 'tax_audit_3cd' | 'sign_off'>('exceptions');
+  const [activeSubTab, setActiveSubTab] = useState<'exceptions' | 'tax_audit_3cd' | 'sign_off' | 'cover_page' | 'appointment' | 'mrl'>('exceptions');
   const [generatedUDIN, setGeneratedUDIN] = useState(config.udin || '');
   const [auditOpinion, setAuditOpinion] = useState<'unmodified' | 'qualified' | 'adverse'>('unmodified');
 
@@ -117,6 +120,39 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
           >
             <Award className="w-3.5 h-3.5 text-indigo-400" />
             <span>CA Auditor Sign-Off &amp; UDIN</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('cover_page')}
+            className={`px-3.5 py-1.5 rounded-xl font-semibold transition flex items-center gap-1.5 shrink-0 ${
+              activeSubTab === 'cover_page'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Cover Page</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('appointment')}
+            className={`px-3.5 py-1.5 rounded-xl font-semibold transition flex items-center gap-1.5 shrink-0 ${
+              activeSubTab === 'appointment'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Audit Appointment (SA 210)</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('mrl')}
+            className={`px-3.5 py-1.5 rounded-xl font-semibold transition flex items-center gap-1.5 shrink-0 ${
+              activeSubTab === 'mrl'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            <span>Management Representation (SA 580)</span>
           </button>
         </div>
       </div>
@@ -526,6 +562,30 @@ export const AuditReportView: React.FC<AuditReportViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* SUB-TAB 4: COVER PAGE & TITLE DOSSIER */}
+      {activeSubTab === 'cover_page' && (
+        <CoverPageView
+          config={config}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {/* SUB-TAB 5: AUDIT APPOINTMENT (SA 210) */}
+      {activeSubTab === 'appointment' && (
+        <AuditAppointmentView
+          config={config}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {/* SUB-TAB 6: MANAGEMENT REPRESENTATION LETTER (SA 580) */}
+      {activeSubTab === 'mrl' && (
+        <ManagementRepresentationView
+          config={config}
+          onUpdateConfig={onUpdateConfig}
+        />
       )}
     </div>
   );

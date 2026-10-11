@@ -380,6 +380,222 @@ export const EntityConfigModal: React.FC<EntityConfigModalProps> = ({
             </div>
           </div>
 
+          {/* Audit Appointment, Cover Page & Management Representation Quick Fields */}
+          <div className="border-t border-slate-200 pt-3 space-y-3">
+            <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+              <span>Audit Appointment, Cover Page &amp; Management Representation</span>
+            </h4>
+
+            {/* Audit Appointment */}
+            <div className="p-3 bg-indigo-50/60 border border-indigo-200 rounded-lg space-y-2">
+              <span className="font-bold text-indigo-950 block text-[11px]">
+                1. Audit Appointment (SA 210)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-0.5">Appointment Date</label>
+                  <input
+                    type="text"
+                    value={formData.auditAppointment?.appointmentDate || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        auditAppointment: {
+                          ...formData.auditAppointment,
+                          appointmentDate: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. 15-09-2025"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-0.5">Resolution / Ref No.</label>
+                  <input
+                    type="text"
+                    value={formData.auditAppointment?.resolutionNumber || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        auditAppointment: {
+                          ...formData.auditAppointment,
+                          resolutionNumber: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. AUD/APPT/2025-26/01"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-0.5">Appointing Authority</label>
+                  <input
+                    type="text"
+                    value={formData.auditAppointment?.appointingAuthority || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        auditAppointment: {
+                          ...formData.auditAppointment,
+                          appointingAuthority: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. Partners of the Firm / Sole Proprietor"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-0.5">Agreed Audit Fee (₹)</label>
+                  <input
+                    type="number"
+                    value={formData.auditAppointment?.proposedAuditFees ?? 25000}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        auditAppointment: {
+                          ...formData.auditAppointment,
+                          proposedAuditFees: parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none font-bold text-emerald-800"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Cover Page */}
+            <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-lg space-y-2">
+              <span className="font-bold text-emerald-950 block text-[11px]">
+                2. Audit Report Cover Page
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div className="sm:col-span-2">
+                  <label className="block font-medium text-slate-700 mb-0.5">Report Title</label>
+                  <input
+                    type="text"
+                    value={formData.coverPageConfig?.reportTitle || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        coverPageConfig: {
+                          ...formData.coverPageConfig,
+                          reportTitle: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="STATUTORY AUDIT REPORT & FINANCIAL STATEMENTS"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-0.5">Color Theme</label>
+                  <select
+                    value={formData.coverPageConfig?.theme || 'navy'}
+                    onChange={(e: any) =>
+                      setFormData({
+                        ...formData,
+                        coverPageConfig: {
+                          ...formData.coverPageConfig,
+                          theme: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  >
+                    <option value="navy">ICAI Classic Navy</option>
+                    <option value="emerald">Prestige Emerald</option>
+                    <option value="slate">Executive Slate</option>
+                    <option value="classic">Monochrome Black</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-0.5">Subtitle / Period</label>
+                  <input
+                    type="text"
+                    value={formData.coverPageConfig?.reportSubtitle || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        coverPageConfig: {
+                          ...formData.coverPageConfig,
+                          reportSubtitle: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder={`For the Financial Year Ended ${formData.reportingPeriod || 'March 31, 2026'}`}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Management Representation */}
+            <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-lg space-y-2">
+              <span className="font-bold text-amber-950 block text-[11px]">
+                3. Management Representation Letter (SA 580)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-0.5">Representation Date</label>
+                  <input
+                    type="text"
+                    value={formData.managementRepresentation?.letterDate || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        managementRepresentation: {
+                          ...formData.managementRepresentation,
+                          letterDate: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. 31-03-2026"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-0.5">Management Signatory</label>
+                  <input
+                    type="text"
+                    value={formData.managementRepresentation?.signatoryName || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        managementRepresentation: {
+                          ...formData.managementRepresentation,
+                          signatoryName: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. Managing Partner / Proprietor"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block font-medium text-slate-700 mb-0.5">Inventory Valuation Method</label>
+                  <input
+                    type="text"
+                    value={formData.managementRepresentation?.inventoryValuationMethod || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        managementRepresentation: {
+                          ...formData.managementRepresentation,
+                          inventoryValuationMethod: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Valued at lower of cost or net realizable value on FIFO basis"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
             <button
               type="button"

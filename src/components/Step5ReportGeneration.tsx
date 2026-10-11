@@ -16,6 +16,8 @@ import {
   Layers,
   ChevronRight,
   ExternalLink,
+  FileText,
+  FileCheck2,
 } from 'lucide-react';
 import {
   EntityConfig,
@@ -28,6 +30,9 @@ import {
 import { CREDIT_COSTS } from '../data/subscriptionPlans';
 import { GmailPanel } from './GmailPanel';
 import { DrivePanel } from './DrivePanel';
+import { CoverPageView } from './CoverPageView';
+import { AuditAppointmentView } from './AuditAppointmentView';
+import { ManagementRepresentationView } from './ManagementRepresentationView';
 import type { User } from 'firebase/auth';
 
 interface Step5ReportGenerationProps {
@@ -49,6 +54,7 @@ interface Step5ReportGenerationProps {
   onSignOut?: () => void;
   onBackToStep4: () => void;
   onSwitchCompany: () => void;
+  onUpdateConfig?: (updated: Partial<EntityConfig>) => void;
 }
 
 export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
@@ -66,8 +72,11 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
   onSignOut,
   onBackToStep4,
   onSwitchCompany,
+  onUpdateConfig = () => {},
 }) => {
-  const [activeDeliveryTab, setActiveDeliveryTab] = useState<'export' | 'gmail' | 'drive'>('export');
+  const [activeDeliveryTab, setActiveDeliveryTab] = useState<
+    'export' | 'cover_page' | 'appointment' | 'mrl' | 'gmail' | 'drive'
+  >('export');
   const [isExporting, setIsExporting] = useState(false);
 
   const bs = computedFinancials.balanceSheet;
@@ -135,45 +144,147 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
         </div>
 
         {/* Inner Delivery Sub-Tabs */}
-        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-slate-100 overflow-x-auto">
+        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-slate-100 overflow-x-auto text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveDeliveryTab('export')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer shrink-0 ${
               activeDeliveryTab === 'export'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
             <Download className="w-4 h-4 text-emerald-400" />
-            <span>1. Download Excel & Print PDF</span>
+            <span>1. Download Excel &amp; Financials</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveDeliveryTab('cover_page')}
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              activeDeliveryTab === 'cover_page'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-emerald-400" />
+            <span>2. Audit Report Cover Page</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveDeliveryTab('appointment')}
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              activeDeliveryTab === 'appointment'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Building2 className="w-4 h-4 text-indigo-400" />
+            <span>3. Audit Appointment (SA 210)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveDeliveryTab('mrl')}
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              activeDeliveryTab === 'mrl'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>4. Management Representation (SA 580)</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveDeliveryTab('gmail')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer shrink-0 ${
               activeDeliveryTab === 'gmail'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
             <Mail className="w-4 h-4 text-indigo-400" />
-            <span>2. Client Email Transmittal</span>
+            <span>5. Client Email Transmittal</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveDeliveryTab('drive')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer shrink-0 ${
               activeDeliveryTab === 'drive'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
             <HardDrive className="w-4 h-4 text-sky-400" />
-            <span>3. Google Drive Archival & Backup</span>
+            <span>6. Google Drive Archival</span>
           </button>
+        </div>
+      </div>
+
+      {/* Audit Working Paper Quick Launch Banners */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <div
+          onClick={() => setActiveDeliveryTab('cover_page')}
+          className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs hover:border-emerald-500/50 hover:bg-emerald-50/20 transition cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+              Audit Dossier
+            </span>
+            <Layers className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
+          </div>
+          <h4 className="text-sm font-bold text-slate-900 mt-2">Cover Page &amp; Title Dossier</h4>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Entity credentials, Table of Contents index, theme palettes &amp; UDIN badge.
+          </p>
+          <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center gap-1 group-hover:underline">
+            <span>Open &amp; Print Cover Page</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+
+        <div
+          onClick={() => setActiveDeliveryTab('appointment')}
+          className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs hover:border-indigo-500/50 hover:bg-indigo-50/20 transition cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+              ICAI SA 210
+            </span>
+            <Building2 className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition" />
+          </div>
+          <h4 className="text-sm font-bold text-slate-900 mt-2">Audit Appointment &amp; Acceptance</h4>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Client appointment resolution, statutory fees, scope, and auditor acceptance letter.
+          </p>
+          <div className="mt-3 text-xs font-bold text-indigo-700 flex items-center gap-1 group-hover:underline">
+            <span>Create / Edit Appointment</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+
+        <div
+          onClick={() => setActiveDeliveryTab('mrl')}
+          className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs hover:border-amber-500/50 hover:bg-amber-50/20 transition cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+              ICAI SA 580
+            </span>
+            <ShieldCheck className="w-4 h-4 text-amber-600 group-hover:scale-110 transition" />
+          </div>
+          <h4 className="text-sm font-bold text-slate-900 mt-2">Management Representation (MRL)</h4>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Written representations for inventory, cash, MSMED Act Sec 22 &amp; tax declarations.
+          </p>
+          <div className="mt-3 text-xs font-bold text-amber-700 flex items-center gap-1 group-hover:underline">
+            <span>Draft &amp; Print MRL</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
         </div>
       </div>
 
@@ -335,7 +446,37 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. GMAIL CLIENT TRANSMITTAL                                               */}
+      {/* 2. STATUTORY COVER PAGE & TITLE DOSSIER                                   */}
+      {/* ========================================================================= */}
+      {activeDeliveryTab === 'cover_page' && (
+        <CoverPageView
+          config={config}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. AUDIT APPOINTMENT & ENGAGEMENT ACCEPTANCE (SA 210)                     */}
+      {/* ========================================================================= */}
+      {activeDeliveryTab === 'appointment' && (
+        <AuditAppointmentView
+          config={config}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. MANAGEMENT REPRESENTATION LETTER (MRL - SA 580)                        */}
+      {/* ========================================================================= */}
+      {activeDeliveryTab === 'mrl' && (
+        <ManagementRepresentationView
+          config={config}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. GMAIL CLIENT TRANSMITTAL                                               */}
       {/* ========================================================================= */}
       {activeDeliveryTab === 'gmail' && (
         <div className="space-y-4">
