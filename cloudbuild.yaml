@@ -24,7 +24,7 @@ steps:
       - '--port'
       - '8080'
       - '--set-env-vars'
-      - 'GEMINI_API_KEY=AQ.Ab8RN6IAPwIQy4k5WPBABJ4D2wIbwAA-U8r0jB74Y__mI5JOGw,RAZORPAY_KEY_ID=rzp_live_Tg8uM3EpnHOuxF,RAZORPAY_KEY_SECRET=h7ElBvNCkEo2h3JYHFhM2GY7'
+      - 'NODE_ENV=production,PORT=8080,GEMINI_API_KEY=AQ.Ab8RN6IAPwIQy4k5WPBABJ4D2wIbwAA-U8r0jB74Y__mI5JOGw,RAZORPAY_KEY_ID=rzp_live_Tg8uM3EpnHOuxF,RAZORPAY_KEY_SECRET=h7ElBvNCkEo2h3JYHFhM2GY7'
 
 images:
   - 'gcr.io/$PROJECT_ID/auditfinancials:latest'
