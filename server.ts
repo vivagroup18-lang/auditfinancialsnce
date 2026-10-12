@@ -763,7 +763,9 @@ interface ServerReferralEvent {
   claimedAt?: string;
 }
 
-const REFERRAL_STORE_PATH = path.join(process.cwd(), ".referral_store.json");
+const REFERRAL_STORE_PATH =
+  process.env.REFERRAL_STORE_PATH ||
+  (fs.existsSync("/tmp") ? path.join("/tmp", ".referral_store.json") : path.join(process.cwd(), ".referral_store.json"));
 
 function loadReferralStore(): {
   profiles: Record<string, ServerReferralProfile>;
@@ -1534,11 +1536,9 @@ app.get("/api/razorpay/orders", (req, res) => {
 });
 
 async function startServer() {
-  const isProduction =
-    process.env.NODE_ENV === "production" ||
-    fs.existsSync(path.join(process.cwd(), "dist", "index.html"));
+  const isProduction = process.env.NODE_ENV === "production";
 
-  // Vite middleware for development only when production dist/index.html is not present
+  // Vite middleware for development
   if (!isProduction) {
     try {
       const { createServer: createViteServer } = await import("vite");
@@ -1556,9 +1556,18 @@ async function startServer() {
       });
     }
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    const dir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
+    const candidateDistPaths = [
+      path.join(process.cwd(), "dist"),
+      path.join(dir, "dist"),
+      dir,
+    ];
+    const distPath = candidateDistPaths.find((p) => fs.existsSync(path.join(p, "index.html"))) || path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      if (req.path.startsWith("/api")) {
+        return res.status(404).json({ error: `API endpoint ${req.path} not found` });
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

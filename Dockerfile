@@ -8,15 +8,18 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
+# Install all build dependencies
 COPY package*.json ./
-RUN npm ci || npm install
+RUN npm install --no-audit --no-fund
 
 # Copy application source files
 COPY . .
 
 # Build Vite static assets and bundle server.ts into dist/
 RUN npm run build
+
+# Prune development dependencies so only production packages remain for runtime
+RUN npm prune --omit=dev --no-audit --no-fund
 
 # ------------------------------------------------------------------------------
 # Stage 2: Production Runtime Container
@@ -29,16 +32,20 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV RAZORPAY_STORE_PATH=/tmp/.razorpay_orders.json
+ENV REFERRAL_STORE_PATH=/tmp/.referral_store.json
 
-# Install only production runtime dependencies
-COPY package*.json ./
-RUN (npm ci --omit=dev || npm install --omit=dev) && npm cache clean --force
+# Copy production node_modules from builder (no secondary network downloads)
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
 
 # Copy compiled frontend assets and bundled Node server from builder
-COPY --from=builder /app/dist ./dist
+COPY --chown=node:node --from=builder /app/dist ./dist
 
-# Ensure app directory permissions for non-root node user
-RUN chown -R node:node /app
+# Copy package metadata
+COPY --chown=node:node --from=builder /app/package.json ./package.json
+
+# Initialize temporary storage files with open permissions for non-root node user
+RUN touch /tmp/.razorpay_orders.json /tmp/.referral_store.json && \
+    chmod 666 /tmp/.razorpay_orders.json /tmp/.referral_store.json
 
 # Use standard non-root node user for Cloud Run security compliance
 USER node

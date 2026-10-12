@@ -16,3 +16,4 @@ yarn-error.log*
 .razorpay_orders.json
 .referral_store.json
 Sample_Statutory_Report_*.xlsx
+bun.lock

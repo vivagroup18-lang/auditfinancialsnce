@@ -955,18 +955,92 @@ export function printMrl(
   financials: FinancialContext,
   noteSchedules?: Record<number, NoteScheduleData>
 ): boolean {
-  try {
-    const html = generateMrlPrintHtml(config, formData, financials, noteSchedules);
+  const html = generateMrlPrintHtml(config, formData, financials, noteSchedules);
 
-    // Create a hidden, isolated iframe so print works without modal clipping or UI clutter
+  // Bulletproof in-DOM print fallback that guarantees only the MRL prints cleanly
+  const executeInDomPrintFallback = () => {
+    try {
+      // Remove any prior existing print roots
+      const existingRoot = document.getElementById('mrl-print-root');
+      if (existingRoot) existingRoot.remove();
+      const existingStyle = document.getElementById('mrl-print-style');
+      if (existingStyle) existingStyle.remove();
+
+      // Extract body inner content from generated HTML
+      const bodyStart = html.indexOf('<body>');
+      const bodyEnd = html.indexOf('</body>');
+      const bodyContent = bodyStart !== -1 && bodyEnd !== -1
+        ? html.substring(bodyStart + 6, bodyEnd)
+        : html;
+
+      // Extract CSS from generated HTML
+      const styleStart = html.indexOf('<style>');
+      const styleEnd = html.indexOf('</style>');
+      const rawStyles = styleStart !== -1 && styleEnd !== -1
+        ? html.substring(styleStart + 7, styleEnd)
+        : '';
+
+      const printContainer = document.createElement('div');
+      printContainer.id = 'mrl-print-root';
+      printContainer.innerHTML = bodyContent;
+
+      const printStyle = document.createElement('style');
+      printStyle.id = 'mrl-print-style';
+      printStyle.textContent = `
+        ${rawStyles}
+        @media print {
+          body > *:not(#mrl-print-root) {
+            display: none !important;
+          }
+          #mrl-print-root {
+            display: block !important;
+            position: static !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+          }
+        }
+        @media screen {
+          #mrl-print-root {
+            display: none !important;
+          }
+        }
+      `;
+
+      document.head.appendChild(printStyle);
+      document.body.appendChild(printContainer);
+
+      window.print();
+
+      const cleanup = () => {
+        printContainer.remove();
+        printStyle.remove();
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup);
+      setTimeout(cleanup, 5000);
+      return true;
+    } catch (e) {
+      console.warn('[printMrl] Fallback print exception:', e);
+      window.print();
+      return true;
+    }
+  };
+
+  try {
+    // Render off-screen iframe that is NOT hidden, allowing Chromium layout engine to compute print styles
     const iframe = document.createElement('iframe');
+    iframe.id = 'mrl-print-frame';
     iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
+    iframe.style.top = '0';
+    iframe.style.left = '-9999px';
+    iframe.style.width = '1024px';
+    iframe.style.height = '1400px';
     iframe.style.border = '0';
-    iframe.style.visibility = 'hidden';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
     document.body.appendChild(iframe);
 
     const doc = iframe.contentWindow?.document || iframe.contentDocument;
@@ -975,29 +1049,35 @@ export function printMrl(
       doc.write(html);
       doc.close();
 
-      setTimeout(() => {
+      let printed = false;
+      const triggerIframePrint = () => {
+        if (printed) return;
+        printed = true;
         try {
           iframe.contentWindow?.focus();
           iframe.contentWindow?.print();
         } catch (e) {
-          console.warn('[printMrl] Iframe print exception, fallback to window.print():', e);
-          window.print();
+          console.warn('[printMrl] Iframe print blocked, using dedicated print fallback:', e);
+          executeInDomPrintFallback();
         } finally {
           setTimeout(() => {
             if (document.body.contains(iframe)) {
               document.body.removeChild(iframe);
             }
-          }, 4000);
+          }, 3500);
         }
-      }, 350);
+      };
+
+      // Ensure styles and fonts are parsed before initiating print
+      setTimeout(triggerIframePrint, 300);
       return true;
+    } else {
+      return executeInDomPrintFallback();
     }
   } catch (err) {
-    console.warn('[printMrl] Error initializing iframe print, fallback to window.print():', err);
+    console.warn('[printMrl] Error creating print frame, using dedicated in-DOM print fallback:', err);
+    return executeInDomPrintFallback();
   }
-
-  window.print();
-  return true;
 }
 
 export function downloadMrlWord(
