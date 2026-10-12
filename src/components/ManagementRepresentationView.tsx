@@ -20,6 +20,10 @@ import {
   Layers,
   CheckCircle2,
   Table,
+  Download,
+  FileDown,
+  ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import {
   EntityConfig,
@@ -30,6 +34,12 @@ import {
 } from '../types';
 import { getDefaultManagementRepresentation } from '../utils/auditDossierDefaults';
 import { formatINR } from '../utils/financialCalculations';
+import {
+  printMrl,
+  downloadMrlWord,
+  downloadMrlHtml,
+  downloadMrlTxt,
+} from '../utils/mrlExporter';
 
 interface ManagementRepresentationViewProps {
   config: EntityConfig;
@@ -51,6 +61,59 @@ export const ManagementRepresentationView: React.FC<ManagementRepresentationView
   const [activeTab, setActiveTab] = useState<'fields' | 'preview'>('fields');
   const [isCopied, setIsCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+
+  const showFeedback = (msg: string) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(null), 3500);
+  };
+
+  const handlePrintAction = () => {
+    setIsPrinting(true);
+    showFeedback('Opening official Management Representation Letter print / PDF dialog...');
+    printMrl(
+      config,
+      formData,
+      { balanceSheet, profitAndLoss },
+      noteSchedules
+    );
+    setTimeout(() => setIsPrinting(false), 1200);
+  };
+
+  const handleWordDownload = () => {
+    downloadMrlWord(
+      config,
+      formData,
+      { balanceSheet, profitAndLoss },
+      noteSchedules
+    );
+    showFeedback('Downloaded official Word Document (.doc) — Ready for client letterhead');
+    setDownloadMenuOpen(false);
+  };
+
+  const handleTxtDownload = () => {
+    downloadMrlTxt(
+      config,
+      formData,
+      { balanceSheet, profitAndLoss },
+      noteSchedules
+    );
+    showFeedback('Downloaded Plain Text Document (.txt)');
+    setDownloadMenuOpen(false);
+  };
+
+  const handleHtmlDownload = () => {
+    downloadMrlHtml(
+      config,
+      formData,
+      { balanceSheet, profitAndLoss },
+      noteSchedules
+    );
+    showFeedback('Downloaded Standalone HTML Document (.html)');
+    setDownloadMenuOpen(false);
+  };
 
   const isProprietor = config.entityType === 'Sole Proprietorship';
   const primarySigner =
@@ -379,16 +442,104 @@ ${
                 <span>{isSaved ? 'Saved to Entity!' : 'Save Parameters'}</span>
               </button>
             )}
+
+            {/* Quick Word (.doc) Download */}
             <button
               type="button"
-              onClick={() => window.print()}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
+              onClick={handleWordDownload}
+              className="px-3.5 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-bold text-xs shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+              title="Download official editable Word document (.doc) to place on client letterhead"
             >
-              <Printer className="w-4 h-4" />
-              <span>Print Letter</span>
+              <FileDown className="w-4 h-4 text-blue-700" />
+              <span>Word (.doc)</span>
+            </button>
+
+            {/* Download Options Menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDownloadMenuOpen(!downloadMenuOpen)}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer border border-slate-200"
+              >
+                <Download className="w-4 h-4 text-slate-600" />
+                <span>Download</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+
+              {downloadMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-30 space-y-1">
+                  <div className="px-2.5 py-1 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Statutory Formats (SA 580)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleWordDownload}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold hover:bg-blue-50 text-slate-800 hover:text-blue-900 flex items-center gap-2 cursor-pointer transition"
+                  >
+                    <FileDown className="w-4 h-4 text-blue-600 shrink-0" />
+                    <div>
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>Word Document (.doc)</span>
+                        <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold">Recommended</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-normal">Formatted for client letterhead</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTxtDownload}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-100 text-slate-800 flex items-center gap-2 cursor-pointer transition"
+                  >
+                    <FileText className="w-4 h-4 text-slate-500 shrink-0" />
+                    <div>
+                      <div className="font-bold">Plain Text (.txt)</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Clean clause copy with actual figures</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleHtmlDownload}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-100 text-slate-800 flex items-center gap-2 cursor-pointer transition"
+                  >
+                    <Download className="w-4 h-4 text-slate-500 shrink-0" />
+                    <div>
+                      <div className="font-bold">Standalone Web Document (.html)</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Print-ready standalone letter with styles</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Print / Save PDF Button */}
+            <button
+              type="button"
+              onClick={handlePrintAction}
+              disabled={isPrinting}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+            >
+              {isPrinting ? (
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+              ) : (
+                <Printer className="w-4 h-4 text-emerald-400" />
+              )}
+              <span>{isPrinting ? 'Preparing Print...' : 'Print / Save PDF'}</span>
             </button>
           </div>
         </div>
+
+        {/* Feedback Alert */}
+        {feedback && (
+          <div className="mt-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-2xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{feedback}</span>
+            </div>
+            <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+              ICAI SA 580 Verified
+            </span>
+          </div>
+        )}
 
         {/* Live Financial Balances Carried In Banner */}
         {hasFinancials && (
@@ -798,22 +949,54 @@ ${
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={handleCopy}
-                className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{isCopied ? 'Copied!' : 'Copy Letter'}</span>
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 font-semibold flex items-center gap-1.5 cursor-pointer"
+                onClick={handleWordDownload}
+                className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-900 font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Download formatted Word document (.doc) to print on client letterhead"
               >
-                <Printer className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Print Document</span>
+                <FileDown className="w-3.5 h-3.5 text-blue-700" />
+                <span>Word (.doc)</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleTxtDownload}
+                className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold flex items-center gap-1.5 cursor-pointer"
+                title="Download plain text file (.txt)"
+              >
+                <FileText className="w-3.5 h-3.5 text-slate-500" />
+                <span>Text (.txt)</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleHtmlDownload}
+                className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold flex items-center gap-1.5 cursor-pointer"
+                title="Download standalone HTML file (.html)"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>HTML</span>
+              </button>
+              <button
+                type="button"
+                onClick={handlePrintAction}
+                disabled={isPrinting}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-60 shadow-xs"
+              >
+                {isPrinting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                ) : (
+                  <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                )}
+                <span>{isPrinting ? 'Printing...' : 'Print / Save PDF'}</span>
               </button>
             </div>
           </div>

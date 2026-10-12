@@ -1,1 +1,45 @@
 @import "tailwindcss";
+
+@media print {
+  /* Hide interactive web chrome, sidebars, buttons, and tools */
+  header,
+  aside,
+  nav,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Unclip fixed modals so full contents print cleanly across pages */
+  .fixed.inset-0 {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  @page {
+    margin: 15mm;
+    size: auto;
+  }
+}

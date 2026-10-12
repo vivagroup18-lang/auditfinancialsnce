@@ -282,7 +282,7 @@ export const Step5ReportGeneration: React.FC<Step5ReportGenerationProps> = ({
             Written representations for inventory, cash, MSMED Act Sec 22 &amp; tax declarations.
           </p>
           <div className="mt-3 text-xs font-bold text-amber-700 flex items-center gap-1 group-hover:underline">
-            <span>Draft &amp; Print MRL</span>
+            <span>Draft, Print &amp; Download MRL</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </div>
         </div>

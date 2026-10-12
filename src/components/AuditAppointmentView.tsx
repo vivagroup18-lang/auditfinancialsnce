@@ -6,6 +6,7 @@ import {
   Check,
   Save,
   Download,
+  FileDown,
   Building2,
   Calendar,
   ShieldCheck,
@@ -183,6 +184,44 @@ Membership No: ${config.auditorMembershipNo || 'Chartered Accountant'}`;
     navigator.clipboard.writeText(text);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleDownloadWord = (text: string, title: string, filename: string) => {
+    const safeTitle = (title || 'Audit Document').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeText = (text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>${safeTitle}</title>
+<style>
+  @page WordSection1 { size: 210mm 297mm; margin: 20mm; }
+  div.WordSection1 { page: WordSection1; }
+  body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; color: #000; }
+  h1 { font-family: Arial, sans-serif; font-size: 14pt; text-align: center; }
+</style>
+</head>
+<body>
+<div class="WordSection1" style="white-space: pre-line;">${safeText}</div>
+</body></html>`;
+    const blob = new Blob(['\ufeff' + html], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleDownloadTxt = (text: string, filename: string) => {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
